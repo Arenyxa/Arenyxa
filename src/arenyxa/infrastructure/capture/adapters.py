@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import os
 from arenyxa.recoverable import record_current_exception
 
 from arenyxa.infrastructure.process_safety import validated_argv

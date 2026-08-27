@@ -1,4 +1,4 @@
-name: Arenyxa Quality
+﻿name: Arenyxa Quality
 
 on:
   push:
@@ -34,7 +34,7 @@ jobs:
       - name: Install lightweight development runtime
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev,analysis]"
+          python -m pip install -e ".[dev,full]"
       - name: Assert static-analysis environment
         run: python scripts/ci_environment_gate.py --require-static
       - name: Release-blocking static quality
@@ -90,7 +90,7 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev,desktop,analysis,capture]"
+          python -m pip install -e ".[dev,full]"
       - name: Assert release tooling, Qt and process probe are present
         shell: pwsh
         run: python scripts/ci_environment_gate.py --require-static

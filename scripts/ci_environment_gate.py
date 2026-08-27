@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
 import importlib.util
@@ -17,7 +17,7 @@ def _require_module(name: str) -> None:
 
 def _qt_probe() -> dict[str, Any]:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    from PySide6.QtCore import QT_VERSION_STR
+    from PySide6.QtCore import qVersion
     from PySide6.QtWidgets import QApplication, QLabel
 
     app = QApplication.instance() or QApplication([])
@@ -28,7 +28,7 @@ def _qt_probe() -> dict[str, Any]:
     visible = label.isVisible()
     label.close()
     app.processEvents()
-    return {"qt": QT_VERSION_STR, "platform": os.environ.get("QT_QPA_PLATFORM", ""), "widget_visible": visible}
+    return {"qt": qVersion(), "platform": os.environ.get("QT_QPA_PLATFORM", ""), "widget_visible": visible}
 
 
 def _process_probe() -> dict[str, Any]:

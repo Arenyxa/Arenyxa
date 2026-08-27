@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from arenyxa.application.packet_analytics import PacketAdvancedAnalyzer
+
 import json
 import shutil
 from dataclasses import asdict
