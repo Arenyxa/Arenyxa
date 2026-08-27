@@ -61,7 +61,23 @@ def _postgres_fencing_probe(
     first = first_queue.lease_next(first_worker, lease_seconds=15)
     if first is None or first.job_id != job_id:
         return {"passed": False, "detail": "first worker could not lease fencing probe"}
-    first_queue.start_job(job_id, first_worker, first.lease_token)
+    try:
+        first_queue.start_job(job_id, first_worker, first.lease_token)
+    except Exception as exc:
+        now_epoch = time.time()
+        return {
+            "passed": False,
+            "detail": "first fencing lease expired before start_job",
+            "error_type": type(exc).__name__,
+            "error": str(exc),
+            "job_id": job_id,
+            "first_worker": first_worker,
+            "lease_expires_at": first.lease_expires_at,
+            "wall_epoch_at_failure": now_epoch,
+            "wall_remaining_seconds": first.lease_expires_at - now_epoch,
+            "job_state": coordinator.job(job_id),
+        }
+
     recovered = coordinator.recover_expired_leases(now=first.lease_expires_at + 1.0)
     state_after_recovery = coordinator.job(job_id)
     second = second_queue.lease_next(second_worker, lease_seconds=60)
