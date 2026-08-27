@@ -94,12 +94,14 @@ class DistributedQueueHealthMixin:
                 ).fetchall()
             }
             worker_capacity = connection.execute(
-                "SELECT count(*),coalesce(sum(max_slots),0),coalesce(sum(active_leases),0) "
+                "SELECT count(*) AS worker_count, "
+                "coalesce(sum(max_slots),0) AS total_worker_slots, "
+                "coalesce(sum(active_leases),0) AS active_leases "
                 "FROM distributed_workers WHERE state<>'revoked'"
             ).fetchone()
-            worker_count = 0 if worker_capacity is None else int(worker_capacity[0] or 0)
-            total_worker_slots = 0 if worker_capacity is None else int(worker_capacity[1] or 0)
-            active_leases = 0 if worker_capacity is None else int(worker_capacity[2] or 0)
+            worker_count = 0 if worker_capacity is None else int(worker_capacity["worker_count"] or 0)
+            total_worker_slots = 0 if worker_capacity is None else int(worker_capacity["total_worker_slots"] or 0)
+            active_leases = 0 if worker_capacity is None else int(worker_capacity["active_leases"] or 0)
         capacity = assess_storage_capacity(
             self._storage.capabilities,
             worker_count=worker_count,

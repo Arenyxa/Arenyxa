@@ -88,6 +88,34 @@ jobs:
       - uses: actions/setup-python@v6
         with: { python-version: "3.11", cache: pip }
       - run: python -m pip install --upgrade pip && python -m pip install -e ".[dev,database]"
+      - name: Configure PostgreSQL stress capacity
+        run: |
+          POSTGRES_CONTAINER="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          test -n "$POSTGRES_CONTAINER"
+
+          docker exec "$POSTGRES_CONTAINER" \
+            psql -U arenyxa -d arenyxa_ci \
+            -c "ALTER SYSTEM SET max_connections = '256';"
+
+          docker restart "$POSTGRES_CONTAINER"
+
+          READY=0
+          for i in $(seq 1 30); do
+            if docker exec "$POSTGRES_CONTAINER" \
+              pg_isready -U arenyxa -d arenyxa_ci; then
+              READY=1
+              break
+            fi
+            sleep 2
+          done
+
+          test "$READY" -eq 1
+
+          VALUE="$(docker exec "$POSTGRES_CONTAINER" \
+            psql -U arenyxa -d arenyxa_ci -Atc "SHOW max_connections;")"
+
+          echo "PostgreSQL max_connections=$VALUE"
+          test "$VALUE" = "256"
       - name: PostgreSQL 64-worker / 128-concurrency no-storm gate
         run: python scripts/postgresql_64_worker_128_concurrency_gate.py --jobs 1024 --report POSTGRES_64W_128C_GATE.json
       - uses: actions/upload-artifact@v6

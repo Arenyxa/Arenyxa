@@ -57,6 +57,34 @@ jobs:
           ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa-ci@127.0.0.1:5432/arenyxa_ci
           ARENYXA_POSTGRES_32W_P99_MS: "350"
         run: python scripts/postgresql_32_worker_gate.py --workers 32 --jobs 512 --report POSTGRES_32_WORKER_GATE.json
+      - name: Configure PostgreSQL stress capacity
+        run: |
+          POSTGRES_CONTAINER="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          test -n "$POSTGRES_CONTAINER"
+
+          docker exec "$POSTGRES_CONTAINER" \
+            psql -U arenyxa -d arenyxa_ci \
+            -c "ALTER SYSTEM SET max_connections = '256';"
+
+          docker restart "$POSTGRES_CONTAINER"
+
+          READY=0
+          for i in $(seq 1 30); do
+            if docker exec "$POSTGRES_CONTAINER" \
+              pg_isready -U arenyxa -d arenyxa_ci; then
+              READY=1
+              break
+            fi
+            sleep 2
+          done
+
+          test "$READY" -eq 1
+
+          VALUE="$(docker exec "$POSTGRES_CONTAINER" \
+            psql -U arenyxa -d arenyxa_ci -Atc "SHOW max_connections;")"
+
+          echo "PostgreSQL max_connections=$VALUE"
+          test "$VALUE" = "256"
       - name: PostgreSQL 64-worker 128-concurrency pool-storm gate
         env:
           ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa-ci@127.0.0.1:5432/arenyxa_ci
