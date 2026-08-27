@@ -1,0 +1,113 @@
+{
+  "schema": "arenyxa.enterprise-server-http-performance/v1",
+  "stable": true,
+  "tls_minimum": "TLSv1.3",
+  "requests_per_level": 96,
+  "recommended_clients": 1,
+  "peak_throughput_requests_per_second": 1327.3136525301531,
+  "server_thread_stopped": true,
+  "levels": [
+    {
+      "clients": 1,
+      "requests": 96,
+      "duration_seconds": 0.07232653699975344,
+      "throughput_requests_per_second": 1327.3136525301531,
+      "p95_ms": 0.8505760001753515,
+      "p99_ms": 6.036609000148019,
+      "max_ms": 6.036609000148019,
+      "errors": 0,
+      "status_counts": {
+        "200": 96
+      },
+      "tls_versions": {
+        "TLSv1.3": 96
+      },
+      "stable": true
+    },
+    {
+      "clients": 4,
+      "requests": 96,
+      "duration_seconds": 0.08665329199993721,
+      "throughput_requests_per_second": 1107.8632765627597,
+      "p95_ms": 4.536375000043336,
+      "p99_ms": 10.446537000007083,
+      "max_ms": 10.446537000007083,
+      "errors": 0,
+      "status_counts": {
+        "200": 96
+      },
+      "tls_versions": {
+        "TLSv1.3": 96
+      },
+      "stable": true
+    },
+    {
+      "clients": 8,
+      "requests": 96,
+      "duration_seconds": 0.08509840600027019,
+      "throughput_requests_per_second": 1128.1057367830745,
+      "p95_ms": 8.879493000222283,
+      "p99_ms": 15.863403999901493,
+      "max_ms": 15.863403999901493,
+      "errors": 0,
+      "status_counts": {
+        "200": 96
+      },
+      "tls_versions": {
+        "TLSv1.3": 96
+      },
+      "stable": true
+    },
+    {
+      "clients": 16,
+      "requests": 96,
+      "duration_seconds": 0.11003077499981373,
+      "throughput_requests_per_second": 872.4831757311763,
+      "p95_ms": 26.13682199989853,
+      "p99_ms": 32.24537899995994,
+      "max_ms": 32.24537899995994,
+      "errors": 0,
+      "status_counts": {
+        "200": 96
+      },
+      "tls_versions": {
+        "TLSv1.3": 96
+      },
+      "stable": true
+    },
+    {
+      "clients": 32,
+      "requests": 96,
+      "duration_seconds": 0.18783528499989188,
+      "throughput_requests_per_second": 511.08608268172435,
+      "p95_ms": 78.30334299978858,
+      "p99_ms": 81.77024999986315,
+      "max_ms": 81.77024999986315,
+      "errors": 0,
+      "status_counts": {
+        "200": 96
+      },
+      "tls_versions": {
+        "TLSv1.3": 96
+      },
+      "stable": true
+    },
+    {
+      "clients": 64,
+      "requests": 96,
+      "duration_seconds": 0.2568691010001203,
+      "throughput_requests_per_second": 373.7312102787912,
+      "p95_ms": 145.38805800020782,
+      "p99_ms": 147.71555900006206,
+      "max_ms": 147.71555900006206,
+      "errors": 0,
+      "status_counts": {
+        "200": 96
+      },
+      "tls_versions": {
+        "TLSv1.3": 96
+      },
+      "stable": true
+    }
+  ]
+}

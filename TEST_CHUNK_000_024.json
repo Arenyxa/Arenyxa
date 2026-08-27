@@ -1,0 +1,170 @@
+[
+  {
+    "file": "tests/test_a_quality_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.893,
+    "output": "...                                                                      [100%]\n3 passed in 0.07s\n"
+  },
+  {
+    "file": "tests/test_animation_mode_policy.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.158,
+    "output": ".....                                                                    [100%]\n5 passed in 0.04s\n"
+  },
+  {
+    "file": "tests/test_architecture_ceiling_hardening.py",
+    "rc": 1,
+    "timeout": false,
+    "seconds": 5.729,
+    "output": "...F..                                                                   [100%]\n=================================== FAILURES ===================================\n______________ test_safe_regex_preserves_search_and_sub_semantics ______________\n\n    def test_safe_regex_preserves_search_and_sub_semantics() -> None:\n>       match = safe_search(r\"(ab+)\", \"xxabbbzz\")\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\ntests/test_architecture_ceiling_hardening.py:57: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \nsrc/arenyxa/infrastructure/safe_regex.py:115: in safe_search\n    result = _run(\"search\", pattern, text, \"\", timeout_seconds)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\noperation = 'search', pattern = '(ab+)', text = 'xxabbbzz', replacement = ''\ntimeout_seconds = 1.25\n\n    def _run(operation: str, pattern: str, text: str, replacement: str, timeout_seconds: float) -> Any:\n        pattern, text, replacement = _bounded_inputs(pattern, text, replacement)\n        timeout = max(0.05, min(MAX_TIMEOUT_SECONDS, float(timeout_seconds)))\n        context = mp.get_context(\"spawn\")\n        parent, child = context.Pipe(duplex=False)\n        process = context.Process(\n            target=_worker,\n            args=(child, operation, pattern, text, replacement),\n            name=\"ArenyxaRegexSandbox\",\n            daemon=True,\n        )\n        process.start()\n        child.close()\n        try:\n            if not parent.poll(timeout):\n                process.terminate()\n                process.join(timeout=0.5)\n                if process.is_alive() and hasattr(process, \"kill\"):\n                    process.kill()\n                    process.join(timeout=0.5)\n>               raise _regex_error(\n                    \"REGEX_TIMEOUT\",\n                    \"Regex execution exceeded the wall-clock safety limit\",\n                    timeout_seconds=timeout,\n                )\nE               arenyxa.domain.errors.ArenyxaError: [REGEX:REGEX_TIMEOUT] Regex execution exceeded the wall-clock safety limit\n\nsrc/arenyxa/infrastructure/safe_regex.py:86: ArenyxaError\n=========================== short test summary info ============================\nFAILED tests/test_architecture_ceiling_hardening.py::test_safe_regex_preserves_search_and_sub_semantics - arenyxa.domain.errors.ArenyxaError: [REGEX:REGEX_TIMEOUT] Regex execution exceeded the wall-clock safety limit\n1 failed, 5 passed in 2.86s\n"
+  },
+  {
+    "file": "tests/test_architecture_debt_gate.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 5.373,
+    "output": ".                                                                        [100%]\n1 passed in 2.91s\n"
+  },
+  {
+    "file": "tests/test_arenyxa_brand_migration.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.365,
+    "output": "........                                                                 [100%]\n8 passed in 0.18s\n"
+  },
+  {
+    "file": "tests/test_async_runtime_boundaries.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.231,
+    "output": "....                                                                     [100%]\n4 passed in 0.61s\n"
+  },
+  {
+    "file": "tests/test_autopilot_learning.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 6.647,
+    "output": ".......                                                                  [100%]\n7 passed in 4.46s\n"
+  },
+  {
+    "file": "tests/test_capture_resilience.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.745,
+    "output": ".                                                                        [100%]\n1 passed in 0.13s\n"
+  },
+  {
+    "file": "tests/test_cli_entrypoint.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 7.013,
+    "output": "..                                                                       [100%]\n2 passed in 4.57s\n"
+  },
+  {
+    "file": "tests/test_code_quality_maturity_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 4.563,
+    "output": "...                                                                      [100%]\n3 passed in 2.18s\n"
+  },
+  {
+    "file": "tests/test_competitive_edge.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.202,
+    "output": ".......                                                                  [100%]\n7 passed in 0.08s\n"
+  },
+  {
+    "file": "tests/test_concurrency_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.933,
+    "output": "..........                                                               [100%]\n10 passed in 1.82s\n"
+  },
+  {
+    "file": "tests/test_concurrent_scraping.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 6.348,
+    "output": "............                                                             [100%]\n12 passed in 4.03s\n"
+  },
+  {
+    "file": "tests/test_crawler_engine.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 4.099,
+    "output": ".......                                                                  [100%]\n7 passed in 1.80s\n"
+  },
+  {
+    "file": "tests/test_data_lineage_v64.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 1.97,
+    "output": "..                                                                       [100%]\n2 passed in 0.14s\n"
+  },
+  {
+    "file": "tests/test_deep_runtime_resilience.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 12.17,
+    "output": "...................................                                      [100%]\n35 passed in 10.27s\n"
+  },
+  {
+    "file": "tests/test_developer_validation_suite.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 8.945,
+    "output": ".........                                                                [100%]\n9 passed in 6.59s\n"
+  },
+  {
+    "file": "tests/test_distributed_connection_lifecycle_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.522,
+    "output": ".                                                                        [100%]\n1 passed in 0.15s\n"
+  },
+  {
+    "file": "tests/test_distributed_state_consistency_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.816,
+    "output": ".......                                                                  [100%]\n7 passed in 0.88s\n"
+  },
+  {
+    "file": "tests/test_domain_database.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.41,
+    "output": ".....                                                                    [100%]\n5 passed in 0.15s\n"
+  },
+  {
+    "file": "tests/test_enterprise_observability_convergence.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.804,
+    "output": ".                                                                        [100%]\n1 passed in 0.06s\n"
+  },
+  {
+    "file": "tests/test_enterprise_operation_convergence.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 5.48,
+    "output": ".......                                                                  [100%]\n7 passed in 3.45s\n"
+  },
+  {
+    "file": "tests/test_enterprise_security_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 4.599,
+    "output": ".......                                                                  [100%]\n7 passed in 2.39s\n"
+  },
+  {
+    "file": "tests/test_exception_governance.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.206,
+    "output": ".                                                                        [100%]\n1 passed in 0.03s\n"
+  }
+]

@@ -1,0 +1,27 @@
+{
+  "schema": "arenyxa.windows-native-qualification/v3",
+  "status": "NOT_EXECUTED",
+  "complete": false,
+  "reason": "Windows native qualification requires a real Windows host or Windows VM.",
+  "host": "cc69f98abfe3",
+  "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+  "python": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+  "required_automated_checks": [
+    "runtime_deep_probe",
+    "npcap_enumeration",
+    "etw_round_trip",
+    "wfp_engine_round_trip",
+    "dpapi_round_trip",
+    "tpm_cng_probe",
+    "event_log_round_trip",
+    "named_pipe_capability",
+    "conpty_api",
+    "conpty_powershell_session",
+    "conpty_cmd_session",
+    "conpty_resize",
+    "playwright_chromium_launch"
+  ],
+  "optional_destructive_checks": [
+    "windows_service_install_start_stop_remove"
+  ]
+}

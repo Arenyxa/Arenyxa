@@ -1,0 +1,238 @@
+{
+  "schema": "arenyxa.v8-test-evidence/v2",
+  "version": "8.0",
+  "package_version": "8.0.0",
+  "started_at": "2026-08-22T14:55:00+00:00",
+  "finished_at": "2026-08-22T15:08:18+00:00",
+  "full": true,
+  "python": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+  "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+  "windows_vm_attempt": {
+    "qemu_system_x86_64": null,
+    "wine": null,
+    "powershell": null,
+    "kvm_device": false,
+    "status": "NOT_AVAILABLE"
+  },
+  "local_engineering_passed": true,
+  "external_certification_complete": false,
+  "passed": true,
+  "regression": {
+    "test_files": 149,
+    "passed": 1256,
+    "skipped": 19,
+    "failed": 0,
+    "execution": "deterministic shards due host command wall-time cap"
+  },
+  "results": [
+    {
+      "name": "compileall",
+      "status": "PASS",
+      "required_local": true,
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "-m",
+        "compileall",
+        "-q",
+        "src/arenyxa",
+        "scripts",
+        "tests"
+      ],
+      "return_code": 0,
+      "output_tail": "Python compileall completed successfully."
+    },
+    {
+      "name": "static_quality_gate",
+      "status": "NOT_EXECUTED",
+      "required_local": false,
+      "reason": "ruff and mypy are not installed; pip installation was attempted but network/DNS is unavailable in this execution environment",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "scripts/static_quality_gate.py"
+      ],
+      "return_code": null
+    },
+    {
+      "name": "python38_grammar",
+      "status": "PASS",
+      "required_local": true,
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "scripts/check_python38_grammar.py"
+      ],
+      "return_code": 0,
+      "output_tail": "Win7 legacy Python 3.8 grammar gate passed: 140 files"
+    },
+    {
+      "name": "v80_identity",
+      "status": "PASS",
+      "required_local": true,
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "scripts/verify_v80_release_identity.py"
+      ],
+      "return_code": 0,
+      "output_tail": "Arenyxa v8.0 release identity gate: PASS"
+    },
+    {
+      "name": "phase6_gate",
+      "status": "PASS",
+      "required_local": true,
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "scripts/v8_phase6_gate.py"
+      ],
+      "return_code": 0,
+      "output_tail": "106 passed; Phase-6 performance microbaseline passed"
+    },
+    {
+      "name": "full_pytest",
+      "status": "PASS",
+      "required_local": true,
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "<deterministic-sharded-full-suite>"
+      ],
+      "return_code": 0,
+      "output_tail": "1256 passed, 19 skipped in deterministic sharded full regression; all 149 test files executed"
+    },
+    {
+      "name": "post_promotion_impacted_regression",
+      "status": "PASS",
+      "required_local": true,
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_a_quality_hardening.py",
+        "tests/test_repair_center.py",
+        "tests/test_source_manifest.py",
+        "tests/test_v66beta2_windows_fsync.py",
+        "tests/test_v80_final_release_acceptance.py"
+      ],
+      "return_code": 0,
+      "output_tail": "33 passed in 0.98s"
+    },
+    {
+      "name": "phase0_integrity",
+      "status": "PASS",
+      "required_local": true,
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "scripts/phase0_gate.py",
+        "--skip-pytest",
+        "--skip-static"
+      ],
+      "return_code": 0,
+      "output_tail": "Arenyxa Phase 0 baseline verification: PASS"
+    },
+    {
+      "name": "github_publication",
+      "status": "PASS",
+      "required_local": true,
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "scripts/github_publication_gate.py",
+        "--allow-local-artifacts"
+      ],
+      "return_code": 0,
+      "output_tail": "Arenyxa GitHub publication gate: PASS"
+    },
+    {
+      "name": "architecture_debt",
+      "status": "PASS",
+      "required_local": true,
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "scripts/architecture_debt_gate.py"
+      ],
+      "return_code": 0,
+      "output_tail": "architecture debt gate: PASS"
+    },
+    {
+      "name": "exception_quality",
+      "status": "PASS",
+      "required_local": true,
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "scripts/exception_quality_gate.py"
+      ],
+      "return_code": 0,
+      "output_tail": "healthy=true; findings=[]"
+    },
+    {
+      "name": "performance_regression",
+      "status": "PASS",
+      "required_local": true,
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "scripts/performance_regression_gate.py"
+      ],
+      "return_code": 0,
+      "output_tail": "healthy=true; checked_reports=3"
+    },
+    {
+      "name": "production_config",
+      "status": "PASS",
+      "required_local": true,
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "scripts/production_config_gate.py"
+      ],
+      "return_code": 0,
+      "output_tail": "production_config=validated; passed=true"
+    },
+    {
+      "name": "tshark_protocol_differential",
+      "status": "NOT_EXECUTED",
+      "required_local": false,
+      "reason": "tshark is not installed",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_v71_protocol_differential_tshark.py"
+      ],
+      "return_code": null
+    },
+    {
+      "name": "postgresql_32_worker",
+      "status": "NOT_EXECUTED",
+      "required_local": false,
+      "reason": "ARENYXA_POSTGRES_TEST_DSN is not configured and no live PostgreSQL multi-node lab is attached",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "scripts/postgresql_32_worker_gate.py"
+      ],
+      "return_code": null
+    },
+    {
+      "name": "windows_native",
+      "status": "NOT_EXECUTED",
+      "required_local": false,
+      "reason": "host is Linux and qemu-system-x86_64, /dev/kvm, Wine, PowerShell and Windows image are unavailable",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "scripts/windows_native_qualification.py"
+      ],
+      "return_code": null
+    },
+    {
+      "name": "powershell_test_all",
+      "status": "NOT_EXECUTED",
+      "required_local": false,
+      "reason": "PowerShell is not installed on the current host; scripts/test.ps1 semantics were reproduced where possible with direct Python gates",
+      "command": [
+        "pwsh",
+        "-File",
+        "test-all.ps1"
+      ],
+      "return_code": null
+    }
+  ]
+}

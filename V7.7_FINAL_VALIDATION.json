@@ -1,0 +1,50 @@
+{
+  "schema": "arenyxa.final-validation/v2",
+  "version": "7.7",
+  "package_version": "7.7.0",
+  "validation_date": "2026-08-22",
+  "pytest": {
+    "mode": "all 137 test files executed in 10 bounded partitions to avoid known single-process teardown drag in this Linux container",
+    "passed": 1177,
+    "failed": 0,
+    "skipped": 17,
+    "warnings_observed": 2,
+    "status": "PASS",
+    "environment_notes": [
+      "Qt-dependent tests skipped because no supported Qt binding is installed in the Linux validation environment.",
+      "Windows process-probe tests skipped outside Windows.",
+      "TShark differential tests skipped because TShark is not installed in the validation environment.",
+      "A monolithic one-process pytest invocation was not represented as passing because this container develops severe resource/thread teardown drag; all test files were executed successfully in bounded partitions instead."
+    ]
+  },
+  "enterprise_release_gate": {
+    "checks_passed": 11,
+    "checks_expected": 11,
+    "status": "PASS"
+  },
+  "p0_hardening": {
+    "distributed_production_evidence": [
+      "self-asserted scenario PASS strings are rejected",
+      "three distinct SSH target identities are required",
+      "PostgreSQL, TLS 1.3, and protocol v2+ are mandatory",
+      "all eight chaos scenarios require post-cleanup verification on one Server and two Workers",
+      "scenario operation + verification records are SHA-256 bound and digest mismatches fail closed",
+      "24h soak requires at least 96 samples, three-node coverage, zero probe failures, zero uncaught errors, zero invariant violations, and zero duplicate terminal receipts"
+    ],
+    "sqlite_concurrency": [
+      "distributed/non-loopback SQLite remains fail closed",
+      "local SQLite above 8 workers surfaces serialized-WAL pressure",
+      "local SQLite at 16 or more workers is fail closed and requires PostgreSQL",
+      "Enterprise Worker registration enforces the SQLite capacity cutover instead of merely warning"
+    ],
+    "postgresql_gate": [
+      "32-worker release gate now uses multiple independent queue clients/pools",
+      "stale lease completion after reassignment must be rejected",
+      "exact terminal replay must remain idempotent",
+      "conflicting terminal replay must fail closed",
+      "post-run state invariants and active lease count must be clean"
+    ]
+  },
+  "external_evidence_boundary": "No real three-machine production chaos campaign or PostgreSQL service was available in this validation container. The code now refuses to certify production readiness without that evidence rather than treating local simulation as proof.",
+  "static_tooling_note": "Pinned Ruff/Mypy remain release-blocking in the project's final static gate; they were unavailable in the offline validation container and are not falsely represented as executed."
+}

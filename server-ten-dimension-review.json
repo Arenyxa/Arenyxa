@@ -1,0 +1,110 @@
+{
+  "schema": "arenyxa.server-ten-dimension-review/v1",
+  "passed": true,
+  "dimensions": [
+    {
+      "name": "1. Architecture and namespace convergence",
+      "status": "PASS",
+      "evidence": [
+        "src/arenyxa is the canonical modern implementation",
+        "legacy/win7/src/arenyxa is the isolated frozen Windows 7 implementation",
+        "modern and Win7 Python imports contain no removed namespace references"
+      ],
+      "findings": []
+    },
+    {
+      "name": "2. Type-safety and UI runtime boundaries",
+      "status": "PASS",
+      "evidence": [
+        "UI_TYPE_GATE=PASS\nstrict_critical_modules=8"
+      ],
+      "findings": []
+    },
+    {
+      "name": "3. Exception taxonomy and failure transparency",
+      "status": "PASS",
+      "evidence": [
+        "broad Exception catches=305",
+        "enterprise broad catches=50",
+        "ratchet prevents regression"
+      ],
+      "findings": []
+    },
+    {
+      "name": "4. Distributed state-machine consistency",
+      "status": "PASS",
+      "evidence": [
+        "terminal states cannot transition back to active states",
+        "fresh runtime invariants={'inconsistent_lease_rows': 0, 'unreceipted_completed_jobs': 0, 'implausible_future_leases': 0, 'journal_events': 0}"
+      ],
+      "findings": []
+    },
+    {
+      "name": "5. Persistence, durability, and server storage topology",
+      "status": "PASS",
+      "evidence": [
+        "SQLite capabilities={'backend': 'sqlite', 'multi_host_writers': False, 'row_lock_skip_locked': False, 'external_server': False, 'write_model': 'serialized-wal', 'recommended_parallel_writers': 1, 'recommended_worker_slots': 4}",
+        "PostgreSQL capabilities={'backend': 'postgresql', 'multi_host_writers': True, 'row_lock_skip_locked': True, 'external_server': True, 'write_model': 'row-lock-concurrent', 'recommended_parallel_writers': 64, 'recommended_worker_slots': 64}",
+        "SQLite is explicitly single-host; PostgreSQL is the multi-host server backend"
+      ],
+      "findings": []
+    },
+    {
+      "name": "6. Network abuse resistance and transport governance",
+      "status": "PASS",
+      "evidence": [
+        "rate limiter state={'tracked_buckets': 2, 'max_buckets': 2, 'overflow_window_count': 32, 'overflow_rejections': 29}",
+        "server inflight cap=256",
+        "DNS-approved address pinning and remote-private-target blocking are enabled in Proxy governance",
+        "modern Enterprise transport defaults to TLS 1.3; TLS 1.2 requires explicit server/worker compatibility opt-in"
+      ],
+      "findings": []
+    },
+    {
+      "name": "7. Resource governance, backpressure, and leak boundaries",
+      "status": "PASS",
+      "evidence": [
+        "distributed jobs/workers/slots are bounded",
+        "proxy upstream concurrency and message sizes are bounded",
+        "server performance validation tracks thread and file-descriptor deltas"
+      ],
+      "findings": []
+    },
+    {
+      "name": "8. Observability, health, and operational diagnostics",
+      "status": "PASS",
+      "evidence": [
+        "modern logger namespace is arenyxa",
+        "server health exposes bounded request/inflight/rejection counters",
+        "liveness and readiness are separate; readiness fails closed on queue invariant violations",
+        "distributed health exposes state invariants and storage deployment profile"
+      ],
+      "findings": []
+    },
+    {
+      "name": "9. Server deployment, concurrency, and recovery readiness",
+      "status": "PASS",
+      "evidence": [
+        "uvicorn concurrency/backlog/keep-alive/graceful-shutdown are explicitly bounded",
+        "modern server TLS minimum defaults to TLS 1.3",
+        "Win7 runtime is physically isolated",
+        "queue_performance_evidence=not supplied",
+        "http_tls_performance_evidence=not supplied",
+        "worker_slot_performance_evidence=not supplied"
+      ],
+      "findings": []
+    },
+    {
+      "name": "10. Professional workbench depth and safe expansion",
+      "status": "PASS",
+      "evidence": [
+        "Proxy provides Intercept/History/Repeater/Decoder/Comparer/AutoResponder/Match-Replace/Inspector/HAR plus deep analysis",
+        "Enterprise provides transactional batch lease, bounded parallel Worker slots and independent Fleet Control telemetry",
+        "Extraction Lab provides local Dry Run, point-and-click selection and bounded browser recipe execution",
+        "Packet Intelligence provides advanced/TCP stream analytics; MITM Proxy provides independent flow analytics",
+        "Flow Designer provides visual graph, execution inspection and side-effect-safe debugging; Terminal provides shared multi-session control"
+      ],
+      "findings": []
+    }
+  ]
+}

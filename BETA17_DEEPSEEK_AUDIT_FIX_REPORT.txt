@@ -1,0 +1,39 @@
+Arenyxa v8.0 beta17 - DeepSeek audit triage and fixes
+
+CONFIRMED / FIXED
+1. Adaptive request controller missing-timing failure feedback:
+   - Added explicit failed signal.
+   - Failed outcomes without local_processing_ms now conservatively back off instead of being ignored.
+   - Added regression test.
+2. Windows capture subprocess cleanup:
+   - Added taskkill /T /F fallback if normal terminate/kill cannot reap tshark/dumpcap.
+3. Accidental startup debug output:
+   - Removed DEBUG: bootstrap returned.
+
+REVIEWED - NO UNSAFE CHANGE MADE
+1. DataRootLease / msvcrt.locking:
+   The audit premise that msvcrt.locking is only intra-process is not accepted as established.
+   The existing implementation is a byte-range file lock; replacing a data-integrity primitive
+   without a Windows multi-process regression test would be riskier than leaving it intact.
+2. append_capture_events / append_network_events:
+   Current modular implementation in database_network.py does not mutate session counters.
+   CaptureController owns counter mutation and explicitly restores old values on append failure.
+3. Developer Terminal:
+   PowerShell/CMD execution is an intentional developer-terminal capability. Arbitrary shell
+   execution is not by itself command injection; the security boundary is authorization/risk gating.
+4. SQL identifiers:
+   sql_identifier() already enforces a conservative ASCII identifier grammar and supports an
+   explicit allowed whitelist. No exploitable dynamic identifier path was established.
+5. SecretBuffer:
+   Deterministic zeroization via __enter__/__exit__ already exists; __del__ is best-effort fallback.
+6. Broad exception handling:
+   No blanket rewrite was performed. Cleanup/fallback boundaries must be assessed individually;
+   mechanically re-raising broad exceptions can break recovery/shutdown semantics.
+
+VALIDATION
+- Python compileall: PASS
+- Focused regression tests:
+  tests/test_concurrency_hardening.py
+  tests/test_network_core_v61.py
+  tests/test_network_capture_v62.py
+  Result: 27 passed

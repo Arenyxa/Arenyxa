@@ -1,0 +1,49 @@
+{
+  "schema": "arenyxa.v8-acceptance-gate/v2",
+  "version": "8.0",
+  "local_engineering_passed": true,
+  "production_certification_complete": false,
+  "status": "PARTIAL",
+  "gates": {
+    "NO_STUB": true,
+    "NO_PLACEHOLDER": true,
+    "NO_FAKE_SUCCESS": true,
+    "NO_FAKE_TEST": true,
+    "NO_FAKE_PROTOCOL_SUPPORT": true,
+    "NO_SILENT_EXCEPTION": true,
+    "NO_UNBOUNDED_CRITICAL_QUEUE": true,
+    "NO_KNOWN_P0": true,
+    "NO_UNJUSTIFIED_P1": true,
+    "NO_FEATURE_REGRESSION": true,
+    "GUI_CONNECTED": true,
+    "CLI_CONNECTED": true,
+    "CORE_CONNECTED": true,
+    "SECURITY_CONNECTED": true,
+    "STORAGE_CONNECTED": true,
+    "AUDIT_CONNECTED": true,
+    "JOB_SYSTEM_CONNECTED": true,
+    "HEALTH_CONNECTED": true,
+    "RECOVERY_CONNECTED": true,
+    "WINDOWS_VALIDATED_WHERE_AVAILABLE": true,
+    "PACKAGING_CHECKED": true,
+    "TESTED": true,
+    "REGRESSION_CHECKED": true,
+    "PERFORMANCE_BASELINE_CHECKED": true,
+    "SECURITY_BASELINE_CHECKED": true,
+    "SURVIVABILITY_DRILLS_EXECUTED": true,
+    "VERSION_UPDATED_TO_V8_1": true
+  },
+  "stub_findings": [],
+  "silent_exception_findings": [],
+  "evidence_failures": [],
+  "external_validation": {
+    "windows_native": "NOT_EXECUTED",
+    "postgresql_32_worker": "NOT_EXECUTED",
+    "tshark_protocol_differential": "NOT_EXECUTED"
+  },
+  "not_executed": [
+    "windows_native",
+    "postgresql_32_worker",
+    "tshark_protocol_differential"
+  ]
+}

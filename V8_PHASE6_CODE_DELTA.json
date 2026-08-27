@@ -1,0 +1,59 @@
+{
+  "schema": "arenyxa.v8-phase6-code-delta/v1",
+  "baseline": "Arenyxa_v8.0_phase5_candidate",
+  "target": "Arenyxa_v8.0",
+  "counting_policy": "git diff --no-index --no-renames line additions/deletions for executable extensions .py/.ps1/.psm1/.cmd/.bat/.iss/.spec; cache artifacts excluded from footprint",
+  "production_python_modern": {
+    "added_lines": 1401,
+    "removed_lines": 53,
+    "net": 1348
+  },
+  "legacy_win7_python": {
+    "added_lines": 2,
+    "removed_lines": 2,
+    "net": 0
+  },
+  "test_python": {
+    "added_lines": 347,
+    "removed_lines": 77,
+    "net": 270
+  },
+  "build_release_and_launcher": {
+    "added_lines": 305,
+    "removed_lines": 122,
+    "net": 183
+  },
+  "packaging_defs": {
+    "added_lines": 4,
+    "removed_lines": 4,
+    "net": 0
+  },
+  "all_executable_code": {
+    "added_lines": 2059,
+    "removed_lines": 258,
+    "net": 1801,
+    "files_added": 8,
+    "files_removed": 1,
+    "files_modified": 44
+  },
+  "current_footprint": {
+    "files": 795,
+    "physical_lines": 207599
+  },
+  "new_production_modules": [
+    "src/arenyxa/application/performance_telemetry.py",
+    "src/arenyxa/application/survivability.py",
+    "src/arenyxa/infrastructure/capture/proxy_persistence.py",
+    "src/arenyxa/infrastructure/capture/proxy_resilience.py"
+  ],
+  "new_validation_modules": [
+    "tests/test_v80_phase6_survivability.py",
+    "scripts/v8_phase6_gate.py",
+    "scripts/v8_phase6_performance_validation.py",
+    "scripts/verify_v80_phase6 candidate_release_identity.py"
+  ],
+  "removed_executable_files": [
+    "scripts/verify_v80_phase5 candidate_release_identity.py"
+  ],
+  "removed_product_capability_modules": []
+}

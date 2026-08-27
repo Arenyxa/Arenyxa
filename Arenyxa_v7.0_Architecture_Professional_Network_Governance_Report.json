@@ -1,0 +1,115 @@
+{
+  "schema": "arenyxa.v7-architecture-professional-network-governance/v2",
+  "product": "Arenyxa",
+  "version": "7.0.0",
+  "primary_runtime_namespace": "arenyxa",
+  "legacy_namespace": {
+    "name": "arenyxa",
+    "role": "thin compatibility shims for historical imports and CLI compatibility",
+    "modern_implementation_files": "src/arenyxa",
+    "compatibility_shims": "src/arenyxa",
+    "new_internal_imports_allowed": false,
+    "frozen_startup_exception": "startup_splash.py retains byte-identical historical imports only to preserve the approved startup visual hash"
+  },
+  "runtime_split": {
+    "modern_python": ">=3.11,<3.14",
+    "modern_qt": "PySide6",
+    "win7_legacy_runtime": "physically isolated under legacy/win7/src/arenyxa",
+    "win7_python": "3.8",
+    "win7_policy": "feature-frozen; security/integrity/compatibility fixes only"
+  },
+  "typing": {
+    "broad_presentation_exclusion_removed": true,
+    "strict_signature_gate_modules": 7,
+    "strict_core_ui": [
+      "presentation/main_window.py",
+      "presentation/pages/network.py",
+      "presentation/pages/proxy.py",
+      "presentation/pages/mitm_proxy.py",
+      "presentation/pages/extraction.py",
+      "presentation/pages/data.py",
+      "presentation/pages/tasks.py"
+    ],
+    "legacy_ui_relaxations": "explicit finite migration list only",
+    "runtime_mypy_execution": "not run because mypy is not installed in the validation container"
+  },
+  "exception_hardening": {
+    "ratchet_previous_ceiling": 329,
+    "broad_exception_catches_final": 326,
+    "enterprise_broad_exception_catches_final": 50,
+    "proxy_broad_exception_catches_final": 2,
+    "critical_unexpected_http_errors": "logged and returned as HTTP 500 rather than misclassified as client errors",
+    "ratchet_gate": "scripts/architecture_debt_gate.py"
+  },
+  "distributed_hardening": {
+    "explicit_job_state_transition_whitelist": true,
+    "terminal_states_cannot_return_to_active_states": true,
+    "stale_lease_completion_rejected": true,
+    "simultaneous_single_job_double_lease_prevented": true,
+    "non_idempotent_side_effect_loss_fenced_to_review": true,
+    "implausibly_future_lease_fails_closed": true,
+    "implausibly_future_lease_health_invariant": true,
+    "corrupt_lease_binding_reconciliation": true,
+    "terminal_receipt_and_idempotency_guards_preserved": true
+  },
+  "professional_workbenches": [
+    "Network / Packet Intelligence",
+    "Proxy / Intercept + HTTP History + Repeater + Decoder + Comparer + Rules/AutoResponder",
+    "MITM / mitm_runtime professional integration",
+    "Extraction Studio / no-code structured-source and pagination planning",
+    "Intelligence Studio",
+    "Workflow",
+    "Automation",
+    "Data and Visualization"
+  ],
+  "professional_navigation": "large professional modules are independent top-level workbenches",
+  "proxy_autoresponder": {
+    "persistent_local_rules": true,
+    "match_dimensions": ["method", "host glob", "path glob"],
+    "local_mock_response": true,
+    "no_upstream_connection_on_match": true,
+    "max_rules": 256,
+    "max_rule_body_bytes": 2097152,
+    "atomic_rule_persistence": true
+  },
+  "network_governance": {
+    "enabled_by_default": true,
+    "visible_proxy_controls": true,
+    "features": [
+      "bounded concurrent upstream connections",
+      "global per-minute connection budget",
+      "per-target per-minute connection budget",
+      "distinct-target fanout budget",
+      "bounded target tracking table",
+      "protected cloud metadata endpoint blocking",
+      "unspecified and multicast target blocking",
+      "remote proxy listener remains explicit opt-in"
+    ]
+  },
+  "validation": {
+    "pytest_collection": "702 tests collected in aggregate collection",
+    "partitioned_regression": "692 passed / 12 environment skip reports / 0 failed; two skip reports are module-level collection skips",
+    "professional_architecture_win7_targeted": "54 passed / 0 failed",
+    "distributed_fault_matrix_and_related": "23 passed / 0 failed",
+    "data_tasks_architecture_targeted": "22 passed / 0 failed",
+    "phase0_integrity": "PASS using compileall + integrity; historical pytest validated separately in bounded partitions",
+    "namespace_gate": "PASS",
+    "ui_type_gate": "PASS",
+    "architecture_debt_gate": "PASS",
+    "win7_python38_grammar_gate": "PASS: 134 files",
+    "startup_visual_frozen_hash_gate": "PASS",
+    "phase12_config_gate": "PASS",
+    "github_publication_gate": "PASS"
+  },
+  "validation_tool_limits": [
+    "ruff is not installed in the validation container, so the Ruff step was not executed",
+    "mypy is not installed in the validation container, so native mypy execution was not performed",
+    "full-suite single-process pytest develops resource/thread teardown drag in this container; bounded file partitions completed with zero failures"
+  ],
+  "native_release_limits": [
+    "Qt UI/native Windows/DPI/process-probe skips require supported Windows and Qt runtime validation",
+    "real mitmdump end-to-end execution requires mitm_runtime installed on the target host",
+    "real packet-analysis runtime execution requires packet-analysis runtime installed on the target host",
+    "real multi-machine partition/reboot/disk-full/clock-shift/TLS-rotation drills remain operator release evidence"
+  ]
+}

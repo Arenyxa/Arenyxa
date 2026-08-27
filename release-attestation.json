@@ -1,0 +1,19 @@
+{
+  "version": "8.1",
+  "stage": "v8.1 Official Source Release",
+  "release_channel": "stable",
+  "completed_phase": 8,
+  "enterprise_hardening": true,
+  "architecture_consolidation": true,
+  "async_request_plane": "asyncio-httpx",
+  "capability_layering": true,
+  "legacy_windows_lane": "frozen-isolated",
+  "traffic_control_plane": true,
+  "phase6_survivability": true,
+  "phase6_performance_telemetry": true,
+  "phase6_failure_drills": true,
+  "bounded_proxy_persistence": true,
+  "job_admission_control": true,
+  "official_release_identity": true,
+  "physical_qa_required_for_external_certification": true
+}

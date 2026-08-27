@@ -1,0 +1,10 @@
+
+PySide2==5.15.2.1
+lxml==4.9.4
+cssselect==1.2.0
+dnspython==2.4.2
+openpyxl==3.1.5
+tzdata==2024.1
+backports.zoneinfo==0.2.1
+cryptography==42.0.7
+httpx==0.24.1

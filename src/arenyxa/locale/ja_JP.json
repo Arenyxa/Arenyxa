@@ -1,0 +1,14 @@
+{
+  "experience.personal": "パーソナル",
+  "experience.professional": "プロフェッショナル",
+  "experience.developer": "開発者",
+  "experience.enterprise": "エンタープライズ",
+  "experience.root_developer": "ルート開発者",
+  "developer.terminal": "ターミナル",
+  "developer.runtime": "ランタイム",
+  "developer.plugin_sdk": "プラグイン SDK",
+  "developer.diagnostics": "診断",
+  "developer.authority": "権限",
+  "developer.test_lab": "テストラボ",
+  "enterprise.enrollment": "企業登録"
+}

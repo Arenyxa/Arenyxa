@@ -1,0 +1,87 @@
+{
+  "schema": "arenyxa.enterprise-release-gate/v2",
+  "version": "8.0",
+  "release_ready": true,
+  "checks_completed": 11,
+  "checks_expected": 11,
+  "checks": [
+    {
+      "name": "release_identity",
+      "ok": true,
+      "returncode": 0,
+      "seconds": 0.611,
+      "output_tail": "Arenyxa v8.0 release identity gate: PASS\n- display: 8.0\n- package: 8.0.0\n- plugin/runtime compatibility: 6.8.0\n- modern installer: Arenyxa_V8.0_Setup_x64.exe\n- legacy installer: Arenyxa_V8.0_Legacy_Win7_x64_Setup.exe\n"
+    },
+    {
+      "name": "runtime_diagnostic",
+      "ok": true,
+      "returncode": 0,
+      "seconds": 1.168,
+      "output_tail": "{\n  \"schema\": \"arenyxa.runtime-diagnostic/v2\",\n  \"runtime\": \"diagnostic\",\n  \"python\": \"3.13.5\",\n  \"healthy\": true,\n  \"checks\": {\n    \"package_import\": {\n      \"ok\": true,\n      \"version\": \"8.0\"\n    },\n    \"critical_imports\": {\n      \"ok\": true,\n      \"symbols\": [\n        \"ArenyxaCommandRuntime\",\n        \"DynamicProtocolRegistry\",\n        \"BoundedEventStream\",\n        \"LiveIntelligencePipeline\",\n        \"PassiveDetectionEngine\",\n        \"ThreatHunter\",\n        \"OfflinePacketLab\"\n      ]\n    },\n    \"sqlite\": {\n      \"ok\": true,\n      \"quick_check\": \"ok\",\n      \"journal_mode\": \"wal\",\n      \"sqlite_version\": \"3.46.1\"\n    }\n  },\n  \"failures\": []\n}\n"
+    },
+    {
+      "name": "production_config",
+      "ok": true,
+      "returncode": 0,
+      "seconds": 0.578,
+      "output_tail": "{\n  \"schema\": \"arenyxa.production-config-gate/v2\",\n  \"production_config\": \"validated\",\n  \"passed\": true,\n  \"checks\": [\n    {\n      \"name\": \"release_version\",\n      \"ok\": true,\n      \"detail\": \"version=8.0.0\"\n    },\n    {\n      \"name\": \"docker_non_root\",\n      \"ok\": true,\n      \"detail\": \"Dockerfile must switch to a non-root runtime user\"\n    },\n    {\n      \"name\": \"compose_secure_default_bind\",\n      \"ok\": true,\n      \"detail\": \"published desktop/server UI port defaults to loopback\"\n    },\n    {\n      \"name\": \"sqlite_local_allowed\",\n      \"ok\": true,\n      \"detail\": \"SQLite remains supported for local/single-host runtime\"\n    },\n    {\n      \"name\": \"sqlite_pressure_warning\",\n      \"ok\": true,\n      \"detail\": \"SQLite 9-worker local mode must surface serialized-WAL pressure\"\n    },\n    {\n      \"name\": \"sqlite_high_concurrency_fail_closed\",\n      \"ok\": true,\n      \"detail\": \"SQLite 16+ worker concurrency must require PostgreSQL\"\n    },\n    {\n      \"name\": \"sqlite_distributed_fail_closed\",\n      \"ok\": true,\n      \"detail\": \"distributed SQLite must be rejected\"\n    },\n    {\n      \"name\": \"postgres_distributed_allowed\",\n      \"ok\": true,\n      \"detail\": \"PostgreSQL is the supported distributed backend\"\n    },\n    {\n      \"name\": \"loopback_detection\",\n      \"ok\": true,\n      \"detail\": \"bind classification is fail-closed\"\n    },\n    {\n      \"name\": \"enterprise_server_storage_guard\",\n      \"ok\": true,\n      \"detail\": \"Enterprise serve path invokes storage deployment guard before bootstrap\"\n    }\n  ]\n}\n"
+    },
+    {
+      "name": "recovery",
+      "ok": true,
+      "returncode": 0,
+      "seconds": 2.62,
+      "output_tail": "{\n  \"schema\": \"arenyxa.final-recovery-validation/v2\",\n  \"recovery_validation\": \"passed\",\n  \"passed\": true,\n  \"duration_seconds\": 2.013,\n  \"targets\": [\n    \"tests/test_v654_self_healing_runtime_recovery.py\",\n    \"tests/test_v655_recovery_health_resume.py\"\n  ],\n  \"returncode\": 0,\n  \"output_tail\": \".........                                                                [100%]\\n9 passed in 0.38s\\n\"\n}\n"
+    },
+    {
+      "name": "performance",
+      "ok": true,
+      "returncode": 0,
+      "seconds": 0.601,
+      "output_tail": "{\n  \"schema\": \"arenyxa.performance-regression-gate/v2\",\n  \"healthy\": true,\n  \"checked_reports\": 3,\n  \"checks\": [\n    {\n      \"report\": \"server-performance-report-final20.json\",\n      \"stable\": true,\n      \"levels\": 6,\n      \"max_p99_ms\": 343.803,\n      \"peak_observed_throughput\": 105.622\n    },\n    {\n      \"report\": \"server-worker-performance-report-final20.json\",\n      \"stable\": true,\n      \"levels\": 6,\n      \"max_p99_ms\": 185.841,\n      \"peak_observed_throughput\": 174.494\n    },\n    {\n      \"report\": \"server-http-performance-report-final20.json\",\n      \"stable\": true,\n      \"levels\": 6,\n      \"max_p99_ms\": 147.716,\n      \"peak_observed_throughput\": 1327.314\n    }\n  ],\n  \"failures\": []\n}\n"
+    },
+    {
+      "name": "security",
+      "ok": true,
+      "returncode": 0,
+      "seconds": 0.604,
+      "output_tail": "Phase 1-12 static security scan: PASS\n- reviewed architecture/web-intelligence/reliability/enterprise/distributed/release modules contain no eval/exec/pickle/marshal/ctypes/subprocess execution\n- no private-key/Bearer-token-like hardcoded literals detected\n"
+    },
+    {
+      "name": "architecture",
+      "ok": true,
+      "returncode": 0,
+      "seconds": 1.701,
+      "output_tail": "architecture debt gate: PASS · broad_exception=261 · enterprise=38 · proxy=1 · runner_lines=406 · module_ceiling=1000\n"
+    },
+    {
+      "name": "api_contract",
+      "ok": true,
+      "returncode": 0,
+      "seconds": 0.569,
+      "output_tail": "{\n  \"ok\": true,\n  \"stable_modules\": 8,\n  \"missing_docstrings_or_reference\": []\n}\n"
+    },
+    {
+      "name": "cli_contract",
+      "ok": true,
+      "returncode": 0,
+      "seconds": 3.025,
+      "output_tail": "{\n  \"schema\": \"arenyxa.cli-contract-gate/v2\",\n  \"static_surface\": {\n    \"required\": {\n      \"task\": [\n        \"list\",\n        \"show\",\n        \"run\"\n      ],\n      \"run\": [\n        \"list\",\n        \"show\",\n        \"cancel\"\n      ],\n      \"capture\": [\n        \"start\",\n        \"stop\",\n        \"status\"\n      ],\n      \"packet\": [\n        \"sessions\",\n        \"analytics\",\n        \"protocols\"\n      ],\n      \"proxy\": [\n        \"start\",\n        \"stop\",\n        \"sessions\",\n        \"replay\"\n      ],\n      \"mitm\": [\n        \"start\",\n        \"stop\",\n        \"status\"\n      ],\n      \"fleet\": [\n        \"status\",\n        \"workers\",\n        \"jobs\"\n      ],\n      \"plugin\": [\n        \"list\",\n        \"health\"\n      ],\n      \"health-check\": [],\n      \"diagnostics\": [\n        \"export\"\n      ],\n      \"job\": [\n        \"list\",\n        \"show\",\n        \"wait\",\n        \"cancel\"\n      ]\n    },\n    \"missing\": []\n  },\n  \"runtime\": {\n    \"version\": {\n      \"product\": \"Arenyxa\",\n      \"version\": \"8.0\"\n    },\n    \"help_groups\": [\n      \"analyze\",\n      \"api\",\n      \"automation\",\n      \"capture\",\n      \"dataset\",\n      \"diagnostics\",\n      \"enterprise\",\n      \"export\",\n      \"extraction\",\n      \"fleet\",\n      \"flow\",\n      \"health-check\",\n      \"job\",\n      \"mitm\",\n      \"packet\",\n      \"pivot\",\n      \"platform\",\n      \"plugin\",\n      \"proxy\",\n      \"recovery\",\n      \"resilience\",\n      \"run\",\n      \"status\",\n      \"task\",\n      \"terminal\",\n      \"tls\",\n      \"traffic\",\n      \"traffic-automation\",\n      \"version\",\n      \"web\"\n    ],\n    \"health_status\": \"healthy\",\n    \"storage_integrity\": \"ok\",\n    \"job_state\": \"succeeded\",\n    \"diagnostic_archive\": \"/tmp/arenyxa-v8-cli-gate-l4h221cu/runtime/exports/cli-contract-diagnostics.zip\",\n    \"diagnostic_archive_error\": null,\n    \"diagnostic_archive_entries\": [\n      \"jobs.json\",\n      \"logs/01-external-supervisor.stderr.log\",\n      \"manifest.json\",\n      \"performance-telemetry.json\",\n      \"platform-health.json\",\n      \"runtime.json\",\n      \"survivability.json\"\n    ],\n    \"audit_valid\": true,\n    \"audit_reason\": \"ok\"\n  },\n  \"healthy\": true\n}\n"
+    },
+    {
+      "name": "fuzz_smoke",
+      "ok": true,
+      "returncode": 0,
+      "seconds": 0.664,
+      "output_tail": "{\n  \"schema\": \"arenyxa.fuzz-smoke-gate/v2\",\n  \"healthy\": true,\n  \"mode\": \"deterministic-smoke\",\n  \"targets\": 5,\n  \"corpus_cases\": 48,\n  \"executed_cases\": 240,\n  \"per_target\": {\n    \"fuzz_http_parser.py\": 48,\n    \"fuzz_json_parser.py\": 48,\n    \"fuzz_packet_decoder.py\": 48,\n    \"fuzz_tcp_reassembly.py\": 48,\n    \"fuzz_tls_metadata.py\": 48\n  },\n  \"failures\": []\n}\n"
+    },
+    {
+      "name": "skip_policy",
+      "ok": true,
+      "returncode": 0,
+      "seconds": 1.107,
+      "output_tail": "{\n  \"schema\": \"arenyxa.skip-policy-audit/v2\",\n  \"passed\": true,\n  \"observed_skip_sites\": 17,\n  \"failures\": []\n}\n"
+    }
+  ],
+  "production_evidence_note": "This gate validates the local release candidate. Multi-node production certification still requires an explicit evidence file through production_release_gate.py."
+}

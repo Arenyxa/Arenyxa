@@ -1,0 +1,22 @@
+# Arenyxa v8.1 complete local capability runtime.
+-r requirements.txt
+PySide6>=6.8,<7
+openpyxl>=3.1,<4
+lxml>=5.3,<7
+cssselect>=1.2,<2
+dnspython>=2.7,<3
+playwright>=1.49,<2
+fastapi>=0.115,<1
+uvicorn[standard]>=0.48,<1
+SQLAlchemy>=2.0,<3
+psycopg[binary]>=3.2,<4
+psycopg-pool>=3.2,<4
+pymysql>=1.1,<2
+psutil>=6,<8
+hpack>=4.1,<5
+opentelemetry-api>=1.30,<2
+opentelemetry-sdk>=1.30,<2
+opentelemetry-exporter-otlp-proto-http>=1.30,<2
+
+aioquic>=1.2,<2
+mcp>=1,<2

@@ -1,0 +1,14 @@
+{
+  "schema": "arenyxa.v8-final-code-delta/v1",
+  "baseline": "Arenyxa_v8.0",
+  "target": "Arenyxa_v8.0",
+  "executable_code": {
+    "insertions": 953,
+    "deletions": 321,
+    "net": 632,
+    "modified_files": 32,
+    "created_files": 5,
+    "removed_files": 1
+  },
+  "note": "Counts cover .py/.ps1/.cmd/.iss/.spec and exclude caches/build artifacts."
+}

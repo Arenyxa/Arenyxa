@@ -1,0 +1,44 @@
+Arenyxa v7.0 Stable Release Checklist
+=====================================
+
+Release identity
+[x] Public/runtime display version: 7.0
+[x] Python package version: 7.0.0
+[x] Windows file/product version: 7.0.0.0 / 7.0
+[x] Modern installer name: Arenyxa_V7.0_Setup_x64.exe
+[x] Legacy Win7 installer name: Arenyxa_V7.0_Legacy_Win7_x64_Setup.exe
+[x] Release attestation default version: 7.0
+[x] Public launcher title: Arenyxa v7.0
+
+Compatibility
+[x] Historical arenyxa Python/CLI namespace remains available
+[x] Plugin/runtime compatibility identity intentionally remains 6.8.0
+[x] Enterprise protocol remains N/N-1: current 2, minimum 1
+[x] No schema/protocol bump is implied solely by the product version promotion
+
+Automated release gates
+[x] multi-dimensional quality gates pass on the release tree
+[x] phase11_12_gate.py passes
+[x] verify_v70_release_identity.py passes
+[x] Source Manifest and Repair Seed regenerated after final edits
+[x] Fresh-extract regression passes: 592 passed / 12 environment skips / 0 failed
+[x] ZIP CRC/SHA-256 passes
+
+Native/operator release gates
+[ ] Windows modern lane: startup, multi-monitor, DPI, Repair, Capture, install/upgrade/uninstall
+[ ] Windows 7 legacy lane (if distributed): launch, core features, installer/upgrade/uninstall
+[ ] Root Developer DPAPI workstation binding on real Windows
+[ ] Enterprise Server + at least two Workers: loss/reconnect/restart/duplicate-delivery drill
+[ ] Upgrade backup/migration/rollback drill with representative v6.8 data
+[ ] Independent security review record signed off
+
+Signing/publication
+[ ] Official build uses a dedicated release-signing key (never Developer Root/Enterprise Root)
+[ ] Matching public release key is embedded before channel=official build
+[ ] Private Authority state, Root/Issuing private vaults, Owner private keys are absent from source/installer
+[ ] Published installer SHA-256 recorded out of band
+
+IMPORTANT
+Arenyxa v7.0 is the product release identity. The source does not bypass Phase-12 native-Windows,
+distributed-failure, security-review, or signing requirements. An unsigned community build remains
+functional but is intentionally reported as unverified.

@@ -1,0 +1,9 @@
+{
+  "database": "arenyxa.db",
+  "expected_setting_key": "compat.fixture",
+  "expected_task_id": "fixture-task-v12",
+  "migration_version": 12,
+  "schema": "arenyxa.shadow-compatibility-fixture/v1",
+  "sha256": "ce82fa421dd29ed2bc9555a8a0e45c274da16ebbbfda58e01d4eb3b301c7abd8",
+  "source": "Arenyxa historical migration prefix retained by current migration ledger"
+}

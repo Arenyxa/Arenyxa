@@ -1,0 +1,62 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+*.egg-info/
+*.spec.bak
+*.db
+*.db-wal
+*.db-shm
+
+# Required immutable compatibility fixtures
+!tests/fixtures/compatibility/**/arenyxa.db
+*.log
+coverage.xml
+htmlcov/
+
+# Local/editor state
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local environment and credentials
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.aryxkey
+*.aryxkey.json
+*.aryxvault
+*.aryxvault.json
+*.aryxdevice
+*.aryxbak
+*.aryxbak.json
+*.aryxdev
+*.aryxowner
+*.aryxowner.json
+*.aryxcert.json
+*.aryxtrust.json
+
+# Private/offline Arenyxa authority and transient release helpers
+ArenyxaPrivateAuthority/
+PRIVATE_Arenyxa_Developer_Authority*/
+PRIVATE_Arenyxa_Developer_Authority*.zip
+*_Patch.ps1
+
+# Local test/runtime artifacts
+.coverage
+coverage.json
+*.sqlite
+*.sqlite3
+FINAL_QUALITY_GATE.json
+.coverage.*
+
+# Local crash output
+crash.txt

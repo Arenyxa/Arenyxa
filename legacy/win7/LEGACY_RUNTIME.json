@@ -1,0 +1,11 @@
+{
+  "schema": "arenyxa.legacy-runtime/v1",
+  "product": "Arenyxa",
+  "release": "8.0",
+  "runtime": "windows-7-sp1-x64",
+  "python": "3.8",
+  "status": "feature-frozen",
+  "source_namespace": "arenyxa",
+  "modern_runtime_namespace": "arenyxa",
+  "maintenance_policy": "security-integrity-compatibility-fixes-only"
+}

@@ -1,0 +1,74 @@
+{
+  "schema": "arenyxa.production-validation/v1",
+  "started_at": "2026-08-20T09:07:01.344614+00:00",
+  "duration_seconds": 22.344,
+  "local_gate_passed": true,
+  "production_evidence_complete": false,
+  "production_ready": false,
+  "local_items": [
+    {
+      "name": "hard-crash-idempotent-recovery",
+      "status": "passed",
+      "duration_ms": 373.27,
+      "detail": "os._exit hard crash recovered expired idempotent work to queued state"
+    },
+    {
+      "name": "hard-crash-non-idempotent-fence",
+      "status": "passed",
+      "duration_ms": 387.38,
+      "detail": "side-effect-started work was fenced to review_required after hard crash"
+    },
+    {
+      "name": "lost-terminal-response-replay",
+      "status": "passed",
+      "duration_ms": 102.72,
+      "detail": "exact terminal ACK replay is idempotent; conflicting replay fails closed"
+    },
+    {
+      "name": "concurrent-lease-exclusivity",
+      "status": "passed",
+      "duration_ms": 84.96,
+      "detail": "two simultaneous Workers produced exactly one durable lease winner"
+    },
+    {
+      "name": "checkpoint-restart-durability",
+      "status": "passed",
+      "duration_ms": 112.13,
+      "detail": "checkpoint payload and sequence survived queue reconstruction"
+    },
+    {
+      "name": "clock-corruption-fail-closed",
+      "status": "passed",
+      "duration_ms": 110.3,
+      "detail": "impossible future lease was treated as state/clock corruption and fenced"
+    },
+    {
+      "name": "bounded-soak-consistency",
+      "status": "passed",
+      "duration_ms": 11702.94,
+      "detail": "256 jobs completed across 4 Workers; restart health/invariants remained clean"
+    },
+    {
+      "name": "concurrent-batch-soak-consistency",
+      "status": "passed",
+      "duration_ms": 9470.36,
+      "detail": "256 jobs completed with 8 concurrent Worker threads using batch leases; restart invariants remained clean"
+    }
+  ],
+  "external_evidence": {
+    "provided": false,
+    "valid": false,
+    "status": "not_provided",
+    "detail": "Local chaos gate passed independently; true Server + 2 Worker evidence is still required.",
+    "required_scenarios": [
+      "server_process_crash",
+      "worker_process_crash",
+      "network_partition",
+      "duplicate_delivery",
+      "delayed_delivery",
+      "disk_pressure",
+      "clock_discontinuity",
+      "tls_identity_rotation"
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "base": "Arenyxa_v8.0_release_candidate",
+  "target": "Arenyxa_v8.0",
+  "executable_files_base": 799,
+  "executable_files_target": 799,
+  "created_files": [
+    "scripts/v8_final_release_validation.py",
+    "scripts/verify_v80_release_identity.py",
+    "tests/test_v80_final_release_acceptance.py"
+  ],
+  "removed_files": [
+    "scripts/phase7_release_validation.py",
+    "scripts/verify_v80_release candidate_release_identity.py",
+    "tests/test_v80_release candidate_phase7_acceptance.py"
+  ],
+  "modified_files": [
+    "RUN_ARENYXA.cmd",
+    "legacy/win7/src/arenyxa/__init__.py",
+    "packaging/installer.iss",
+    "packaging/installer_win7.iss",
+    "scripts/build.ps1",
+    "scripts/build_release_attestation.py",
+    "scripts/enterprise_release_gate.py",
+    "scripts/generate_final_audit_report.py",
+    "scripts/phase12_config_gate.py",
+    "scripts/production_config_gate.py",
+    "scripts/runtime_diagnostic.py",
+    "scripts/v8_acceptance_gate.py",
+    "scripts/verify_phase0_baseline.py",
+    "src/arenyxa/__init__.py",
+    "src/arenyxa/architecture_contracts.py",
+    "tests/test_phase1_architecture_contracts.py",
+    "tests/test_v656_independent_reaudit.py",
+    "tests/test_v660_stability_stress.py",
+    "tests/test_v661_windows7_legacy_compat.py",
+    "tests/test_v66_final_release.py",
+    "tests/test_v66beta2_deep_review.py",
+    "tests/test_v67_startup_motion_release.py",
+    "tests/test_v68_stable_release_polish.py",
+    "tests/test_v70_release_identity.py",
+    "tests/test_v78_architecture_consolidation.py",
+    "tests/test_v80_platform_control_plane.py"
+  ],
+  "insertions": 491,
+  "deletions": 491,
+  "net": 0
+}

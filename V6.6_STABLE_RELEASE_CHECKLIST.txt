@@ -1,0 +1,23 @@
+Arenyxa v6.6 Stable Release Checklist
+
+Identity
+- Public: 6.6
+- Python package: 6.6.0
+- Plugin compatibility: 6.6.2
+- Modern installer: dist\installer\Arenyxa_V6.6_Setup_x64.exe
+
+Windows build
+1. Set-ExecutionPolicy -Scope Process Bypass -Force
+2. .\scripts\build.ps1
+3. Confirm release-blocking pytest passes.
+4. Confirm PyInstaller COLLECT completes.
+5. Confirm $env:QT_QPA_PLATFORM is unchanged/empty after build.
+6. Launch .\dist\Arenyxa\Arenyxa.exe and validate Dashboard, Capture/Tasks, Network, Data, Advanced, Settings, Repair Center, restart and shutdown.
+7. Enable Developer Mode, accept both developer agreements, then run `test-all` in the built-in terminal.
+8. Run `stress-test standard`; use `stress-test extreme` only on a saved/idle development workstation.
+9. If Inno Setup 6 or 7 is installed, verify .\dist\installer\Arenyxa_V6.6_Setup_x64.exe.
+
+Distribution
+- Portable release must include the entire dist\Arenyxa directory, not Arenyxa.exe alone.
+- Official channel requires ARENYXA_RELEASE_SIGNING_KEY; the legacy signing variable remains accepted for migration builds.
+- Legacy Win7 binary certification remains independent.

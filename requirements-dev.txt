@@ -1,0 +1,10 @@
+-r requirements.txt
+pytest>=8.3,<10
+pytest-cov>=6,<8
+pytest-asyncio>=1,<2
+ruff==0.16.4
+mypy==1.20.2
+pyinstaller>=6.11,<7
+httpx>=0.28,<1
+pip-audit>=2.7
+cyclonedx-bom>=4

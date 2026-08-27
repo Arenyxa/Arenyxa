@@ -1,0 +1,67 @@
+{
+  "schema": "arenyxa.compatibility-matrix/v1",
+  "product_release_version": "8.1.0",
+  "runtime_compatibility_identity": "6.8.0",
+  "channels": [
+    "stable",
+    "beta",
+    "developer",
+    "enterprise"
+  ],
+  "enterprise_protocol": {
+    "current": 2,
+    "minimum": 1,
+    "strategy": "server accepts N and N-1; worker negotiates the highest common version"
+  },
+  "plugin_api": {
+    "current": "1",
+    "deprecation_window_months": 12,
+    "supported": [
+      "1"
+    ]
+  },
+  "workflow_portable": {
+    "current": "arenyxa.workflow/v1",
+    "migration_tool_accepts": [
+      "arenyxa.workflow/v0"
+    ]
+  },
+  "artifacts": {
+    "distributed_queue": {
+      "current": 1,
+      "minimum_supported": 1,
+      "rollback_supported": true
+    },
+    "enterprise_vault": {
+      "current": 1,
+      "minimum_supported": 1,
+      "rollback_supported": true
+    },
+    "plugin_api": {
+      "current": 1,
+      "minimum_supported": 0,
+      "rollback_supported": true
+    },
+    "settings": {
+      "current": 9,
+      "minimum_supported": 8,
+      "rollback_supported": true
+    },
+    "workflow_definition": {
+      "current": 1,
+      "minimum_supported": 0,
+      "rollback_supported": true
+    }
+  },
+  "windows_lanes": {
+    "legacy_enterprise": {
+      "browser_recorder": false,
+      "python": "3.8",
+      "qt": "PySide2"
+    },
+    "modern": {
+      "python": "3.11-3.13",
+      "qt": "PySide6"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "experience.personal": "个人模式",
+  "experience.professional": "专业模式",
+  "experience.developer": "开发者模式",
+  "experience.enterprise": "企业模式",
+  "experience.root_developer": "根开发者模式",
+  "developer.terminal": "终端",
+  "developer.runtime": "运行时",
+  "developer.plugin_sdk": "插件 SDK",
+  "developer.diagnostics": "诊断",
+  "developer.authority": "权限身份",
+  "developer.test_lab": "测试实验室",
+  "enterprise.enrollment": "企业注册"
+}

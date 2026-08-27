@@ -1,0 +1,13 @@
+# Keep repository bytes deterministic across Windows/macOS/Linux clones.  Arenyxa's
+# SOURCE_MANIFEST.sha256 hashes tracked source bytes, so checkout-time CRLF conversion
+# must not silently invalidate integrity verification.
+* text=auto eol=lf
+
+# Explicit binary assets/payloads.
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.zip binary
+*.pdf binary

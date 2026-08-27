@@ -1,0 +1,61 @@
+Arenyxa v6.8 Stable Release Checklist
+Date: 2026-08-11
+
+Release identity
+- Public runtime: 6.8
+- Python package: 6.8.0
+- Plugin/API compatibility: 6.8.0
+- Modern installer: dist\installer\Arenyxa_V6.8_Setup_x64.exe
+- Legacy installer: dist\installer\Arenyxa_V6.8_Legacy_Win7_x64_Setup.exe
+
+Stable gates
+[x] 01 Python compileall
+[x] 02 Python 3.8 grammar / Windows 7 static compatibility
+[x] 03 v6.8 stable identity + packaging contracts
+[x] 04 startup geometry/handoff/motion contract
+[x] 05 Repair single-console + Repair payload integrity
+[x] 06 Capture terminal progress lifecycle
+[x] 07 Runner pause/resume persistence + token-failure transaction boundary
+[x] 08 adaptive request admission + concurrency/shutdown regressions
+[x] 09 Dataset/Workflow/lineage + diagnostic logging regressions
+[x] 10 security/provenance/plugin/terminal regressions
+[x] 11 complete split regression suite
+[x] 12 Source Manifest + Repair Seed + ZIP CRC/SHA-256 freeze
+
+Performance/startup continuity hotfix gates
+[x] 13 beta/Stable source-hash comparison and regression-cause audit
+[x] 14 tracemalloc timing-boundary A/B verification
+[x] 15 steady-state Standard ramp repeated three times
+[x] 16 center-logo scale and quintic endpoint math
+[x] 17 circular reveal coverage for portrait/ultrawide/high-DPI geometry
+[x] 18 native Qt center-mask render and full-surface completion
+[x] 19 shared launch geometry + in-window handoff order
+[x] 20 Reduce Motion + safe/smoke/reduced-visual bypasses
+[x] 21 Repair/Capture/UI-scale/adaptive-concurrency preservation
+[x] 22 complete regression + Python 3.8 grammar + critical Ruff
+[x] 23 refreshed Repair Seed + Source Manifest integrity
+[x] 24 final source ZIP CRC, extraction, and SHA-256
+
+Final performance/stability/compatibility freeze gates
+[x] 25 TLS context reuse + SQLite connection/task/run hot-path contracts
+[x] 26 lazy host buckets + refill fairness + 100k backlog cancellation
+[x] 27 Windows Repair process probe cannot terminate the observed process
+[x] 28 Capture prepare/start/pause/resume rollback + late-session rejection
+[x] 29 Capture filter-error/stop state-commit serialization
+[x] 30 Runner control I/O ordering + queued cancellation
+[x] 31 Workflow shutdown waits across preflight repository side effects
+[x] 32 mixed-DPI/small-logical-screen geometry + physical-DPR logo rendering
+[x] 33 OS/user Reduced Motion + Modern/explicit-Legacy runtime selection
+[x] 34 subprocess decode fallback + one-click launcher dependency probe
+[x] 35 three Standard + one Extreme zero-error performance freeze
+[x] 36 refreshed Repair Seed + Source Manifest + clean D: deployment + ZIP verification
+
+Source-only delivery note
+- This freeze does not modify Git state and does not build or change Inno Setup installers.
+
+Native Windows release verification still required after extraction/build:
+- confirm exact startup motion on the target compositor and both monitors;
+- run test-all, stress-test standard, stress-test extreme;
+- run Repair Center repeatedly and confirm one visible progress terminal only;
+- start/stop Browser/tshark Capture and confirm the top progress strip clears;
+- build with scripts\build.ps1 and smoke the generated Arenyxa_V6.8_Setup_x64.exe.

@@ -1,0 +1,160 @@
+[build-system]
+requires = ["setuptools>=68,<76", "wheel>=0.41,<0.46"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arenyxa"
+version = "8.1.0"
+description = "Enterprise network security, proxy debugging, traffic forensics, API analysis, and automation platform"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = {text = "GPL-3.0-or-later"}
+authors = [{name = "Arenyxa Contributors"}]
+dependencies = [
+  "tzdata>=2025.2; python_version >= '3.11'",
+  "cryptography>=44,<46; python_version >= '3.11'",
+  "httpx>=0.28,<1; python_version >= '3.11'",
+]
+
+[project.optional-dependencies]
+
+desktop = [
+  "PySide6>=6.8,<7; python_version >= '3.11'",
+  "openpyxl>=3.1,<4; python_version >= '3.11'",
+]
+analysis = [
+  "lxml>=5.3,<7; python_version >= '3.11'",
+  "cssselect>=1.2,<2; python_version >= '3.11'",
+  "dnspython>=2.7,<3; python_version >= '3.11'",
+]
+browser = ["playwright>=1.49,<2; python_version >= '3.11'"]
+crawler = [
+  "aioquic>=1.2,<2; python_version >= '3.11'",
+  "dnspython>=2.7,<3; python_version >= '3.11'",
+]
+mcp = ["mcp>=1,<2; python_version >= '3.11'"]
+server = [
+  "fastapi>=0.115,<1; python_version >= '3.11'",
+  "uvicorn[standard]>=0.48,<1; python_version >= '3.11'",
+]
+database = [
+  "SQLAlchemy>=2.0,<3; python_version >= '3.11'",
+  "psycopg[binary]>=3.2,<4; python_version >= '3.11'",
+  "psycopg-pool>=3.2,<4; python_version >= '3.11'",
+  "pymysql>=1.1,<2; python_version >= '3.11'",
+]
+capture = [
+  "psutil>=6,<8; python_version >= '3.11'",
+  "hpack>=4.1,<5; python_version >= '3.11'",
+]
+telemetry = [
+  "opentelemetry-api>=1.30,<2; python_version >= '3.11'",
+  "opentelemetry-sdk>=1.30,<2; python_version >= '3.11'",
+  "opentelemetry-exporter-otlp-proto-http>=1.30,<2; python_version >= '3.11'",
+]
+full = [
+  "PySide6>=6.8,<7; python_version >= '3.11'",
+  "openpyxl>=3.1,<4; python_version >= '3.11'",
+  "lxml>=5.3,<7; python_version >= '3.11'",
+  "cssselect>=1.2,<2; python_version >= '3.11'",
+  "dnspython>=2.7,<3; python_version >= '3.11'",
+  "playwright>=1.49,<2; python_version >= '3.11'",
+  "aioquic>=1.2,<2; python_version >= '3.11'",
+  "mcp>=1,<2; python_version >= '3.11'",
+  "fastapi>=0.115,<1; python_version >= '3.11'",
+  "uvicorn[standard]>=0.48,<1; python_version >= '3.11'",
+  "SQLAlchemy>=2.0,<3; python_version >= '3.11'",
+  "psycopg[binary]>=3.2,<4; python_version >= '3.11'",
+  "psycopg-pool>=3.2,<4; python_version >= '3.11'",
+  "pymysql>=1.1,<2; python_version >= '3.11'",
+  "psutil>=6,<8; python_version >= '3.11'",
+  "hpack>=4.1,<5; python_version >= '3.11'",
+  "opentelemetry-api>=1.30,<2; python_version >= '3.11'",
+  "opentelemetry-sdk>=1.30,<2; python_version >= '3.11'",
+  "opentelemetry-exporter-otlp-proto-http>=1.30,<2; python_version >= '3.11'",
+]
+dev = [
+  "pytest>=8.3,<10; python_version >= '3.11'",
+  "pytest-cov>=6,<8; python_version >= '3.11'",
+  "pytest-asyncio>=1,<2; python_version >= '3.11'",
+  "ruff==0.16.4; python_version >= '3.11'",
+  "mypy==1.20.2; python_version >= '3.11'",
+  "pyinstaller>=6.11,<7; python_version >= '3.11'",
+  "pip-audit>=2.7; python_version >= '3.11'",
+  "cyclonedx-bom>=4; python_version >= '3.11'",
+]
+
+[project.scripts]
+arenyxa = "arenyxa.cli:main"
+arenyxa-gui = "arenyxa.app:main"
+arenyxa-cli = "arenyxa.cli:main"
+arenyxa-server = "arenyxa.infrastructure.server:main"
+arenyxa-windows-service = "arenyxa.infrastructure.windows_service:main"
+arenyxa-crawler-mcp = "arenyxa.application.crawler_mcp:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+arenyxa = ["resources/**/*", "locale/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 110
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_configs = true
+ignore_missing_imports = true
+exclude = []
+
+[[tool.mypy.overrides]]
+module = [
+  "arenyxa.presentation.glass",
+  "arenyxa.presentation.language",
+  "arenyxa.presentation.motion",
+  "arenyxa.presentation.repair_dialog",
+  "arenyxa.presentation.widgets",
+  "arenyxa.presentation.packet_intelligence_workbench",
+  "arenyxa.presentation.pages.dashboard",
+  "arenyxa.presentation.pages.enterprise",
+  "arenyxa.presentation.pages.personalization",
+  "arenyxa.presentation.pages.professional_suite",
+  "arenyxa.presentation.pages.recovery",
+  "arenyxa.presentation.pages.settings",
+  "arenyxa.presentation.pages.studio",
+  "arenyxa.presentation.pages.tools",
+  "arenyxa.presentation.pages.visualization",
+  "arenyxa.presentation.pages.welcome",
+]
+disallow_untyped_defs = false
+check_untyped_defs = true
+disable_error_code = ["override", "misc"]
+
+[tool.coverage.run]
+branch = true
+source = ["src/arenyxa"]
+parallel = true
+omit = [
+  "src/arenyxa/presentation/qt.py",
+]
+
+[tool.coverage.report]
+fail_under = 40.0
+show_missing = true
+skip_covered = false
+precision = 1
+
+[tool.coverage.json]
+output = "coverage.json"
+pretty_print = true

@@ -1,0 +1,26 @@
+{
+  "schema": "arenyxa.v7.7-p1-general-user-validation/v1",
+  "product": "Arenyxa",
+  "version": "7.7",
+  "generated_at": "2026-08-22T05:01:08+00:00",
+  "scope": [
+    "general-user Simple Mode and Task Center",
+    "guided workflows and local intent routing",
+    "progressive disclosure and automatic risk summaries",
+    "external runtime capability matrix and graceful fallback",
+    "network intelligence regression",
+    "repair/source integrity and release identity"
+  ],
+  "targeted_regression": {
+    "passed": 74,
+    "failed": 0
+  },
+  "full_linux_regression": {
+    "status": "not_claimed",
+    "detail": "The broader invocation reached 100% test progress output but did not terminate inside the bounded runner window; no full-suite PASS claim is made from that invocation."
+  },
+  "platform_evidence_limits": [
+    "native Windows/Qt runtime validation remains Windows-dependent",
+    "TShark differential validation requires a TShark runtime"
+  ]
+}

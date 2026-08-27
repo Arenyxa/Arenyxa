@@ -1,0 +1,39 @@
+name: Arenyxa Reproducible Windows Build
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  clean-windows-build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install deterministic packaging toolchain
+        shell: powershell
+        run: |
+          choco install innosetup --yes --no-progress
+          python -m pip install --upgrade pip
+      - name: Bootstrap, test, build and package from clean checkout
+        shell: powershell
+        run: .\scripts\reproducible_windows_build.ps1
+      - name: Upload build report and artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: arenyxa-windows-reproducible-build
+          path: |
+            dist/build/BUILD_REPORT.json
+            dist/**/*.exe
+            dist/security/SBOM.cdx.json

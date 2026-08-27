@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "product": "Arenyxa",
+  "keys": {},
+  "comment": "Optional community/third-party public keys. Official trust anchors are compiled into arenyxa.release_keys. Private keys must never be committed or packaged."
+}

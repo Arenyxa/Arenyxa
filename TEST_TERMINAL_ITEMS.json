@@ -1,0 +1,140 @@
+[
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_command_runtime_requires_developer_mode_for_operational_commands",
+    "rc": 0,
+    "seconds": 7.51,
+    "tail": ".                                                                        [100%]\n1 passed in 3.05s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_command_runtime_help_completion_and_json",
+    "rc": 0,
+    "seconds": 4.82,
+    "tail": ".                                                                        [100%]\n1 passed in 2.54s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_command_runtime_task_run_and_run_control",
+    "rc": 0,
+    "seconds": 5.31,
+    "tail": ".                                                                        [100%]\n1 passed in 2.78s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_command_runtime_dataset_flow_and_fleet_queries",
+    "rc": 0,
+    "seconds": 5.31,
+    "tail": ".                                                                        [100%]\n1 passed in 2.60s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_command_runtime_uses_shared_proxy_and_mitm_engines",
+    "rc": 0,
+    "seconds": 4.86,
+    "tail": ".                                                                        [100%]\n1 passed in 2.46s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_terminal_capabilities_expose_persistent_shells",
+    "rc": 0,
+    "seconds": 5.74,
+    "tail": ".                                                                        [100%]\n1 passed in 2.13s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_python_persistent_session_preserves_state_and_has_no_command_timeout",
+    "rc": 0,
+    "seconds": 4.78,
+    "tail": ".                                                                        [100%]\n1 passed in 2.14s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_shell_session_launch_contracts_are_persistent",
+    "rc": 0,
+    "seconds": 3.09,
+    "tail": ".                                                                        [100%]\n1 passed in 0.46s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_internal_pipeline_filters_selects_and_limits",
+    "rc": 0,
+    "seconds": 5.51,
+    "tail": ".                                                                        [100%]\n1 passed in 2.84s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_packet_and_extraction_command_groups_are_discoverable",
+    "rc": 0,
+    "seconds": 5.4,
+    "tail": ".                                                                        [100%]\n1 passed in 2.81s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_web_autopilot_validation_and_automation_list",
+    "rc": 0,
+    "seconds": 5.55,
+    "tail": ".                                                                        [100%]\n1 passed in 2.34s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_proxy_professional_cli_rules_and_export_are_bounded",
+    "rc": 0,
+    "seconds": 5.38,
+    "tail": ".                                                                        [100%]\n1 passed in 2.63s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_proxy_resolve_missing_intercept_is_explicit",
+    "rc": 0,
+    "seconds": 5.14,
+    "tail": ".                                                                        [100%]\n1 passed in 2.60s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_flow_cli_exposes_execution_contract",
+    "rc": 0,
+    "seconds": 5.12,
+    "tail": ".                                                                        [100%]\n1 passed in 2.62s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_external_terminal_source_requires_valid_developer_authorization",
+    "rc": 0,
+    "seconds": 3.36,
+    "tail": ".                                                                        [100%]\n1 passed in 0.39s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_headless_external_terminal_run_requires_confirmation_and_is_bounded",
+    "rc": 0,
+    "seconds": 5.36,
+    "tail": ".                                                                        [100%]\n1 passed in 2.83s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_automation_cli_full_lifecycle",
+    "rc": 0,
+    "seconds": 5.14,
+    "tail": ".                                                                        [100%]\n1 passed in 2.69s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_run_export_is_confined_and_machine_readable",
+    "rc": 0,
+    "seconds": 4.98,
+    "tail": ".                                                                        [100%]\n1 passed in 2.54s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_fleet_snapshot_export_is_bounded_and_confined",
+    "rc": 0,
+    "seconds": 5.09,
+    "tail": ".                                                                        [100%]\n1 passed in 2.52s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_pipeline_count_and_unique",
+    "rc": 0,
+    "seconds": 4.65,
+    "tail": ".                                                                        [100%]\n1 passed in 2.50s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_terminal_network_diagnostics_are_first_class_commands",
+    "rc": 0,
+    "seconds": 4.3,
+    "tail": ".                                                                        [100%]\n1 passed in 2.33s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_terminal_packet_protocol_catalog_and_native_decode",
+    "rc": 0,
+    "seconds": 4.09,
+    "tail": ".                                                                        [100%]\n1 passed in 2.18s\n"
+  },
+  {
+    "item": "tests/test_terminal_first_control_plane.py::test_terminal_can_inspect_capture_info_frames_summaries_and_stats",
+    "rc": 0,
+    "seconds": 4.35,
+    "tail": ".                                                                        [100%]\n1 passed in 2.35s\n"
+  }
+]

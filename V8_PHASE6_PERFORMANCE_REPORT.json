@@ -1,0 +1,84 @@
+{
+  "schema": "arenyxa.v8-phase6-performance/v1",
+  "generated_at": "2026-08-23T06:49:38.252091+00:00",
+  "version": "8.0",
+  "host": {
+    "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+    "python": "3.13.5"
+  },
+  "scope": "current-host in-process Phase-6 microbaseline; not Windows/Npcap/WAN/PostgreSQL production certification",
+  "telemetry": {
+    "samples_submitted": 100000,
+    "samples_retained": 4096,
+    "max_samples": 4096,
+    "elapsed_seconds": 0.148511,
+    "operations_per_second": 673350.92,
+    "p50_ms": 51.15,
+    "p95_ms": 95.825,
+    "p99_ms": 99.1,
+    "bounded": true
+  },
+  "proxy_persistence": {
+    "flows": 5000,
+    "elapsed_seconds": 0.106319,
+    "flows_per_second": 47028.07,
+    "history_rows": 5000,
+    "archive_rows": 5000,
+    "drained": true,
+    "closed": true,
+    "capacity": 256,
+    "max_queue_depth": 256,
+    "sync_fallbacks": 776,
+    "history_failures": 0,
+    "archive_failures": 0,
+    "bounded": true
+  },
+  "sqlite_contention": {
+    "passed": true,
+    "detail": "SQLite lock contention remained bounded and recoverable",
+    "metrics": {
+      "bounded_failure": true,
+      "elapsed_ms": 50.604,
+      "budget_ms": 1000.0
+    }
+  },
+  "resource_pressure": {
+    "passed": true,
+    "detail": "resource governor degraded under pressure and recovered gradually",
+    "metrics": {
+      "critical": {
+        "pressure": "critical",
+        "request_ceiling": 4,
+        "worker_ceiling": 4,
+        "browser_ceiling": 0,
+        "admit_new_runs": false,
+        "admit_new_browser": false,
+        "reasons": [
+          "cpu-critical",
+          "memory-critical",
+          "disk-critical"
+        ]
+      },
+      "recovered": {
+        "pressure": "normal",
+        "request_ceiling": 8,
+        "worker_ceiling": 8,
+        "browser_ceiling": 4,
+        "admit_new_runs": true,
+        "admit_new_browser": true,
+        "reasons": []
+      }
+    }
+  },
+  "checks": {
+    "telemetry_bounded": true,
+    "telemetry_rate": true,
+    "proxy_bounded": true,
+    "proxy_complete": true,
+    "proxy_no_sink_failures": true,
+    "proxy_rate": true,
+    "sqlite_contention_bounded": true,
+    "resource_pressure_recovers": true
+  },
+  "passed": true
+}

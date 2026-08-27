@@ -1,0 +1,29 @@
+{
+  "schema": "arenyxa.performance-regression-gate/v2",
+  "healthy": true,
+  "checked_reports": 3,
+  "checks": [
+    {
+      "report": "server-performance-report-final20.json",
+      "stable": true,
+      "levels": 6,
+      "max_p99_ms": 343.803,
+      "peak_observed_throughput": 105.622
+    },
+    {
+      "report": "server-worker-performance-report-final20.json",
+      "stable": true,
+      "levels": 6,
+      "max_p99_ms": 185.841,
+      "peak_observed_throughput": 174.494
+    },
+    {
+      "report": "server-http-performance-report-final20.json",
+      "stable": true,
+      "levels": 6,
+      "max_p99_ms": 147.716,
+      "peak_observed_throughput": 1327.314
+    }
+  ],
+  "failures": []
+}

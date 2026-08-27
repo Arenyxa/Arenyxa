@@ -1,0 +1,26 @@
+{
+  "algorithm": "streaming-sha256-o-chunk-memory",
+  "cases": [
+    {
+      "duration_seconds": 0.001,
+      "input_bytes": 1048576,
+      "input_mib": 1.0,
+      "passed": true,
+      "peak_python_bytes": 2097751,
+      "peak_python_mib": 2.001,
+      "sha256": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58"
+    },
+    {
+      "duration_seconds": 0.002,
+      "input_bytes": 2097152,
+      "input_mib": 2.0,
+      "passed": true,
+      "peak_python_bytes": 2097751,
+      "peak_python_mib": 2.001,
+      "sha256": "5647f05ec18958947d32874eeb788fa396a05d0bab7c1b71f112ceb7e9b31eee"
+    }
+  ],
+  "limit_python_mib": 16,
+  "passed": true,
+  "schema": "arenyxa.hot-path-memory-gate/v1"
+}

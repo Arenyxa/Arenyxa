@@ -1,0 +1,14 @@
+{
+  "experience.personal": "Personal",
+  "experience.professional": "Professional",
+  "experience.developer": "Developer",
+  "experience.enterprise": "Enterprise",
+  "experience.root_developer": "Root Developer",
+  "developer.terminal": "Terminal",
+  "developer.runtime": "Runtime",
+  "developer.plugin_sdk": "Plugin SDK",
+  "developer.diagnostics": "Diagnostics",
+  "developer.authority": "Authority",
+  "developer.test_lab": "Test Lab",
+  "enterprise.enrollment": "Enterprise Enrollment"
+}

@@ -1,0 +1,75 @@
+Arenyxa v8.0 beta17 - Final targeted bugfix / UX / stability report
+
+SCOPE
+Only the five requested remaining bugs, startup/preset motion, directly related navigation/Root/Enterprise code,
+quality ratchets, and two oversized startup/Root-Developer modules were changed. Existing unrelated UI surfaces
+and product capabilities were not redesigned.
+
+1. ENTERPRISE MODE SELECTION / ACCESS-DENIED UX - FIXED
+- Experience selection remains presentation-only and does not mint Enterprise authority.
+- After a successful preset switch, navigation is rebuilt and the landing page is selected from the visible
+  workspace pages. A protected server/fleet operation may still deny access independently, but selecting the
+  Enterprise workspace itself does not fail merely because Enterprise identity is not authenticated.
+- Root Developer authority remains a separate authenticated security path.
+
+2. DEVELOPER MODE CHILD TOOLS / TERMINAL / PLUGIN SANDBOX - FIXED
+- Developer navigation buttons now carry explicit navPageId metadata.
+- Developer shortcut actions carry explicit real resolver targets; Plugin Sandbox maps to the existing plugins page.
+- Developer child visibility is evaluated against one cached navigation projection instead of repeated identity
+  projections / O(n^2) reverse button lookup.
+- Manual group collapse is preserved; stale Developer-toggle/profile split-brain state is reconciled on restart.
+
+3. DEVELOPER MODE RESTART RESTORATION - FIXED
+- ExperienceContextController reconciles persisted developer_mode before the first navigation projection.
+- A stale Personal/Professional profile is restored through the same Developer profile transition used by an
+  explicit enable action, before the sidebar is built.
+- If the saved profile is already Developer/Root/Enterprise, a deliberate manual group-collapse preference is
+  preserved rather than overwritten.
+
+4. ROOT DEVICE KEY / ROOT AUTHORITY STARTUP DETECTION - FIXED / FAIL-CLOSED
+- The Root startup gate re-probes the live DeveloperAccessManager before deciding the current machine is not a
+  registered Root workstation, avoiding a stale early bootstrap projection bypass.
+- Expected Root probe failures enter mandatory authentication; unexpected failures still propagate, so the security
+  boundary fails closed.
+- Registered Root workstations can no longer choose a normal-session bypass after failed/cancelled Root challenge.
+- Root authority is still granted only after the existing fresh Owner/device proof; no security check was bypassed.
+- Oversized developer_access.py was split: Root workstation binding/probe logic now lives in
+  application/root_workstation_binding.py while the historical public imports remain compatible.
+
+5. STARTUP PROGRESS / BLUE LOADING MOTION - FIXED
+- Bootstrap now reports granular real work stages from 4% through 99%: settings, Root trust, performance policy,
+  database/schema, recovery, resource governor, Security Kernel, Developer/Root trust, Enterprise/Zero Trust,
+  scheduler/runner, workflow/lineage, capture/intelligence, proxy/MITM/plugins, supervisor, resilience/control plane,
+  navigation/command runtime, schedules, scheduler start, then app.py commits 100% Ready.
+- Shell splash now shows a second activity/detail line describing what Arenyxa is currently doing.
+- Progress animation remains bounded and smooth but was shortened for the increased milestone count so cosmetic
+  animation does not add seconds to startup.
+- bootstrap() was refactored from 197 lines to 146 lines by extracting foundation preparation.
+
+PRESET/THEME SWITCH UX - FIXED
+- Usage-mode switching reveals newly added navigation items with a staggered transition.
+- Theme preset crossfade now paints the old-screen snapshot overlay BEFORE the expensive global stylesheet update,
+  processes one UI paint turn, applies the theme behind the overlay, then fades the overlay away.
+- No nested event loop was introduced.
+
+PERFORMANCE / STRUCTURAL OPTIMIZATION
+- developer_access.py: 1273 lines -> ~750 lines; Root workstation binding/probe moved to dedicated module.
+- bootstrap(): 197 lines -> 146 lines.
+- Navigation visibility hot path: one Experience/Navigation projection per refresh and explicit page/action metadata,
+  replacing repeated projections and O(n^2) reverse lookups.
+- NavigationPolicyEngine microbenchmark in this environment: 100,000 rebuilds in 4.431334 s (~44.31 us/op).
+- Python module ceiling gate: PASS; largest module below 1000 lines.
+
+QUALITY / STABILITY VALIDATION
+- python compileall src/arenyxa: PASS
+- python -m arenyxa --version: Arenyxa 8.0 beta17
+- architecture debt gate: PASS
+  broad_exception=284, enterprise=38, proxy=1, runner_lines=408, module_ceiling=1000
+- Focused + cross-domain regression suite: 231 passed, 5 skipped, 0 failed
+  (navigation, Developer/Root, Enterprise, startup, motion, database/network capture, concurrency, architecture/quality)
+- The 5 skipped checks require a supported Qt binding; this Linux execution environment has neither PySide6 nor
+  PySide2, so live Qt rendering/performance cannot be executed here.
+
+SECURITY BOUNDARY
+No Root authentication/integrity check, Enterprise protected-operation check, Security Kernel policy, Repair Center,
+Recovery Center, capture security, or Developer credential verification was disabled to make tests pass.

@@ -1,0 +1,13 @@
+Arenyxa v8.0 beta19 - engineering version promotion
+
+Changes
+=======
+- Engineering display version: 8.0 beta19
+- Engineering distribution version: 8.0.19
+- Release channel / engineering build identity: beta19
+- Current validated feature set is preserved; this version-promotion step does not intentionally change working runtime behavior.
+- Existing navigation, Enterprise workspace, terminal permission inspection, startup progress styling, Developer, Root Developer, Root Owner, Server/Worker, Recovery, and Security Kernel behavior are preserved.
+
+Security
+========
+No Root integrity, certificate-chain, private-key proof, revocation, workstation-binding, platform.root, Security Kernel, or Enterprise authorization checks were bypassed or weakened by the version promotion.

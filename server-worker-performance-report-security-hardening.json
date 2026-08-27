@@ -1,0 +1,123 @@
+{
+  "schema": "arenyxa.enterprise-worker-slot-performance/v1",
+  "stable": true,
+  "storage_backend": "sqlite-single-host",
+  "recommended_slots": 4,
+  "peak_throughput_jobs_per_second": 166.839,
+  "levels": [
+    {
+      "slots": 1,
+      "jobs": 64,
+      "throughput_jobs_per_second": 113.902,
+      "p95_ms": 8.413,
+      "p99_ms": 9.944,
+      "max_ms": 10.945,
+      "errors": 0,
+      "completed": 64,
+      "thread_delta": 0,
+      "fd_delta": 0,
+      "invariants": {
+        "inconsistent_lease_rows": 0,
+        "unreceipted_completed_jobs": 0,
+        "implausible_future_leases": 0,
+        "active_jobs_remaining": 0
+      },
+      "stable": true
+    },
+    {
+      "slots": 2,
+      "jobs": 64,
+      "throughput_jobs_per_second": 121.903,
+      "p95_ms": 16.488,
+      "p99_ms": 17.309,
+      "max_ms": 18.303,
+      "errors": 0,
+      "completed": 64,
+      "thread_delta": 0,
+      "fd_delta": 0,
+      "invariants": {
+        "inconsistent_lease_rows": 0,
+        "unreceipted_completed_jobs": 0,
+        "implausible_future_leases": 0,
+        "active_jobs_remaining": 0
+      },
+      "stable": true
+    },
+    {
+      "slots": 4,
+      "jobs": 64,
+      "throughput_jobs_per_second": 157.504,
+      "p95_ms": 20.569,
+      "p99_ms": 22.371,
+      "max_ms": 22.925,
+      "errors": 0,
+      "completed": 64,
+      "thread_delta": 0,
+      "fd_delta": 0,
+      "invariants": {
+        "inconsistent_lease_rows": 0,
+        "unreceipted_completed_jobs": 0,
+        "implausible_future_leases": 0,
+        "active_jobs_remaining": 0
+      },
+      "stable": true
+    },
+    {
+      "slots": 8,
+      "jobs": 64,
+      "throughput_jobs_per_second": 166.839,
+      "p95_ms": 42.384,
+      "p99_ms": 43.595,
+      "max_ms": 44.218,
+      "errors": 0,
+      "completed": 64,
+      "thread_delta": 0,
+      "fd_delta": 0,
+      "invariants": {
+        "inconsistent_lease_rows": 0,
+        "unreceipted_completed_jobs": 0,
+        "implausible_future_leases": 0,
+        "active_jobs_remaining": 0
+      },
+      "stable": true
+    },
+    {
+      "slots": 16,
+      "jobs": 64,
+      "throughput_jobs_per_second": 146.776,
+      "p95_ms": 137.254,
+      "p99_ms": 142.631,
+      "max_ms": 145.027,
+      "errors": 0,
+      "completed": 64,
+      "thread_delta": 0,
+      "fd_delta": 0,
+      "invariants": {
+        "inconsistent_lease_rows": 0,
+        "unreceipted_completed_jobs": 0,
+        "implausible_future_leases": 0,
+        "active_jobs_remaining": 0
+      },
+      "stable": true
+    },
+    {
+      "slots": 32,
+      "jobs": 64,
+      "throughput_jobs_per_second": 57.835,
+      "p95_ms": 785.2,
+      "p99_ms": 789.436,
+      "max_ms": 791.946,
+      "errors": 0,
+      "completed": 64,
+      "thread_delta": 0,
+      "fd_delta": 0,
+      "invariants": {
+        "inconsistent_lease_rows": 0,
+        "unreceipted_completed_jobs": 0,
+        "implausible_future_leases": 0,
+        "active_jobs_remaining": 0
+      },
+      "stable": true
+    }
+  ]
+}

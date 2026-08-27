@@ -1,0 +1,114 @@
+[
+  {
+    "file": "tests/test_v71_root_owner_startup_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.977,
+    "output": "....                                                                     [100%]\n4 passed in 0.04s\n"
+  },
+  {
+    "file": "tests/test_v71_tpm_private_boundary.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.89,
+    "output": "..                                                                       [100%]\n2 passed in 0.08s\n"
+  },
+  {
+    "file": "tests/test_v77_network_intelligence_completion.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 6.596,
+    "output": "................                                                         [100%]\n16 passed in 2.95s\n"
+  },
+  {
+    "file": "tests/test_v77_p1_general_user_completion.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 4.78,
+    "output": "..................                                                       [100%]\n18 passed in 1.05s\n"
+  },
+  {
+    "file": "tests/test_v78_architecture_consolidation.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 4.104,
+    "output": ".........                                                                [100%]\n9 passed in 0.95s\n"
+  },
+  {
+    "file": "tests/test_v78_p0_p1_closure.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 4.64,
+    "output": "..........                                                               [100%]\n10 passed in 0.90s\n"
+  },
+  {
+    "file": "tests/test_v80_platform_control_plane.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 13.016,
+    "output": ".....                                                                    [100%]\n5 passed in 10.27s\n"
+  },
+  {
+    "file": "tests/test_v80_traffic_control_plane.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 15.606,
+    "output": "......                                                                   [100%]\n6 passed in 13.18s\n"
+  },
+  {
+    "file": "tests/test_v80_phase4_phase5_platform.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 5.832,
+    "output": ".......                                                                  [100%]\n7 passed in 2.80s\n"
+  },
+  {
+    "file": "tests/test_v80_phase6_survivability.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 8.305,
+    "output": ".........                                                                [100%]\n9 passed in 5.69s\n"
+  },
+  {
+    "file": "tests/test_v80_final_release_acceptance.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.54,
+    "output": ".....                                                                    [100%]\n5 passed in 0.83s\n"
+  },
+  {
+    "file": "tests/test_v80_industrialization_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 6.026,
+    "output": "...........                                                              [100%]\n11 passed in 4.17s\n"
+  },
+  {
+    "file": "tests/test_version_project_workflow_security.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.434,
+    "output": "..........                                                               [100%]\n10 passed in 0.12s\n"
+  },
+  {
+    "file": "tests/test_visual_motion_capture.py",
+    "rc": 5,
+    "timeout": false,
+    "seconds": 2.01,
+    "output": "\n=========================== short test summary info ============================\nSKIPPED [1] tests/test_visual_motion_capture.py:7: No supported Qt binding is installed\n1 skipped in 0.02s\n"
+  },
+  {
+    "file": "tests/test_workflow_contract_gate.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.184,
+    "output": "........                                                                 [100%]\n8 passed in 0.08s\n"
+  },
+  {
+    "file": "tests/test_workflow_dataset_v65.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.262,
+    "output": "..                                                                       [100%]\n2 passed in 0.59s\n"
+  }
+]

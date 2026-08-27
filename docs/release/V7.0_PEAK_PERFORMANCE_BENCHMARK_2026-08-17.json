@@ -1,0 +1,84 @@
+{
+  "schema": "arenyxa.peak-performance-comparison/v1",
+  "measured_on": "2026-08-17",
+  "method": "five paired isolated runs; median reported; no machine-specific pass threshold",
+  "runner": "scripts/benchmark_peak_hotpaths.py",
+  "environment": {
+    "os": "Linux 6.18.35 x86_64",
+    "python": "3.12.13",
+    "sqlite": "3.53.1"
+  },
+  "baseline": {
+    "archive_sha256": "e7ef2c1d55eff5a3c198ca96243c603bdc6992847cce592e07ec370d77159a36",
+    "archive_entries": 411
+  },
+  "measurements": {
+    "list_projects_1000_seconds": {
+      "baseline_samples": [0.502187, 0.476386, 0.491773, 0.463275, 0.453585],
+      "baseline_median": 0.476386,
+      "hardened_samples": [0.004447, 0.005075, 0.005342, 0.004765, 0.004807],
+      "hardened_median": 0.004807,
+      "delta_percent": -98.99
+    },
+    "list_projects_1000_connections": {
+      "baseline_median": 1001,
+      "hardened_median": 1,
+      "delta_percent": -99.90
+    },
+    "empty_lease_poll_250_seconds": {
+      "baseline_samples": [0.055289, 0.061546, 0.068959, 0.057708, 0.055594],
+      "baseline_median": 0.057708,
+      "hardened_samples": [0.034143, 0.034750, 0.032331, 0.032605, 0.036910],
+      "hardened_median": 0.034143,
+      "delta_percent": -40.83
+    },
+    "dashboard_metrics_250_seconds": {
+      "baseline_samples": [0.143633, 0.149568, 0.146068, 0.131447, 0.130145],
+      "baseline_median": 0.143633,
+      "hardened_samples": [0.129331, 0.135854, 0.133172, 0.130371, 0.143671],
+      "hardened_median": 0.133172,
+      "delta_percent": -7.28
+    },
+    "json_log_format_20000_seconds": {
+      "baseline_samples": [0.341442, 0.353543, 0.352969, 0.344484, 0.342675],
+      "baseline_median": 0.344484,
+      "hardened_samples": [0.310363, 0.310164, 0.319300, 0.308963, 0.315706],
+      "hardened_median": 0.310363,
+      "delta_percent": -9.90
+    },
+    "json_log_bytes": {
+      "baseline_median": 207,
+      "hardened_median": 195,
+      "delta_percent": -5.80
+    },
+    "append_results_5000_seconds": {
+      "baseline_samples": [0.086954, 0.080915, 0.078600, 0.078548, 0.071013],
+      "baseline_median": 0.078600,
+      "hardened_samples": [0.077068, 0.085981, 0.075872, 0.074993, 0.088535],
+      "hardened_median": 0.077068,
+      "delta_percent": -1.95,
+      "correct_rows": 5000
+    },
+    "append_results_5000_duplicate_seconds": {
+      "baseline_samples": [0.006791, 0.006805, 0.005960, 0.006267, 0.006282],
+      "baseline_median": 0.006282,
+      "hardened_samples": [0.005967, 0.006959, 0.006163, 0.006900, 0.006098],
+      "hardened_median": 0.006163,
+      "delta_percent": -1.89
+    },
+    "rate_limiter_100000_seconds_control": {
+      "baseline_median": 0.068899,
+      "hardened_median": 0.070246,
+      "delta_percent": 1.96,
+      "interpretation": "unchanged control path; small variation treated as measurement noise"
+    }
+  },
+  "runner_batch_sweep": {
+    "rows": 2000,
+    "repetitions": 3,
+    "batch_48_median_seconds": 0.5226,
+    "batch_96_median_seconds": 0.4193,
+    "batch_192_median_seconds": 0.3552,
+    "batch_192_vs_48_delta_percent": -32.0
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "name": "Arenyxa v7.0 Unified Professional Suite",
+  "baseline": "Arenyxa_v7.0_MITM_Professional_Hardened_Source.zip",
+  "navigation": "one top-level Professional Suite",
+  "domains": [
+    "Packet Intelligence",
+    "Intercept & Debug",
+    "MITM Automation",
+    "Web Extraction",
+    "Workflow Automation"
+  ],
+  "integrated_inspirations": {
+    "Packet Analysis": [
+      "packet/dissector analysis",
+      "PCAP/PCAPNG",
+      "Follow Stream",
+      "Expert/statistics/export"
+    ],
+    "Intercepting Proxy": [
+      "HTTP(S) interception",
+      "history",
+      "request/response editing",
+      "MITM CA",
+      "replay foundations"
+    ],
+    "HTTP debugging": [
+      "map local/remote",
+      "rewrite/block/allow",
+      "replay",
+      "TLS controls",
+      "shared debugging surface"
+    ],
+    "mitm": [
+      "official mitmdump bridge",
+      "advanced proxy modes",
+      "HTTP/WebSocket/TCP/UDP/DNS",
+      "addons",
+      "HTTP2/3",
+      "QUIC"
+    ],
+    "Structured Extraction": [
+      "SmartPath",
+      "selector self-healing",
+      "browser recorder",
+      "pagination/templates",
+      "data quality",
+      "distributed workers"
+    ],
+    "Workflow Automation": [
+      "DAG workflow",
+      "failure routing",
+      "retry",
+      "debugging",
+      "scheduling",
+      "secrets",
+      "plugins",
+      "distributed execution"
+    ]
+  },
+  "validation": {
+    "python_compileall": "PASS",
+    "targeted_regression": "24 passed",
+    "full_regression": "started; >30% completed without failure before execution-window timeout; not claimed complete"
+  },
+  "startup_visual": "unchanged/frozen"
+}

@@ -1,0 +1,20 @@
+{
+  "schema": "arenyxa.skip-policy/v2",
+  "allowed_optional_dependencies": [
+    "fastapi",
+    "httpx",
+    "playwright"
+  ],
+  "allowed_reason_fragments": [
+    "Qt binding",
+    "TShark protocol parity backend",
+    "POSIX process-group",
+    "POSIX /proc",
+    "Windows process-probe",
+    "symlink creation",
+    "validation environment",
+    "explicit release/soak gate"
+  ],
+  "unconditional_skip_forbidden": true,
+  "reason_required": true
+}

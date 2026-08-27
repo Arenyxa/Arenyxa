@@ -1,0 +1,475 @@
+{
+  "schema": "arenyxa.v7.0-ten-dimension-server-professional-hardening/v1",
+  "generated_at": "2026-08-18T11:16:02+00:00",
+  "product": "Arenyxa",
+  "version": "7.0",
+  "review": {
+    "dimensions_passed": 10,
+    "dimensions_total": 10,
+    "passed": true,
+    "dimensions": [
+      {
+        "name": "1. Architecture and namespace convergence",
+        "status": "PASS",
+        "evidence": [
+          "src/arenyxa is the modern implementation",
+          "modern operational scripts import arenyxa",
+          "startup splash remains the single frozen legacy-import exception"
+        ],
+        "findings": []
+      },
+      {
+        "name": "2. Type-safety and UI runtime boundaries",
+        "status": "PASS",
+        "evidence": [
+          "UI_TYPE_GATE=PASS\nstrict_critical_modules=7"
+        ],
+        "findings": []
+      },
+      {
+        "name": "3. Exception taxonomy and failure transparency",
+        "status": "PASS",
+        "evidence": [
+          "broad Exception catches=326",
+          "enterprise broad catches=50",
+          "ratchet prevents regression"
+        ],
+        "findings": []
+      },
+      {
+        "name": "4. Distributed state-machine consistency",
+        "status": "PASS",
+        "evidence": [
+          "terminal states cannot transition back to active states",
+          "fresh runtime invariants={'inconsistent_lease_rows': 0, 'unreceipted_completed_jobs': 0, 'implausible_future_leases': 0, 'journal_events': 0}"
+        ],
+        "findings": []
+      },
+      {
+        "name": "5. Persistence, durability, and server storage topology",
+        "status": "PASS",
+        "evidence": [
+          "SQLite capabilities={'backend': 'sqlite', 'multi_host_writers': False, 'row_lock_skip_locked': False, 'external_server': False}",
+          "PostgreSQL capabilities={'backend': 'postgresql', 'multi_host_writers': True, 'row_lock_skip_locked': True, 'external_server': True}",
+          "SQLite is explicitly single-host; PostgreSQL is the multi-host server backend"
+        ],
+        "findings": []
+      },
+      {
+        "name": "6. Network abuse resistance and transport governance",
+        "status": "PASS",
+        "evidence": [
+          "rate limiter state={'tracked_buckets': 2, 'max_buckets': 2, 'overflow_window_count': 32, 'overflow_rejections': 29}",
+          "server inflight cap=256",
+          "DNS-approved address pinning and remote-private-target blocking are enabled in Proxy governance",
+          "modern Enterprise transport defaults to TLS 1.3; TLS 1.2 requires explicit server/worker compatibility opt-in"
+        ],
+        "findings": []
+      },
+      {
+        "name": "7. Resource governance, backpressure, and leak boundaries",
+        "status": "PASS",
+        "evidence": [
+          "distributed jobs/workers/slots are bounded",
+          "proxy upstream concurrency and message sizes are bounded",
+          "server performance validation tracks thread and file-descriptor deltas"
+        ],
+        "findings": []
+      },
+      {
+        "name": "8. Observability, health, and operational diagnostics",
+        "status": "PASS",
+        "evidence": [
+          "modern logger namespace is arenyxa",
+          "server health exposes bounded request/inflight/rejection counters",
+          "liveness and readiness are separate; readiness fails closed on queue invariant violations",
+          "distributed health exposes state invariants and storage deployment profile"
+        ],
+        "findings": []
+      },
+      {
+        "name": "9. Server deployment, concurrency, and recovery readiness",
+        "status": "PASS",
+        "evidence": [
+          "uvicorn concurrency/backlog/keep-alive/graceful-shutdown are explicitly bounded",
+          "modern server TLS minimum defaults to TLS 1.3",
+          "Win7 runtime is physically isolated",
+          "queue_performance_evidence={'schema': 'arenyxa.enterprise-server-performance/v1', 'started_at_epoch': 1787051255.395501, 'duration_seconds': 19.423, 'stable': True, 'recommended_workers': 1, 'peak_execute_ops_per_second': 84.994, 'levels': [{'workers': 1, 'jobs': 192, 'enqueue_ops_per_second': 275.112, 'execute_ops_per_second': 75.92, 'enqueue_p95_ms': 7.885, 'execute_p95_ms': 23.928, 'execute_p99_ms': 33.592, 'max_execute_ms': 45.943, 'errors': 0, 'completed': 192, 'thread_delta': 0, 'fd_delta': 0, 'invariants': {'inconsistent_lease_rows': 0, 'unreceipted_completed_jobs': 0, 'implausible_future_leases': 0, 'active_jobs_remaining': 0}, 'stable': True}, {'workers': 2, 'jobs': 192, 'enqueue_ops_per_second': 260.3, 'execute_ops_per_second': 79.65, 'enqueue_p95_ms': 13.58, 'execute_p95_ms': 34.165, 'execute_p99_ms': 36.796, 'max_execute_ms': 45.436, 'errors': 0, 'completed': 192, 'thread_delta': 0, 'fd_delta': 0, 'invariants': {'inconsistent_lease_rows': 0, 'unreceipted_completed_jobs': 0, 'implausible_future_leases': 0, 'active_jobs_remaining': 0}, 'stable': True}, {'workers': 4, 'jobs': 192, 'enqueue_ops_per_second': 291.44, 'execute_ops_per_second': 70.134, 'enqueue_p95_ms': 19.956, 'execute_p95_ms': 79.803, 'execute_p99_ms': 93.679, 'max_execute_ms': 94.089, 'errors': 0, 'completed': 192, 'thread_delta': 0, 'fd_delta': 0, 'invariants': {'inconsistent_lease_rows': 0, 'unreceipted_completed_jobs': 0, 'implausible_future_leases': 0, 'active_jobs_remaining': 0}, 'stable': True}, {'workers': 8, 'jobs': 192, 'enqueue_ops_per_second': 257.735, 'execute_ops_per_second': 81.969, 'enqueue_p95_ms': 44.096, 'execute_p95_ms': 119.421, 'execute_p99_ms': 125.469, 'max_execute_ms': 148.888, 'errors': 0, 'completed': 192, 'thread_delta': 0, 'fd_delta': 0, 'invariants': {'inconsistent_lease_rows': 0, 'unreceipted_completed_jobs': 0, 'implausible_future_leases': 0, 'active_jobs_remaining': 0}, 'stable': True}, {'workers': 16, 'jobs': 192, 'enqueue_ops_per_second': 303.388, 'execute_ops_per_second': 84.994, 'enqueue_p95_ms': 66.513, 'execute_p95_ms': 208.554, 'execute_p99_ms': 237.315, 'max_execute_ms': 251.025, 'errors': 0, 'completed': 192, 'thread_delta': 0, 'fd_delta': 0, 'invariants': {'inconsistent_lease_rows': 0, 'unreceipted_completed_jobs': 0, 'implausible_future_leases': 0, 'active_jobs_remaining': 0}, 'stable': True}, {'workers': 32, 'jobs': 192, 'enqueue_ops_per_second': 314.785, 'execute_ops_per_second': 74.705, 'enqueue_p95_ms': 110.861, 'execute_p95_ms': 490.461, 'execute_p99_ms': 497.76, 'max_execute_ms': 608.05, 'errors': 0, 'completed': 192, 'thread_delta': 0, 'fd_delta': 0, 'invariants': {'inconsistent_lease_rows': 0, 'unreceipted_completed_jobs': 0, 'implausible_future_leases': 0, 'active_jobs_remaining': 0}, 'stable': True}]}",
+          "http_tls_performance_evidence={'schema': 'arenyxa.enterprise-server-http-performance/v1', 'stable': True, 'tls_minimum': 'TLSv1.3', 'requests_per_level': 80, 'recommended_clients': 4, 'peak_throughput_requests_per_second': 1012.6780071260663, 'server_thread_stopped': True, 'levels': [{'clients': 1, 'requests': 80, 'duration_seconds': 0.07994263900036458, 'throughput_requests_per_second': 1000.7175269712469, 'p95_ms': 1.0997780000252533, 'p99_ms': 7.576877999781573, 'max_ms': 7.576877999781573, 'errors': 0, 'status_counts': {'200': 80}, 'tls_versions': {'TLSv1.3': 80}, 'stable': True}, {'clients': 4, 'requests': 80, 'duration_seconds': 0.0789984569992157, 'throughput_requests_per_second': 1012.6780071260663, 'p95_ms': 6.379630000083125, 'p99_ms': 9.35073500022554, 'max_ms': 9.35073500022554, 'errors': 0, 'status_counts': {'200': 80}, 'tls_versions': {'TLSv1.3': 80}, 'stable': True}, {'clients': 8, 'requests': 80, 'duration_seconds': 0.08938426300028368, 'throughput_requests_per_second': 895.0121342919849, 'p95_ms': 10.471599000084097, 'p99_ms': 18.895013000474137, 'max_ms': 18.895013000474137, 'errors': 0, 'status_counts': {'200': 80}, 'tls_versions': {'TLSv1.3': 80}, 'stable': True}, {'clients': 16, 'requests': 80, 'duration_seconds': 0.12314176899963059, 'throughput_requests_per_second': 649.65771281262, 'p95_ms': 38.402098000005935, 'p99_ms': 41.724975999386515, 'max_ms': 41.724975999386515, 'errors': 0, 'status_counts': {'200': 80}, 'tls_versions': {'TLSv1.3': 80}, 'stable': True}, {'clients': 32, 'requests': 80, 'duration_seconds': 0.19692409399976896, 'throughput_requests_per_second': 406.2479017935401, 'p95_ms': 82.83815899994806, 'p99_ms': 96.28357800011145, 'max_ms': 96.28357800011145, 'errors': 0, 'status_counts': {'200': 80}, 'tls_versions': {'TLSv1.3': 80}, 'stable': True}]}",
+          "worker_slot_performance_evidence=not supplied"
+        ],
+        "findings": []
+      },
+      {
+        "name": "10. Professional workbench depth and safe expansion",
+        "status": "PASS",
+        "evidence": [
+          "Proxy: Intercept/History/Repeater/Decoder/Comparer/AutoResponder/Inspector/redacted HAR export",
+          "Enterprise: bounded batch lease API",
+          "Extraction Studio remains an independent professional workbench",
+          "Packet Intelligence and MITM interception remain independent workbenches"
+        ],
+        "findings": []
+      }
+    ]
+  },
+  "regression": {
+    "passed": 709,
+    "skipped_environment": 12,
+    "failed": 0,
+    "execution": "partitioned by test file to obtain explicit process exit codes",
+    "environment_skips": [
+      "Qt binding unavailable",
+      "Windows process probe",
+      "Windows DPI/native UI"
+    ]
+  },
+  "server_queue_concurrency": {
+    "schema": "arenyxa.enterprise-server-performance/v1",
+    "started_at_epoch": 1787051255.395501,
+    "duration_seconds": 19.423,
+    "stable": true,
+    "recommended_workers": 1,
+    "peak_execute_ops_per_second": 84.994,
+    "levels": [
+      {
+        "workers": 1,
+        "jobs": 192,
+        "enqueue_ops_per_second": 275.112,
+        "execute_ops_per_second": 75.92,
+        "enqueue_p95_ms": 7.885,
+        "execute_p95_ms": 23.928,
+        "execute_p99_ms": 33.592,
+        "max_execute_ms": 45.943,
+        "errors": 0,
+        "completed": 192,
+        "thread_delta": 0,
+        "fd_delta": 0,
+        "invariants": {
+          "inconsistent_lease_rows": 0,
+          "unreceipted_completed_jobs": 0,
+          "implausible_future_leases": 0,
+          "active_jobs_remaining": 0
+        },
+        "stable": true
+      },
+      {
+        "workers": 2,
+        "jobs": 192,
+        "enqueue_ops_per_second": 260.3,
+        "execute_ops_per_second": 79.65,
+        "enqueue_p95_ms": 13.58,
+        "execute_p95_ms": 34.165,
+        "execute_p99_ms": 36.796,
+        "max_execute_ms": 45.436,
+        "errors": 0,
+        "completed": 192,
+        "thread_delta": 0,
+        "fd_delta": 0,
+        "invariants": {
+          "inconsistent_lease_rows": 0,
+          "unreceipted_completed_jobs": 0,
+          "implausible_future_leases": 0,
+          "active_jobs_remaining": 0
+        },
+        "stable": true
+      },
+      {
+        "workers": 4,
+        "jobs": 192,
+        "enqueue_ops_per_second": 291.44,
+        "execute_ops_per_second": 70.134,
+        "enqueue_p95_ms": 19.956,
+        "execute_p95_ms": 79.803,
+        "execute_p99_ms": 93.679,
+        "max_execute_ms": 94.089,
+        "errors": 0,
+        "completed": 192,
+        "thread_delta": 0,
+        "fd_delta": 0,
+        "invariants": {
+          "inconsistent_lease_rows": 0,
+          "unreceipted_completed_jobs": 0,
+          "implausible_future_leases": 0,
+          "active_jobs_remaining": 0
+        },
+        "stable": true
+      },
+      {
+        "workers": 8,
+        "jobs": 192,
+        "enqueue_ops_per_second": 257.735,
+        "execute_ops_per_second": 81.969,
+        "enqueue_p95_ms": 44.096,
+        "execute_p95_ms": 119.421,
+        "execute_p99_ms": 125.469,
+        "max_execute_ms": 148.888,
+        "errors": 0,
+        "completed": 192,
+        "thread_delta": 0,
+        "fd_delta": 0,
+        "invariants": {
+          "inconsistent_lease_rows": 0,
+          "unreceipted_completed_jobs": 0,
+          "implausible_future_leases": 0,
+          "active_jobs_remaining": 0
+        },
+        "stable": true
+      },
+      {
+        "workers": 16,
+        "jobs": 192,
+        "enqueue_ops_per_second": 303.388,
+        "execute_ops_per_second": 84.994,
+        "enqueue_p95_ms": 66.513,
+        "execute_p95_ms": 208.554,
+        "execute_p99_ms": 237.315,
+        "max_execute_ms": 251.025,
+        "errors": 0,
+        "completed": 192,
+        "thread_delta": 0,
+        "fd_delta": 0,
+        "invariants": {
+          "inconsistent_lease_rows": 0,
+          "unreceipted_completed_jobs": 0,
+          "implausible_future_leases": 0,
+          "active_jobs_remaining": 0
+        },
+        "stable": true
+      },
+      {
+        "workers": 32,
+        "jobs": 192,
+        "enqueue_ops_per_second": 314.785,
+        "execute_ops_per_second": 74.705,
+        "enqueue_p95_ms": 110.861,
+        "execute_p95_ms": 490.461,
+        "execute_p99_ms": 497.76,
+        "max_execute_ms": 608.05,
+        "errors": 0,
+        "completed": 192,
+        "thread_delta": 0,
+        "fd_delta": 0,
+        "invariants": {
+          "inconsistent_lease_rows": 0,
+          "unreceipted_completed_jobs": 0,
+          "implausible_future_leases": 0,
+          "active_jobs_remaining": 0
+        },
+        "stable": true
+      }
+    ]
+  },
+  "server_http_tls_concurrency": {
+    "schema": "arenyxa.enterprise-server-http-performance/v1",
+    "stable": true,
+    "tls_minimum": "TLSv1.3",
+    "requests_per_level": 80,
+    "recommended_clients": 4,
+    "peak_throughput_requests_per_second": 1012.6780071260663,
+    "server_thread_stopped": true,
+    "levels": [
+      {
+        "clients": 1,
+        "requests": 80,
+        "duration_seconds": 0.07994263900036458,
+        "throughput_requests_per_second": 1000.7175269712469,
+        "p95_ms": 1.0997780000252533,
+        "p99_ms": 7.576877999781573,
+        "max_ms": 7.576877999781573,
+        "errors": 0,
+        "status_counts": {
+          "200": 80
+        },
+        "tls_versions": {
+          "TLSv1.3": 80
+        },
+        "stable": true
+      },
+      {
+        "clients": 4,
+        "requests": 80,
+        "duration_seconds": 0.0789984569992157,
+        "throughput_requests_per_second": 1012.6780071260663,
+        "p95_ms": 6.379630000083125,
+        "p99_ms": 9.35073500022554,
+        "max_ms": 9.35073500022554,
+        "errors": 0,
+        "status_counts": {
+          "200": 80
+        },
+        "tls_versions": {
+          "TLSv1.3": 80
+        },
+        "stable": true
+      },
+      {
+        "clients": 8,
+        "requests": 80,
+        "duration_seconds": 0.08938426300028368,
+        "throughput_requests_per_second": 895.0121342919849,
+        "p95_ms": 10.471599000084097,
+        "p99_ms": 18.895013000474137,
+        "max_ms": 18.895013000474137,
+        "errors": 0,
+        "status_counts": {
+          "200": 80
+        },
+        "tls_versions": {
+          "TLSv1.3": 80
+        },
+        "stable": true
+      },
+      {
+        "clients": 16,
+        "requests": 80,
+        "duration_seconds": 0.12314176899963059,
+        "throughput_requests_per_second": 649.65771281262,
+        "p95_ms": 38.402098000005935,
+        "p99_ms": 41.724975999386515,
+        "max_ms": 41.724975999386515,
+        "errors": 0,
+        "status_counts": {
+          "200": 80
+        },
+        "tls_versions": {
+          "TLSv1.3": 80
+        },
+        "stable": true
+      },
+      {
+        "clients": 32,
+        "requests": 80,
+        "duration_seconds": 0.19692409399976896,
+        "throughput_requests_per_second": 406.2479017935401,
+        "p95_ms": 82.83815899994806,
+        "p99_ms": 96.28357800011145,
+        "max_ms": 96.28357800011145,
+        "errors": 0,
+        "status_counts": {
+          "200": 80
+        },
+        "tls_versions": {
+          "TLSv1.3": 80
+        },
+        "stable": true
+      }
+    ]
+  },
+  "production_chaos": {
+    "schema": "arenyxa.production-validation/v1",
+    "started_at": "2026-08-18T11:08:06.988770+00:00",
+    "duration_seconds": 8.681,
+    "local_gate_passed": true,
+    "production_evidence_complete": false,
+    "production_ready": false,
+    "local_items": [
+      {
+        "name": "hard-crash-idempotent-recovery",
+        "status": "passed",
+        "duration_ms": 615.51,
+        "detail": "os._exit hard crash recovered expired idempotent work to queued state"
+      },
+      {
+        "name": "hard-crash-non-idempotent-fence",
+        "status": "passed",
+        "duration_ms": 706.79,
+        "detail": "side-effect-started work was fenced to review_required after hard crash"
+      },
+      {
+        "name": "lost-terminal-response-replay",
+        "status": "passed",
+        "duration_ms": 34.09,
+        "detail": "exact terminal ACK replay is idempotent; conflicting replay fails closed"
+      },
+      {
+        "name": "concurrent-lease-exclusivity",
+        "status": "passed",
+        "duration_ms": 31.55,
+        "detail": "two simultaneous Workers produced exactly one durable lease winner"
+      },
+      {
+        "name": "checkpoint-restart-durability",
+        "status": "passed",
+        "duration_ms": 42.1,
+        "detail": "checkpoint payload and sequence survived queue reconstruction"
+      },
+      {
+        "name": "clock-corruption-fail-closed",
+        "status": "passed",
+        "duration_ms": 40.41,
+        "detail": "impossible future lease was treated as state/clock corruption and fenced"
+      },
+      {
+        "name": "bounded-soak-consistency",
+        "status": "passed",
+        "duration_ms": 7209.64,
+        "detail": "512 jobs completed across 4 Workers; restart health/invariants remained clean"
+      }
+    ],
+    "external_evidence": {
+      "provided": false,
+      "valid": false,
+      "status": "not_provided",
+      "detail": "Local chaos gate passed independently; true Server + 2 Worker evidence is still required.",
+      "required_scenarios": [
+        "server_process_crash",
+        "worker_process_crash",
+        "network_partition",
+        "duplicate_delivery",
+        "delayed_delivery",
+        "disk_pressure",
+        "clock_discontinuity",
+        "tls_identity_rotation"
+      ]
+    }
+  },
+  "professional_advances": [
+    "Proxy Inspector for request/response headers, cookies, CORS, cache, security headers and timing",
+    "Proxy redacted HAR 1.2 export with sensitive-header masking and binary Base64 content",
+    "Proxy validated multi-address DNS pinning with fallback only inside the already-approved address set",
+    "Rules/AutoResponder local responses remain upstream-free and bounded",
+    "Enterprise bounded batch lease API and bounded concurrent Worker execution path",
+    "Enterprise liveness and readiness endpoints with readiness fail-closed on queue invariant violations",
+    "Extraction Studio remains an independent professional collection workbench",
+    "Packet Intelligence and MITM interception remain independent professional workbenches"
+  ],
+  "server_hardening": [
+    "Modern Enterprise Server and Coordinator default to TLS 1.3",
+    "TLS 1.2 is explicit compatibility opt-in for Server/Worker; Coordinator remains TLS 1.3-only",
+    "Uvicorn in-flight concurrency, backlog, keep-alive and graceful shutdown are explicitly bounded",
+    "Rate limiter high-cardinality churn cannot evict a known peer and reset its rate history",
+    "Proxy remote exposure blocks private/loopback/link-local targets by default",
+    "Enterprise health exposes bounded traffic and rate-limiter state without high-cardinality labels",
+    "SQLite deployment profile is explicitly single-host; PostgreSQL is the multi-host server backend"
+  ],
+  "performance_interpretation": {
+    "sqlite_queue": "All 1/2/4/8/16/32 Worker levels were stable with zero errors/invariant/thread/FD leaks. Peak execute throughput in this run was 84.994 jobs/s, but tail latency rose materially at 16/32 Workers; use PostgreSQL for sustained high-concurrency or multi-host deployment.",
+    "http_tls": "All tested 1/4/8/16/32 client levels were stable and negotiated TLSv1.3. Peak loopback health throughput was 1012.678 req/s at the measured optimum; this is a lightweight health-endpoint microbenchmark, not an application workload SLA."
+  },
+  "release_gates": {
+    "arenyxa_namespace_gate": "PASS",
+    "ui_type_gate": "PASS (7 strict critical modules)",
+    "architecture_debt_gate": "PASS (broad Exception 326; enterprise 50; proxy 2)",
+    "win7_python38_legacy_grammar": "PASS (134 legacy files)",
+    "startup_visual_frozen_hashes": "PASS",
+    "phase12_config_parse": "PASS",
+    "ruff": "NOT RUN - ruff is not installed in this container",
+    "native_mypy": "NOT RUN - mypy executable/module is not available in this container; project UI type gate ran instead",
+    "phase0_compileall_and_integrity": "PASS (pytest and ruff skipped inside Phase 0 because regression was run separately and ruff is unavailable)",
+    "v7_release_identity": "PASS",
+    "github_publication_gate": "PASS (724 files scanned with PYTHONDONTWRITEBYTECODE=1; no private key/vault/credential/local-profile findings)"
+  },
+  "remaining_external_evidence": [
+    "Real PostgreSQL concurrency benchmark was not run because no PostgreSQL service/psycopg runtime is available in this environment",
+    "True Server plus at least two independent Worker machines with network partition, delayed/duplicate delivery, disk pressure, clock discontinuity and TLS identity rotation remains required",
+    "Native Windows/Qt/DPI and Windows process lifecycle validation remains required",
+    "Real mitmdump and packet-analysis runtime end-to-end execution remains environment-dependent"
+  ],
+  "production_claim": {
+    "local_server_gate_passed": true,
+    "production_evidence_complete": false,
+    "production_ready": false,
+    "statement": "The local automated server gate is strong and passes, but this report does not claim full production readiness until the required external multi-machine/native evidence is supplied."
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "schema": "arenyxa.production-config-gate/v2",
+  "production_config": "validated",
+  "passed": true,
+  "checks": [
+    {
+      "name": "release_version",
+      "ok": true,
+      "detail": "version=8.0.0"
+    },
+    {
+      "name": "docker_non_root",
+      "ok": true,
+      "detail": "Dockerfile must switch to a non-root runtime user"
+    },
+    {
+      "name": "compose_secure_default_bind",
+      "ok": true,
+      "detail": "published desktop/server UI port defaults to loopback"
+    },
+    {
+      "name": "sqlite_local_allowed",
+      "ok": true,
+      "detail": "SQLite remains supported for local/single-host runtime"
+    },
+    {
+      "name": "sqlite_pressure_warning",
+      "ok": true,
+      "detail": "SQLite 9-worker local mode must surface serialized-WAL pressure"
+    },
+    {
+      "name": "sqlite_high_concurrency_fail_closed",
+      "ok": true,
+      "detail": "SQLite 16+ worker concurrency must require PostgreSQL"
+    },
+    {
+      "name": "sqlite_distributed_fail_closed",
+      "ok": true,
+      "detail": "distributed SQLite must be rejected"
+    },
+    {
+      "name": "postgres_distributed_allowed",
+      "ok": true,
+      "detail": "PostgreSQL is the supported distributed backend"
+    },
+    {
+      "name": "loopback_detection",
+      "ok": true,
+      "detail": "bind classification is fail-closed"
+    },
+    {
+      "name": "enterprise_server_storage_guard",
+      "ok": true,
+      "detail": "Enterprise serve path invokes storage deployment guard before bootstrap"
+    }
+  ]
+}

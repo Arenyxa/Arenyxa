@@ -1,0 +1,13 @@
+services:
+  arenyxa:
+    build: .
+    command: ["--host", "0.0.0.0", "--allow-lan"]
+    environment:
+      - ARENYXA_DATA_DIR=/data
+    volumes:
+      - arenyxa-data:/data
+    ports:
+      - "127.0.0.1:8787:8787"
+    restart: unless-stopped
+volumes:
+  arenyxa-data:

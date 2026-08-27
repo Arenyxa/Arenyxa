@@ -1,0 +1,5 @@
+from __future__ import annotations
+
+DEFAULT_SOCKET_TIMEOUT = 30.0
+MAX_CONNECTIONS = 4096
+MAX_BUFFER_BYTES = 64 * 1024 * 1024

@@ -1,0 +1,14 @@
+{
+  "schema": "arenyxa.release-identity/v1",
+  "product": "Arenyxa",
+  "channel": "stable",
+  "display_version": "7.0",
+  "package_version": "7.0.0",
+  "windows_file_version": "7.0.0.0",
+  "runtime_compatibility_identity": "6.8.0",
+  "enterprise_protocol_current": 2,
+  "enterprise_protocol_minimum": 1,
+  "modern_installer": "Arenyxa_V7.0_Setup_x64.exe",
+  "legacy_win7_installer": "Arenyxa_V7.0_Legacy_Win7_x64_Setup.exe",
+  "startup_visual_frozen": true
+}

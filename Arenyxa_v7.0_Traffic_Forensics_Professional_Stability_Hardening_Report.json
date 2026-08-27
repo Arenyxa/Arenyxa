@@ -1,0 +1,56 @@
+{
+  "schema": "arenyxa.hardening-report/v1",
+  "baseline": "Arenyxa_v7.0_A_Quality_20D_Professional_Final_Hardened_Source.zip",
+  "result": "Arenyxa_v7.0_Traffic_Forensics_Professional_Stability_Hardened_Source.zip",
+  "date": "2026-08-19",
+  "scope": [
+    "test and CI reproducibility",
+    "proxy decoder correctness",
+    "passive traffic forensics professional workbench",
+    "welcome-window release-contract validation",
+    "Windows 7 / Python 3.8 frozen compatibility",
+    "startup visual freeze preservation"
+  ],
+  "changes": [
+    {
+      "area": "pytest src-layout discovery",
+      "detail": "Added tool.pytest.ini_options.pythonpath=[src], so project pytest invocations resolve arenyxa without an external PYTHONPATH override."
+    },
+    {
+      "area": "Proxy Decoder",
+      "detail": "Codec operations are now mode-specific: URL/Base64/Hex expose Encode/Decode, JSON exposes Format. Invalid mode-operation pairs fail explicitly instead of silently treating Format as Decode."
+    },
+    {
+      "area": "Traffic Forensics",
+      "detail": "Added an independent Professional Suite tab and passive analyzer for host/protocol/status distributions, flow counts, p50/p95/p99 latency, large-transfer findings, host error/latency spikes, plaintext-sensitive metadata detection, bounded evidence timeline and atomic JSON export. Sensitive header values and request bodies are not copied into forensic findings."
+    },
+    {
+      "area": "Welcome contract gate",
+      "detail": "Updated the gate to follow the split main_window_navigation.py implementation after the MainWindow modularization, eliminating a false release-blocking failure while keeping current Welcome behavior unchanged."
+    },
+    {
+      "area": "Legacy compatibility",
+      "detail": "Changed Traffic Forensics runtime type aliases to typing.Mapping/Sequence so the Windows 7 Python 3.8 frozen compatibility gate remains valid."
+    }
+  ],
+  "validation": {
+    "compileall": "PASS",
+    "professional_network_security_regression": "98 passed",
+    "ui_navigation_regression": "15 passed, 3 skipped because Qt binding is unavailable in the Linux validation container",
+    "traffic_forensics_win7_targeted": "31 passed",
+    "post_fix_targeted_and_contract": "35 passed; Welcome contract PASS; startup visual baseline PASS",
+    "phase_8_10_gate": "101 passed, 1 Qt-dependent test skipped",
+    "phase_11_12_gate": "35 passed plus 68 prerequisite enterprise regression passed",
+    "startup_visual_sha256": {
+      "src/arenyxa/presentation/startup_splash.py": "70c66f51c513c2adeaf4a425492bc9f2ae94e2aaa2d1a6a734e1663075dac20a",
+      "src/arenyxa/presentation/startup_motion_math.py": "04488fec32a69741b93dcf5b5806108acc3f265f1ea7cdf2930552190bca77ae"
+    },
+    "traffic_forensics_20000_event_benchmark_seconds": 0.130467,
+    "traffic_forensics_benchmark_timeline_limit": 2000,
+    "static_quality_gate": "NOT EXECUTED: release gate stopped because ruff is not installed in this validation container. The gate itself requests python -m pip install -e .[dev]. No claim of ruff PASS is made."
+  },
+  "inventory": {
+    "python_files_src_tests_scripts": 353,
+    "non_cache_files_current_tree": 671
+  }
+}

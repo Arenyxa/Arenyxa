@@ -1,0 +1,150 @@
+name: Arenyxa Industrialization Gates
+
+on:
+  pull_request:
+  push:
+    branches: [main, "release/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arenyxa-industrialization-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.11", cache: pip }
+      - run: python -m pip install --upgrade pip && python -m pip install -e ".[dev,analysis]"
+      - name: Static and workflow contract gates
+        run: |
+          python scripts/static_quality_gate.py
+          python scripts/workflow_contract_gate.py
+          python scripts/architecture_debt_gate.py
+
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.11", cache: pip }
+      - run: python -m pip install --upgrade pip && python -m pip install -e ".[dev,analysis]"
+      - name: Industrialization unit contracts
+        run: >-
+          python -m pytest -q
+          tests/test_workflow_contract_gate.py
+          tests/test_shadow_compatibility.py
+          tests/test_v70_distributed_fault_matrix.py
+          tests/test_reliability_stability_hardening.py
+          tests/test_v80_industrialization_hardening.py
+          tests/test_hot_path_memory.py
+
+  integration:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.11", cache: pip }
+      - shell: pwsh
+        run: python -m pip install --upgrade pip; python -m pip install -e ".[dev,desktop,analysis,capture]"
+      - name: Windows PowerShell 5.1 launch probe
+        shell: powershell
+        run: .\scripts\test_launch_probe.ps1
+      - name: Windows service and runtime contracts
+        run: python -m pytest -q tests/test_v68_stability_hardening.py tests/test_v66beta2_windows_native_qt_crash_hardening.py
+
+  postgres-stress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.11", cache: pip }
+      - run: python -m pip install --upgrade pip && python -m pip install -e ".[dev,database]"
+      - name: PostgreSQL 64-worker / 128-concurrency no-storm gate
+        run: python scripts/postgresql_64_worker_128_concurrency_gate.py --jobs 1024 --report POSTGRES_64W_128C_GATE.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: postgres-64w-128c-gate
+          path: POSTGRES_64W_128C_GATE.json
+
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.11", cache: pip }
+      - run: python -m pip install --upgrade pip && python -m pip install -e ".[dev,analysis]"
+      - name: Dependency CVE, wheel RECORD hash, and SBOM gate
+        run: python scripts/dependency_security_gate.py
+      - name: Release identity and publication contracts
+        run: |
+          python scripts/verify_v81_release_identity.py
+          python scripts/github_publication_gate.py --allow-local-artifacts
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: dependency-security-artifacts
+          path: dist/security
+
+  final-gate-report:
+    if: always()
+    needs: [static, unit, integration, postgres-stress, release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build unified FINAL_GATE_REPORT
+        env:
+          STATIC_RESULT: ${{ needs.static.result }}
+          UNIT_RESULT: ${{ needs.unit.result }}
+          INTEGRATION_RESULT: ${{ needs.integration.result }}
+          POSTGRES_STRESS_RESULT: ${{ needs.postgres-stress.result }}
+          RELEASE_RESULT: ${{ needs.release.result }}
+        run: |
+          python - <<'PY'
+          import json, os
+          groups = {
+              "static": os.environ["STATIC_RESULT"],
+              "unit": os.environ["UNIT_RESULT"],
+              "integration": os.environ["INTEGRATION_RESULT"],
+              "postgres_stress": os.environ["POSTGRES_STRESS_RESULT"],
+              "release": os.environ["RELEASE_RESULT"],
+          }
+          report = {"schema":"arenyxa.final-gate-report/v1", "groups":groups, "passed":all(v == "success" for v in groups.values())}
+          open("FINAL_GATE_REPORT.json","w",encoding="utf-8").write(json.dumps(report,indent=2,sort_keys=True))
+          print(json.dumps(report,indent=2,sort_keys=True))
+          raise SystemExit(0 if report["passed"] else 2)
+          PY
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: FINAL_GATE_REPORT
+          path: FINAL_GATE_REPORT.json
