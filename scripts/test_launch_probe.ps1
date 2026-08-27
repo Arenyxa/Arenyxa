@@ -31,7 +31,7 @@ Write-Host 'launch probe regression passed'
 
 $Slow = Invoke-ArenyxaProcessProbe -PythonExecutable $Python -WorkingDirectory $Root -TimeoutSeconds 1 -ProbeScript @'
 import time
-print("stdout-before-timeout")
+print("stdout-before-timeout", flush=True)
 time.sleep(30)
 '@
 if (-not $Slow.Started -or $Slow.ExitCode -ne -2) { throw "timeout probe was not classified as -2: $($Slow.ExitCode)" }
