@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 IMPLEMENTATION = ROOT / "src" / "arenyxa"
 REMOVED_NAMESPACE = "n" + "exora"
 # Modularization baseline; this ratchet may only decrease in later releases.
-MAX_BROAD_EXCEPTION_CATCHES = 285
+MAX_BROAD_EXCEPTION_CATCHES = 284
 MAX_ENTERPRISE_BROAD_EXCEPTION_CATCHES = 50
 MAX_PROXY_BROAD_EXCEPTION_CATCHES = 1
 MAX_PYTHON_MODULE_LINES = 1000
