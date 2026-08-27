@@ -63,9 +63,38 @@ def _postgres_fencing_probe(
         return {"passed": False, "detail": "first worker could not lease fencing probe"}
     first_queue.start_job(job_id, first_worker, first.lease_token)
     recovered = coordinator.recover_expired_leases(now=first.lease_expires_at + 1.0)
+    state_after_recovery = coordinator.job(job_id)
     second = second_queue.lease_next(second_worker, lease_seconds=60)
-    if recovered < 1 or second is None or second.job_id != job_id:
-        return {"passed": False, "detail": "expired lease was not recovered and reassigned"}
+
+    if recovered < 1:
+        return {
+            "passed": False,
+            "detail": "expired lease recovery returned zero",
+            "recovered": recovered,
+            "job_id": job_id,
+            "state_after_recovery": state_after_recovery,
+            "second_job_id": None if second is None else second.job_id,
+        }
+
+    if second is None:
+        return {
+            "passed": False,
+            "detail": "recovered fencing job could not be leased by second worker",
+            "recovered": recovered,
+            "job_id": job_id,
+            "state_after_recovery": state_after_recovery,
+            "second_worker": second_worker,
+        }
+
+    if second.job_id != job_id:
+        return {
+            "passed": False,
+            "detail": "second worker leased a different job after fencing recovery",
+            "recovered": recovered,
+            "job_id": job_id,
+            "state_after_recovery": state_after_recovery,
+            "second_job_id": second.job_id,
+        }
 
     stale_rejected = False
     try:
