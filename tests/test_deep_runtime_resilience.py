@@ -781,3 +781,37 @@ def test_app_has_pre_gui_internal_plugin_worker_dispatch() -> None:
     main_body = source.split("def main(", 1)[1]
     assert 'effective_argv[0] == "--internal-plugin-worker"' in main_body
     assert main_body.index('effective_argv[0] == "--internal-plugin-worker"') < main_body.index("faulthandler")
+
+
+def test_app_has_pre_gui_frozen_external_supervisor_dispatch() -> None:
+    root = Path(__file__).resolve().parents[1]
+    source = (root / "src/arenyxa/app.py").read_text(encoding="utf-8")
+    main_body = source.split("def main(", 1)[1]
+    assert 'effective_argv[0] == "--internal-external-supervisor-child"' in main_body
+    assert main_body.index('effective_argv[0] == "--internal-external-supervisor-child"') < main_body.index("faulthandler")
+
+
+def test_external_supervisor_uses_frozen_reentry_command(tmp_path: Path, monkeypatch) -> None:
+    import arenyxa.infrastructure.external_supervisor as supervisor_module
+
+    commands: list[list[str]] = []
+
+    class FakeProcess:
+        stdin = None
+
+        def poll(self):
+            return None
+
+    def fake_popen(command, **kwargs):
+        commands.append(list(command))
+        return FakeProcess()
+
+    monkeypatch.setattr(supervisor_module.sys, "executable", str(tmp_path / "Arenyxa.exe"))
+    monkeypatch.setattr(supervisor_module.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(supervisor_module.subprocess, "Popen", fake_popen)
+
+    client = supervisor_module.ExternalSupervisorClient(tmp_path / "diagnostics")
+    client.start()
+    assert commands
+    assert commands[0][1] == "--internal-external-supervisor-child"
+    assert "-m" not in commands[0]

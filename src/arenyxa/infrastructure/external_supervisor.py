@@ -105,10 +105,12 @@ class ExternalSupervisorClient:
             creationflags = 0
             if os.name == "nt":
                 creationflags = int(getattr(subprocess, "CREATE_NO_WINDOW", 0))
-            command = [
-                sys.executable,
-                "-m",
-                "arenyxa.infrastructure.external_supervisor",
+            command = [sys.executable]
+            if getattr(sys, "frozen", False):
+                command.append("--internal-external-supervisor-child")
+            else:
+                command.extend(["-m", "arenyxa.infrastructure.external_supervisor"])
+            command.extend([
                 "--child",
                 "--parent-pid",
                 str(os.getpid()),
@@ -116,7 +118,7 @@ class ExternalSupervisorClient:
                 str(self.diagnostics_dir),
                 "--stale-seconds",
                 str(self.stale_seconds),
-            ]
+            ])
             child_env = os.environ.copy()
             source_root = str(Path(__file__).resolve().parents[2])
             existing_pythonpath = child_env.get("PYTHONPATH", "")

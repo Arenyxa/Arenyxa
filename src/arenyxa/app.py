@@ -564,8 +564,12 @@ def main(argv: list[str] | None = None) -> int:
         multiprocessing.freeze_support()
     effective_argv = list(sys.argv[1:] if argv is None else argv)
     checkpoint("BOOT-003-MAIN-ENTER", argv=effective_argv)
-                                                                                           
-                                                                                       
+    if effective_argv and effective_argv[0] == "--internal-external-supervisor-child":
+        from arenyxa.infrastructure.external_supervisor import main as run_external_supervisor
+
+        return run_external_supervisor(effective_argv[1:])
+    
+    
     if effective_argv and effective_argv[0] == "--internal-plugin-worker":
         if len(effective_argv) != 3:
             console_write("invalid internal plugin worker arguments", error=True)
