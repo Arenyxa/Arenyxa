@@ -1,5 +1,6 @@
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_dynamic_libs
 
 project = Path(SPECPATH).parent
 icon = project / "src" / "arenyxa" / "resources" / "icons" / "arenyxa.ico"
@@ -10,11 +11,15 @@ data_files = [
     (str(project / "NOTICE.md"), "."),
     (str(project / "TRADEMARKS.md"), "."),
 ] + collect_data_files("tzdata")
+# Qt6Core loads ICU at runtime.  Keep PySide6's native dependency set in the
+# same directory as the Qt extension modules so the installed one-folder app
+# does not depend on the developer machine's DLL search path.
+qt_binaries = collect_dynamic_libs("PySide6")
 
 a = Analysis(
     [str(project / "src" / "arenyxa" / "app.py")],
     pathex=[str(project / "src")],
-    binaries=[],
+    binaries=qt_binaries,
     datas=data_files,
     hiddenimports=[
         "lxml.cssselect",
