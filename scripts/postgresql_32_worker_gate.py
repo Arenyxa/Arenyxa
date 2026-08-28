@@ -300,7 +300,8 @@ def run_gate(
     # Open every independent client pool before the timed workload so the gate
     # measures lease-path latency rather than one-time connection establishment.
     for client in clients:
-        client._connection_pool()
+        with client._connection():
+            pass
     job_ids = [
         coordinator.enqueue(
             "benchmark.noop", {"sequence": index},
