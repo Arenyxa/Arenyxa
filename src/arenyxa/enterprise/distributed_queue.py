@@ -424,26 +424,49 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
         self._recover_expired_leases_if_due()
         with self._lock, self._connection() as connection:
             self._begin(connection)
-            worker_row = connection.execute(self._storage.worker_for_lease_sql(), (worker,)).fetchone()
-            if worker_row is None:
-                connection.rollback()
-                raise _fail("WORKER_UNKNOWN", "Worker is not registered")
-            if str(worker_row["state"]) != "active":
-                connection.rollback()
-                if str(worker_row["state"]) == "revoked":
-                    raise _fail("WORKER_REVOKED", "Worker is revoked")
-                return None
-            if int(worker_row["active_leases"]) >= int(worker_row["max_slots"]):
-                connection.rollback()
-                return None
-            protocol_min = int(worker_row["protocol_min"])
-            protocol_max = int(worker_row["protocol_max"])
+            atomic_slot_sql = self._storage.claim_worker_slot_for_lease_sql()
+            if atomic_slot_sql is not None:
+                worker_row = connection.execute(
+                    atomic_slot_sql, (self._clock.stable_epoch(), utc_now(), worker)
+                ).fetchone()
+                if worker_row is None:
+                    state_row = connection.execute(
+                        "SELECT state FROM distributed_workers WHERE worker_id=?", (worker,)
+                    ).fetchone()
+                    connection.rollback()
+                    if state_row is None:
+                        raise _fail("WORKER_UNKNOWN", "Worker is not registered")
+                    if str(state_row["state"]) == "revoked":
+                        raise _fail("WORKER_REVOKED", "Worker is revoked")
+                    return None
+                protocol_min = int(worker_row["protocol_min"])
+                protocol_max = int(worker_row["protocol_max"])
+                slot_claimed = True
+            else:
+                worker_row = connection.execute(self._storage.worker_for_lease_sql(), (worker,)).fetchone()
+                if worker_row is None:
+                    connection.rollback()
+                    raise _fail("WORKER_UNKNOWN", "Worker is not registered")
+                if str(worker_row["state"]) != "active":
+                    connection.rollback()
+                    if str(worker_row["state"]) == "revoked":
+                        raise _fail("WORKER_REVOKED", "Worker is revoked")
+                    return None
+                if int(worker_row["active_leases"]) >= int(worker_row["max_slots"]):
+                    connection.rollback()
+                    return None
+                protocol_min = int(worker_row["protocol_min"])
+                protocol_max = int(worker_row["protocol_max"])
+                slot_claimed = False
             row = connection.execute(
                 self._storage.lease_candidate_sql(),
                 (protocol_min, protocol_max),
             ).fetchone()
             if row is None:
-                connection.commit()
+                if slot_claimed:
+                    connection.rollback()
+                else:
+                    connection.commit()
                 return None
             token = secrets.token_urlsafe(32)
             digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
@@ -459,13 +482,14 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
             if cursor.rowcount != 1:
                 connection.rollback()
                 return None
-            slot_cursor = connection.execute(
-                self._storage.claim_worker_slot_sql(),
-                (self._clock.stable_epoch(), updated_at, worker),
-            )
-            if slot_cursor.rowcount != 1:
-                connection.rollback()
-                return None
+            if not slot_claimed:
+                slot_cursor = connection.execute(
+                    self._storage.claim_worker_slot_sql(),
+                    (self._clock.stable_epoch(), updated_at, worker),
+                )
+                if slot_cursor.rowcount != 1:
+                    connection.rollback()
+                    return None
             self._record_event_locked(
                 connection, job_id, "leased", "queued", "leased", worker_id=worker,
                 details={"attempt": attempt, "lease_seconds": duration, "clock": "stable-monotonic-epoch"},
@@ -582,9 +606,10 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
         return leases
 
     def _require_lease_locked(
-        self, connection: Any, job_id: str, worker_id: str, lease_token: str,
+        self, connection: Any, job_id: str, worker_id: str, lease_token: str, *, row: Any | None = None,
     ) -> Any:
-        row = connection.execute(self._storage.lease_for_update_sql(), (str(job_id),)).fetchone()
+        if row is None:
+            row = connection.execute(self._storage.lease_for_update_sql(), (str(job_id),)).fetchone()
         if row is None:
             raise _fail("DISTRIBUTED_JOB_UNKNOWN", "Distributed job does not exist")
         if str(row["state"]) not in {"leased", "running"} or str(row["lease_worker_id"]) != str(worker_id):
@@ -738,7 +763,7 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
                     "DISTRIBUTED_TERMINAL_CONFLICT",
                     "Completed job terminal receipt does not match the presented Worker/lease/result",
                 )
-            row = self._require_lease_locked(connection, job_id, worker_id, lease_token)
+            row = self._require_lease_locked(connection, job_id, worker_id, lease_token, row=existing)
             previous = str(row["state"])
             effect = "completed" if str(row["side_effect_state"]) == "started" else str(row["side_effect_state"])
             terminal_at = utc_now()

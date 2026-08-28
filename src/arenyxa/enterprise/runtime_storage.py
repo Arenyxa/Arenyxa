@@ -313,6 +313,10 @@ class DistributedRuntimeStorageBackend(ABC):
             "WHERE worker_id=? AND state='active' AND active_leases<max_slots"
         )
 
+    def claim_worker_slot_for_lease_sql(self) -> str | None:
+        """Return a backend-specific atomic worker admission statement, when available."""
+        return None
+
     def expired_lease_candidates_sql(self) -> str:
         return (
             "SELECT job_id,state,lease_worker_id,lease_token_sha256,lease_expires_at,side_effect_mode,side_effect_state,attempt,max_attempts "
@@ -684,6 +688,13 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
 
     def worker_for_lease_sql(self) -> str:
         return "SELECT * FROM distributed_workers WHERE worker_id=? FOR UPDATE"
+
+    def claim_worker_slot_for_lease_sql(self) -> str:
+        return (
+            "UPDATE distributed_workers SET active_leases=active_leases+1,heartbeat_at=?,updated_at=? "
+            "WHERE worker_id=? AND state='active' AND active_leases<max_slots "
+            "RETURNING protocol_min,protocol_max"
+        )
 
     def lease_for_update_sql(self) -> str:
         return "SELECT * FROM distributed_jobs WHERE job_id=? FOR UPDATE"
