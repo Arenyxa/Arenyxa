@@ -86,7 +86,7 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
         # recovery transactions during a short burst, competing with the hot
         # lease path.  Explicit recovery remains available; the background
         # safety sweep is still frequent enough for the 45s heartbeat window.
-        self._expiry_scan_interval_seconds = 2.0 if self._storage.capabilities.external_server else 0.5
+        self._expiry_scan_interval_seconds = 5.0 if self._storage.capabilities.external_server else 0.5
         self._last_expiry_scan_monotonic = 0.0
         self._worker_heartbeat_timeout_seconds = max(10.0, min(45.0, float(DEFAULT_LEASE_SECONDS) * 0.75))
         self._health_lock = threading.Lock()
