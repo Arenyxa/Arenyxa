@@ -1,4 +1,5 @@
 from pathlib import Path
+from PyInstaller.building.datastruct import TOC
 from PyInstaller.utils.hooks import collect_data_files
 from PyInstaller.utils.hooks import collect_dynamic_libs
 
@@ -42,6 +43,15 @@ a = Analysis(
         "PyInstaller", "setuptools", "pkg_resources", "wheel", "pip",
     ],
     noarchive=False,
+)
+# Qt6Core imports the unversioned Windows ICU shim.  PyInstaller can resolve
+# that import from an unrelated ICU distribution on the build host (for
+# example Poppler), whose versioned exports cause WinError 127 at runtime.
+# Keep the official PySide6 hook output, but discard only those ambient ICU
+# copies so Windows resolves its compatible system ICU implementation.
+a.binaries = TOC(
+    entry for entry in a.binaries
+    if Path(str(entry[0])).name.casefold() not in {"icuuc.dll", "icudt78.dll"}
 )
 pyz = PYZ(a.pure)
 exe = EXE(
