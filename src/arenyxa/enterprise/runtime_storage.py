@@ -18,9 +18,6 @@ from arenyxa.security.sql_safety import sql_identifier
 
 LOGGER = logging.getLogger(__name__)
 
-_POSTGRES_LEASE_ADMISSION = threading.BoundedSemaphore(64)
-
-
 @dataclass(frozen=True, slots=True)
 class RuntimeStorageCapabilities:
     backend: str
@@ -787,9 +784,6 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
             )
             SELECT * FROM leased
         """
-
-    def lease_admission_guard(self):
-        return _POSTGRES_LEASE_ADMISSION
 
     def start_job_fast_sql(self) -> str:
         return """
