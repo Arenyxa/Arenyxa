@@ -76,8 +76,8 @@ def test_postgresql_runtime_reuses_one_bounded_connection_pool(monkeypatch) -> N
 
     assert len(_Pool.created) == 1
     pool = _Pool.created[0]
-    assert pool.kwargs["min_size"] == 4
-    assert pool.kwargs["max_size"] == 8
+    assert pool.kwargs["min_size"] == 1
+    assert pool.kwargs["max_size"] == 64
     assert pool.kwargs["open"] is False
     assert pool.opens == [(True, 15.0)]
     assert pool.connection_calls == [15.0, 15.0]

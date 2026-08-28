@@ -452,25 +452,26 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
             expires = self._clock.deadline_epoch(duration)
             now = utc_now()
             detail_created = utc_now()
-            with self._lock, self._connection() as connection:
-                row = connection.execute(
-                    fast_sql,
-                    (
-                        worker,
-                        self._clock.stable_epoch(),
-                        now,
-                        worker,
-                        worker,
-                        digest,
-                        expires,
-                        now,
-                        worker,
-                        "",
-                        duration,
-                        detail_created,
-                        MAX_JOB_EVENTS_PER_JOB - 1,
-                    ),
-                ).fetchone()
+            with self._storage.lease_admission_guard():
+                with self._lock, self._connection() as connection:
+                    row = connection.execute(
+                        fast_sql,
+                        (
+                            worker,
+                            self._clock.stable_epoch(),
+                            now,
+                            worker,
+                            worker,
+                            digest,
+                            expires,
+                            now,
+                            worker,
+                            "",
+                            duration,
+                            detail_created,
+                            MAX_JOB_EVENTS_PER_JOB - 1,
+                        ),
+                    ).fetchone()
             if row is not None:
                 return self._lease_from_row(row, worker, token, expires, int(row["attempt"]))
 

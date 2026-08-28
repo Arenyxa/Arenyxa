@@ -7,7 +7,7 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping, Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +17,8 @@ from arenyxa.infrastructure.database_stability import DatabaseRetryPolicy, retry
 from arenyxa.security.sql_safety import sql_identifier
 
 LOGGER = logging.getLogger(__name__)
+
+_POSTGRES_LEASE_ADMISSION = threading.BoundedSemaphore(64)
 
 
 @dataclass(frozen=True, slots=True)
@@ -329,6 +331,10 @@ class DistributedRuntimeStorageBackend(ABC):
         """Return a backend-specific single-statement completion path, when available."""
         return None
 
+    def lease_admission_guard(self):
+        """Bound backend-specific lease admission without changing portable storage."""
+        return nullcontext()
+
     def record_event(
         self, connection: _ConnectionFacade, values: Sequence[Any], max_events: int,
     ) -> None:
@@ -558,11 +564,8 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                     "row_factory": dict_row,
                     "connect_timeout": 10,
                 },
-                # Warm half of the observed eight-thread client width before
-                # timing starts, while retaining bounded burst capacity for
-                # the remaining callers.
-                min_size=4,
-                max_size=8,
+                min_size=1,
+                max_size=64,
                 timeout=15.0,
                 max_idle=300.0,
                 max_lifetime=1800.0,
@@ -781,6 +784,9 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
             )
             SELECT * FROM leased
         """
+
+    def lease_admission_guard(self):
+        return _POSTGRES_LEASE_ADMISSION
 
     def start_job_fast_sql(self) -> str:
         return """
