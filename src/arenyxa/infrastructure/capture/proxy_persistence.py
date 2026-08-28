@@ -12,7 +12,8 @@ import logging
 import queue
 import threading
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any, cast
 
 from arenyxa.infrastructure.capture.proxy_models import ProxyFlow
 
@@ -34,6 +35,9 @@ class ProxyPersistencePipeline:
     """
 
     _STOP = object()
+    _OPEN = "open"
+    _CLOSING = "closing"
+    _CLOSED = "closed"
 
     def __init__(
         self,
@@ -49,7 +53,11 @@ class ProxyPersistencePipeline:
         self.error_callback = error_callback
         self._queue: queue.Queue[object] = queue.Queue(maxsize=self.capacity)
         self._lock = threading.RLock()
-        self._closed = False
+        self._lifecycle = threading.Condition(self._lock)
+        self._close_lock = threading.Lock()
+        self._state = self._OPEN
+        self._active_admissions = 0
+        self._stop_enqueued = False
         self._enqueued = 0
         self._persisted = 0
         self._history_failures = 0
@@ -69,31 +77,41 @@ class ProxyPersistencePipeline:
         """Queue a completed flow, or synchronously persist it under bounded backpressure."""
         persisted_flow = copy.deepcopy(flow)
         item = (str(session_id), persisted_flow)
-        with self._lock:
-            if self._closed:
-                raise RuntimeError("Proxy persistence pipeline is closed")
+        with self._lifecycle:
+            if self._state != self._OPEN:
+                raise RuntimeError("Proxy persistence pipeline is closing or closed")
+            self._active_admissions += 1
         try:
-            self._queue.put_nowait(item)
-        except queue.Full:
+            try:
+                self._queue.put_nowait(item)
+            except queue.Full:
+                with self._lock:
+                    self._sync_fallbacks += 1
+                self._persist(str(session_id), persisted_flow)
+                return "synchronous_fallback"
+            depth = self._queue.qsize()
             with self._lock:
-                self._sync_fallbacks += 1
-            self._persist(str(session_id), persisted_flow)
-            return "synchronous_fallback"
-        with self._lock:
-            self._enqueued += 1
-            self._max_queue_depth = max(self._max_queue_depth, self._queue.qsize())
-        return "queued"
+                self._enqueued += 1
+                self._max_queue_depth = max(self._max_queue_depth, depth)
+            return "queued"
+        finally:
+            with self._lifecycle:
+                self._active_admissions -= 1
+                self._lifecycle.notify_all()
 
     def _run(self) -> None:
         while True:
             item = self._queue.get()
             try:
                 if item is self._STOP:
-                    return
-                session_id, flow = item  # type: ignore[misc]
+                    break
+                session_id, flow = cast(tuple[str, ProxyFlow], item)
                 self._persist(str(session_id), flow)
             finally:
                 self._queue.task_done()
+        with self._lifecycle:
+            self._state = self._CLOSED
+            self._lifecycle.notify_all()
 
     def _persist(self, session_id: str, flow: ProxyFlow) -> None:
         history_ok = True
@@ -138,41 +156,62 @@ class ProxyPersistencePipeline:
     def flush(self, timeout: float = 5.0) -> bool:
         """Wait for all currently queued writes to finish within a bounded time budget."""
         deadline = time.monotonic() + max(0.0, float(timeout))
-        while True:
-            # Queue.unfinished_tasks is protected by all_tasks_done's lock.  Reading it under the
-            # same condition avoids relying on an unprotected implementation detail.
-            with self._queue.all_tasks_done:
-                pending = int(self._queue.unfinished_tasks)
-            if pending <= 0:
-                return True
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                return False
-            time.sleep(min(0.01, remaining))
+        with self._queue.all_tasks_done:
+            while self._queue.unfinished_tasks:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return False
+                self._queue.all_tasks_done.wait(remaining)
+        return True
 
     def close(self, timeout: float = 5.0) -> bool:
         """Drain queued evidence and stop the writer.  Returns whether the drain completed."""
-        with self._lock:
-            if self._closed:
-                return not self._thread.is_alive()
-            self._closed = True
-        drained = self.flush(timeout)
-        remaining = max(0.0, float(timeout))
+        deadline = time.monotonic() + max(0.0, float(timeout))
+        if not self._close_lock.acquire(timeout=max(0.0, deadline - time.monotonic())):
+            with self._lifecycle:
+                return self._state == self._CLOSED
         try:
-            self._queue.put(self._STOP, timeout=remaining)
-        except queue.Full:
-            return False
-        if self._thread is not threading.current_thread():
-            self._thread.join(remaining)
-        return drained and not self._thread.is_alive()
+            with self._lifecycle:
+                if self._state == self._CLOSED:
+                    return True
+                if self._state == self._OPEN:
+                    self._state = self._CLOSING
+                    self._lifecycle.notify_all()
+                while self._active_admissions:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        return False
+                    self._lifecycle.wait(remaining)
+
+            remaining = max(0.0, deadline - time.monotonic())
+            if not self.flush(remaining):
+                return False
+
+            if not self._stop_enqueued:
+                try:
+                    self._queue.put_nowait(self._STOP)
+                except queue.Full:
+                    return False
+                self._stop_enqueued = True
+
+            remaining = max(0.0, deadline - time.monotonic())
+            if self._thread is not threading.current_thread():
+                self._thread.join(remaining)
+            with self._lifecycle:
+                return self._state == self._CLOSED
+        finally:
+            self._close_lock.release()
 
     def status(self) -> dict[str, Any]:
-        with self._lock:
+        with self._queue.all_tasks_done:
+            queue_depth = len(self._queue.queue)
+            unfinished = int(self._queue.unfinished_tasks)
+        with self._lifecycle:
             return {
                 "schema": "arenyxa.proxy-persistence/v1",
                 "capacity": self.capacity,
-                "queue_depth": self._queue.qsize(),
-                "unfinished": int(self._queue.unfinished_tasks),
+                "queue_depth": queue_depth,
+                "unfinished": unfinished,
                 "enqueued": self._enqueued,
                 "persisted": self._persisted,
                 "sync_fallbacks": self._sync_fallbacks,
@@ -182,6 +221,8 @@ class ProxyPersistencePipeline:
                 "last_error": self._last_error,
                 "last_persisted_at": self._last_persisted_at,
                 "writer_alive": self._thread.is_alive(),
-                "closed": self._closed,
+                "state": self._state,
+                "active_admissions": self._active_admissions,
+                "closed": self._state == self._CLOSED,
                 "bounded": True,
             }
