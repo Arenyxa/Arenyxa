@@ -471,6 +471,13 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
         return psycopg, dict_row, ConnectionPool
 
     @staticmethod
+    def _configure_pool_connection(connection: Any) -> None:
+        """Configure PostgreSQL session limits once per physical pooled connection."""
+        connection.execute("SET lock_timeout = '10s'")
+        connection.execute("SET statement_timeout = '60s'")
+        connection.execute("SET idle_in_transaction_session_timeout = '60s'")
+
+    @staticmethod
     def _check_pool_connection(connection: Any) -> None:
         """Validate a checked-in/out PostgreSQL connection without relying on pool internals."""
         cursor = connection.execute("SELECT 1 AS arenyxa_pool_health")
@@ -524,6 +531,7 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                 max_lifetime=1800.0,
                 reconnect_timeout=30.0,
                 reconnect_failed=self._on_reconnect_failed,
+                configure=self._configure_pool_connection,
                 check=self._check_pool_connection,
                 open=False,
                 name="arenyxa-distributed-runtime",
@@ -546,9 +554,6 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                     self._pool_acquisitions += 1
                     self._last_pool_error = ""
                 try:
-                    raw.execute("SET lock_timeout = '10s'")
-                    raw.execute("SET statement_timeout = '60s'")
-                    raw.execute("SET idle_in_transaction_session_timeout = '60s'")
                     yield _ConnectionFacade(raw, self)
                 except (ArenyxaError, psycopg.Error, OSError, ValueError, TypeError, RuntimeError, KeyError):
                     try:
