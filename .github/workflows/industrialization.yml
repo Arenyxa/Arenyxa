@@ -117,21 +117,7 @@ jobs:
           echo "PostgreSQL max_connections=$VALUE"
           test "$VALUE" = "256"
       - name: PostgreSQL 64-worker / 128-concurrency no-storm gate
-        run: |
-          # The gate is release-blocking, but GitHub-hosted runner CPU/network
-          # scheduling can create an isolated tail-latency outlier.  Retry the
-          # complete gate without changing its workload or 500ms budget; a
-          # release still requires one full run to pass every invariant.
-          for attempt in 1 2 3; do
-            if python scripts/postgresql_64_worker_128_concurrency_gate.py --jobs 1024 --report POSTGRES_64W_128C_GATE.json; then
-              exit 0
-            fi
-            if [ "$attempt" -lt 3 ]; then
-              echo "PostgreSQL stress attempt $attempt exceeded a release gate; retrying the complete gate."
-              sleep 5
-            fi
-          done
-          exit 1
+        run: python scripts/postgresql_64_worker_128_concurrency_gate.py --jobs 1024 --report POSTGRES_64W_128C_GATE.json
       - uses: actions/upload-artifact@v6
         if: always()
         with:
