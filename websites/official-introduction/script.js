@@ -74,5 +74,12 @@ if (reducedMotion) {
 }
 const sideLinks=[...document.querySelectorAll('.side-index a')];
 const sections=sideLinks.map(a=>document.querySelector(a.getAttribute('href'))).filter(Boolean);
+sideLinks.forEach(link => link.addEventListener('click', event => {
+  const target = document.querySelector(link.getAttribute('href'));
+  if (!target) return;
+  event.preventDefault();
+  history.pushState(null, '', link.hash);
+  target.scrollIntoView({behavior: reducedMotion ? 'auto' : 'smooth', block: 'start'});
+}));
 function updateIndex(){const y=window.scrollY+150;let current=sections[0]?.id;for(const section of sections)if(section.offsetTop<=y)current=section.id;sideLinks.forEach(a=>a.classList.toggle('active',a.getAttribute('href')===`#${current}`));}
 window.addEventListener('scroll',updateIndex,{passive:true});updateIndex();
