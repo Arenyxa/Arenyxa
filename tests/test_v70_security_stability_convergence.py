@@ -270,9 +270,9 @@ def test_source_has_no_bare_except_and_baseexception_handlers_are_explicit_bound
                     base_handlers.append((path.relative_to(root).as_posix(), node.lineno))
     assert bare == []
     allowed_modules = {
-        "enterprise/production_validation.py",
+        "__main__.py",
+        "app.py",
         "infrastructure/database.py",
-        "infrastructure/safe_regex.py",
     }
     assert {item[0] for item in base_handlers}.issubset(allowed_modules)
 
