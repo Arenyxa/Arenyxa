@@ -80,6 +80,7 @@ def test_postgresql_hot_paths_use_atomic_admission_and_one_event_statement() -> 
     assert "RETURNING protocol_min,protocol_max" in backend.claim_worker_slot_for_lease_sql()
     assert "WITH eligible_worker AS" in backend.lease_next_fast_sql()
     assert "FOR UPDATE OF j SKIP LOCKED" in backend.lease_next_fast_sql()
+    assert "w.active_leases<w.max_slots" in backend.lease_next_fast_sql()
     assert "WITH candidate AS" in backend.start_job_fast_sql()
     assert "WITH candidate AS" in backend.complete_fast_sql()
     assert "worker_updated AS" in backend.complete_fast_sql()

@@ -736,7 +736,6 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                 SELECT worker_id,protocol_min,protocol_max
                 FROM distributed_workers
                 WHERE worker_id=? AND state='active' AND active_leases<max_slots
-                FOR UPDATE
             ), candidate AS (
                 SELECT j.*
                 FROM distributed_jobs AS j
@@ -750,13 +749,14 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                 UPDATE distributed_workers AS w
                 SET active_leases=w.active_leases+1,heartbeat_at=?,updated_at=?
                 FROM candidate AS c
-                WHERE w.worker_id=?
+                WHERE w.worker_id=? AND w.state='active' AND w.active_leases<w.max_slots
                 RETURNING w.worker_id
             ), leased AS (
                 UPDATE distributed_jobs AS j
                 SET state='leased',attempt=j.attempt+1,lease_worker_id=?,lease_token_sha256=?,
                     lease_expires_at=?,error_code='',updated_at=?
                 FROM candidate AS c
+                CROSS JOIN claimed_worker AS w
                 WHERE j.job_id=c.job_id AND j.state='queued'
                 RETURNING j.*
             ), event AS (
