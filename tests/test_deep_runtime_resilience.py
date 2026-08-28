@@ -24,16 +24,26 @@ from arenyxa.infrastructure.plugins import PluginSandbox
 
 
 class HostAwareFetcher:
-    def __init__(self) -> None:
+    def __init__(self, *, block_shared: bool = False) -> None:
         self.shared_started = threading.Event()
+        self.shared_release = threading.Event()
+        self.unrelated_started = threading.Event()
+        self.block_shared = block_shared
 
     def fetch(self, spec, token, on_attempt=None):
         if on_attempt:
             on_attempt(0)
         if "shared.example" in spec.url:
             self.shared_started.set()
-            delay = 0.28
+            if self.block_shared:
+                while not self.shared_release.is_set():
+                    token.checkpoint()
+                    time.sleep(0.003)
+                delay = 0.0
+            else:
+                delay = 0.28
         else:
+            self.unrelated_started.set()
             delay = 0.01
         deadline = time.monotonic() + delay
         while time.monotonic() < deadline:
@@ -63,7 +73,7 @@ def _task(name: str, url: str) -> Task:
 
 def test_cross_run_host_waiters_do_not_starve_unrelated_hosts(store) -> None:
     runner = RunOrchestrator(store, max_workers=3, request_workers=2, per_host_workers=1, progress_interval_ms=50)
-    fetcher = HostAwareFetcher()
+    fetcher = HostAwareFetcher(block_shared=True)
     runner.fetcher = fetcher
     first = _task("first", "https://shared.example/a")
     second = _task("second", "https://shared.example/b")
@@ -74,11 +84,11 @@ def test_cross_run_host_waiters_do_not_starve_unrelated_hosts(store) -> None:
         h1 = runner.submit(first)
         assert fetcher.shared_started.wait(1.0)
         h2 = runner.submit(second)
-        time.sleep(0.03)
         h3 = runner.submit(unrelated)
-                                                                                         
-                                                                                           
-        assert h3.future.result(timeout=0.18).status == RunStatus.COMPLETED
+        assert fetcher.unrelated_started.wait(1.0)
+        assert h3.future.result(timeout=2).status == RunStatus.COMPLETED
+        assert not fetcher.shared_release.is_set()
+        fetcher.shared_release.set()
         assert h1.future.result(timeout=2).status == RunStatus.COMPLETED
         assert h2.future.result(timeout=2).status == RunStatus.COMPLETED
     finally:
