@@ -558,8 +558,11 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                     "row_factory": dict_row,
                     "connect_timeout": 10,
                 },
-                min_size=1,
-                max_size=64,
+                # Warm half of the observed eight-thread client width before
+                # timing starts, while retaining bounded burst capacity for
+                # the remaining callers.
+                min_size=4,
+                max_size=8,
                 timeout=15.0,
                 max_idle=300.0,
                 max_lifetime=1800.0,
