@@ -296,6 +296,11 @@ def run_gate(
     # semantics across client boundaries instead of only many threads on one Python object.
     client_count = max(2, min(concurrency, 16))
     clients = [DurableDistributedQueue(dsn) for _ in range(client_count)]
+    # psycopg_pool opens min_size connections lazily on the first checkout.
+    # Open every independent client pool before the timed workload so the gate
+    # measures lease-path latency rather than one-time connection establishment.
+    for client in clients:
+        client._connection_pool()
     job_ids = [
         coordinator.enqueue(
             "benchmark.noop", {"sequence": index},
