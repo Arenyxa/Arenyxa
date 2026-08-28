@@ -410,10 +410,65 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
         self._storage_circuit_success()
         return lease
 
+    @staticmethod
+    def _lease_from_row(row: Any, worker: str, token: str, expires: float, attempt: int) -> DistributedLease:
+        return DistributedLease(
+            job_id=str(row["job_id"]),
+            worker_id=worker,
+            lease_token=token,
+            lease_expires_at=expires,
+            kind=str(row["kind"]),
+            payload=_load_json(str(row["payload_json"]), MAX_JOB_PAYLOAD_BYTES, "job payload"),
+            resource_id=str(row["resource_id"]),
+            permission=str(row["permission"]),
+            attempt=attempt,
+            max_attempts=int(row["max_attempts"]),
+            side_effect_mode=str(row["side_effect_mode"]),
+            checkpoint=_load_json(str(row["checkpoint_json"]), MAX_CHECKPOINT_BYTES, "job checkpoint"),
+            checkpoint_seq=int(row["checkpoint_seq"]),
+            protocol_version=int(row["protocol_version"]),
+            traceparent=str(row["traceparent"]) if "traceparent" in row.keys() else "",
+            tracestate=str(row["tracestate"]) if "tracestate" in row.keys() else "",
+        )
+
     def _lease_next_storage(self, worker_id: str, *, lease_seconds: int = DEFAULT_LEASE_SECONDS) -> DistributedLease | None:
         worker = str(worker_id)
         duration = max(15, min(MAX_LEASE_SECONDS, int(lease_seconds)))
         self._recover_expired_leases_if_due()
+
+        # PostgreSQL can perform admission, candidate selection, lease fencing,
+        # and the audit event as one atomic server-side statement.  A missing
+        # row falls through to the portable path so unknown/revoked workers and
+        # empty queues retain their precise error semantics.
+        fast_sql = self._storage.lease_next_fast_sql()
+        if fast_sql is not None:
+            token = secrets.token_urlsafe(32)
+            digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+            expires = self._clock.deadline_epoch(duration)
+            now = utc_now()
+            detail_created = utc_now()
+            with self._lock, self._connection() as connection:
+                row = connection.execute(
+                    fast_sql,
+                    (
+                        worker,
+                        self._clock.stable_epoch(),
+                        now,
+                        worker,
+                        worker,
+                        digest,
+                        expires,
+                        now,
+                        worker,
+                        "",
+                        duration,
+                        detail_created,
+                        MAX_JOB_EVENTS_PER_JOB - 1,
+                    ),
+                ).fetchone()
+            if row is not None:
+                return self._lease_from_row(row, worker, token, expires, int(row["attempt"]))
+
         with self._lock, self._connection() as connection:
             self._begin(connection)
             atomic_slot_sql = self._storage.claim_worker_slot_for_lease_sql()
@@ -487,24 +542,7 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
                 details={"attempt": attempt, "lease_seconds": duration, "clock": "stable-monotonic-epoch"},
             )
             connection.commit()
-        return DistributedLease(
-            job_id=job_id,
-            worker_id=worker,
-            lease_token=token,
-            lease_expires_at=expires,
-            kind=str(row["kind"]),
-            payload=_load_json(str(row["payload_json"]), MAX_JOB_PAYLOAD_BYTES, "job payload"),
-            resource_id=str(row["resource_id"]),
-            permission=str(row["permission"]),
-            attempt=attempt,
-            max_attempts=int(row["max_attempts"]),
-            side_effect_mode=str(row["side_effect_mode"]),
-            checkpoint=_load_json(str(row["checkpoint_json"]), MAX_CHECKPOINT_BYTES, "job checkpoint"),
-            checkpoint_seq=int(row["checkpoint_seq"]),
-            protocol_version=int(row["protocol_version"]),
-            traceparent=str(row["traceparent"]) if "traceparent" in row.keys() else "",
-            tracestate=str(row["tracestate"]) if "tracestate" in row.keys() else "",
-        )
+        return self._lease_from_row(row, worker, token, expires, attempt)
 
     def lease_many(
         self, worker_id: str, *, max_items: int = 8, lease_seconds: int = DEFAULT_LEASE_SECONDS,
@@ -632,6 +670,20 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
 
     def start_job(self, job_id: str, worker_id: str, lease_token: str) -> None:
         with self._lock, self._connection() as connection:
+            fast_sql = self._storage.start_job_fast_sql()
+            if fast_sql is not None:
+                token_sha = hashlib.sha256(str(lease_token).encode("utf-8")).hexdigest()
+                now = self._clock.stable_epoch()
+                updated_at = utc_now()
+                cursor = connection.execute(
+                    fast_sql,
+                    (
+                        str(job_id), str(worker_id), token_sha, now, updated_at,
+                        str(worker_id), "", "{}", utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,
+                    ),
+                )
+                if cursor.fetchone() is not None:
+                    return
             self._begin(connection)
             row = self._require_lease_locked(connection, job_id, worker_id, lease_token)
             previous = str(row["state"])
@@ -736,6 +788,22 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
         result_json, result_sha = _bounded_json(result, MAX_RESULT_BYTES, "job result")
         token_sha = hashlib.sha256(str(lease_token).encode("utf-8")).hexdigest()
         with self._lock, self._connection() as connection:
+            fast_sql = self._storage.complete_fast_sql()
+            if fast_sql is not None:
+                now = self._clock.stable_epoch()
+                terminal_at = utc_now()
+                details_json, _ = _bounded_json({"result_sha256": result_sha}, MAX_EVENT_DETAILS_BYTES, "distributed event details")
+                cursor = connection.execute(
+                    fast_sql,
+                    (
+                        str(job_id), str(worker_id), token_sha, now,
+                        result_json, result_sha, str(worker_id), token_sha, terminal_at, terminal_at,
+                        self._clock.stable_epoch(), utc_now(), str(worker_id),
+                        str(worker_id), "", details_json, utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,
+                    ),
+                )
+                if cursor.fetchone() is not None:
+                    return
             self._begin(connection)
             existing = connection.execute(self._storage.lease_for_update_sql(), (str(job_id),)).fetchone()
             if existing is None:

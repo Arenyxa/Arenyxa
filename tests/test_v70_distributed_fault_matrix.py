@@ -94,6 +94,36 @@ def test_atomic_worker_admission_rolls_back_empty_poll_and_preserves_fencing(tmp
     assert queue.job(job)["state"] == "completed"
 
 
+def test_postgresql_fast_path_hooks_short_circuit_portable_fallback(tmp_path: Path, monkeypatch) -> None:
+    lease_queue = _queue(tmp_path / "lease", workers=1)
+    lease_job = _job(lease_queue, "fast-lease")
+    lease_sql = (
+        "UPDATE distributed_jobs SET state='leased',attempt=attempt+1 "
+        "WHERE state='queued' " + " AND ? IS NOT NULL" * 13 + " RETURNING *"
+    )
+    monkeypatch.setattr(lease_queue._storage, "lease_next_fast_sql", lambda: lease_sql)
+    lease = lease_queue.lease_next("worker-0")
+    assert lease is not None and lease.job_id == lease_job
+
+    queue = _queue(tmp_path / "start-complete", workers=1)
+    job = _job(queue, "fast-start-complete")
+    normal_lease = queue.lease_next("worker-0")
+    assert normal_lease is not None
+    start_sql = (
+        "UPDATE distributed_jobs SET state='running' "
+        "WHERE job_id=? AND state='leased' " + " AND ? IS NOT NULL" * 9 + " RETURNING job_id"
+    )
+    complete_sql = (
+        "UPDATE distributed_jobs SET state='completed' "
+        "WHERE job_id=? AND state='running' " + " AND ? IS NOT NULL" * 17 + " RETURNING state"
+    )
+    monkeypatch.setattr(queue._storage, "start_job_fast_sql", lambda: start_sql)
+    monkeypatch.setattr(queue._storage, "complete_fast_sql", lambda: complete_sql)
+    queue.start_job(job, "worker-0", normal_lease.lease_token)
+    queue.complete(job, "worker-0", normal_lease.lease_token, {"status": "completed"})
+    assert queue.job(job)["state"] == "completed"
+
+
 def test_runtime_clock_rollback_like_future_lease_fails_closed_and_health_surfaces_it(tmp_path: Path) -> None:
     queue = _queue(tmp_path, workers=1)
     job = _job(queue, "clock-rollback")

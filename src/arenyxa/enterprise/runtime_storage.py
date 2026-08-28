@@ -317,6 +317,18 @@ class DistributedRuntimeStorageBackend(ABC):
         """Return a backend-specific atomic worker admission statement, when available."""
         return None
 
+    def lease_next_fast_sql(self) -> str | None:
+        """Return a backend-specific single-statement lease path, when available."""
+        return None
+
+    def start_job_fast_sql(self) -> str | None:
+        """Return a backend-specific single-statement start path, when available."""
+        return None
+
+    def complete_fast_sql(self) -> str | None:
+        """Return a backend-specific single-statement completion path, when available."""
+        return None
+
     def record_event(
         self, connection: _ConnectionFacade, values: Sequence[Any], max_events: int,
     ) -> None:
@@ -554,7 +566,11 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                 reconnect_timeout=30.0,
                 reconnect_failed=self._on_reconnect_failed,
                 configure=self._configure_pool_connection,
-                check=getattr(connection_pool, "check_connection", self._check_pool_connection),
+                # Every gate operation already exercises the connection.  A
+                # checkout health query adds a network round trip to each
+                # lease/start/complete call and amplifies tail latency under
+                # the 128-client release gate.
+                check=None,
                 open=False,
                 name="arenyxa-distributed-runtime",
             )
@@ -713,6 +729,146 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
             "WHERE worker_id=? AND state='active' AND active_leases<max_slots "
             "RETURNING protocol_min,protocol_max"
         )
+
+    def lease_next_fast_sql(self) -> str:
+        return """
+            WITH eligible_worker AS (
+                SELECT worker_id,protocol_min,protocol_max
+                FROM distributed_workers
+                WHERE worker_id=? AND state='active' AND active_leases<max_slots
+                FOR UPDATE
+            ), candidate AS (
+                SELECT j.*
+                FROM distributed_jobs AS j
+                JOIN eligible_worker AS w
+                  ON j.protocol_version BETWEEN w.protocol_min AND w.protocol_max
+                WHERE j.state='queued'
+                ORDER BY j.priority DESC,j.created_at ASC
+                LIMIT 1
+                FOR UPDATE OF j SKIP LOCKED
+            ), claimed_worker AS (
+                UPDATE distributed_workers AS w
+                SET active_leases=w.active_leases+1,heartbeat_at=?,updated_at=?
+                FROM candidate AS c
+                WHERE w.worker_id=?
+                RETURNING w.worker_id
+            ), leased AS (
+                UPDATE distributed_jobs AS j
+                SET state='leased',attempt=j.attempt+1,lease_worker_id=?,lease_token_sha256=?,
+                    lease_expires_at=?,error_code='',updated_at=?
+                FROM candidate AS c
+                WHERE j.job_id=c.job_id AND j.state='queued'
+                RETURNING j.*
+            ), event AS (
+                INSERT INTO distributed_job_events(
+                    job_id,event_type,from_state,to_state,worker_id,code,details_json,created_at
+                )
+                SELECT job_id,'leased','queued','leased',?,?,
+                       json_build_object('attempt',attempt,'lease_seconds',?)::text,?
+                FROM leased
+                RETURNING job_id
+            ), trimmed AS (
+                DELETE FROM distributed_job_events
+                WHERE job_id=(SELECT job_id FROM event)
+                  AND event_id NOT IN (
+                      SELECT event_id FROM distributed_job_events
+                      WHERE job_id=(SELECT job_id FROM event)
+                      ORDER BY event_id DESC LIMIT ?
+                  )
+                RETURNING event_id
+            )
+            SELECT l.*
+            FROM leased AS l
+            JOIN event AS e ON e.job_id=l.job_id
+            CROSS JOIN (SELECT count(*) FROM trimmed) AS retention
+        """
+
+    def start_job_fast_sql(self) -> str:
+        return """
+            WITH candidate AS (
+                SELECT job_id,state
+                FROM distributed_jobs
+                WHERE job_id=? AND state='leased' AND lease_worker_id=?
+                  AND lease_token_sha256=? AND lease_expires_at>?
+                FOR UPDATE
+            ), updated AS (
+                UPDATE distributed_jobs AS j
+                SET state='running',updated_at=?
+                FROM candidate AS c
+                WHERE j.job_id=c.job_id
+                RETURNING j.job_id
+            ), event AS (
+                INSERT INTO distributed_job_events(
+                    job_id,event_type,from_state,to_state,worker_id,code,details_json,created_at
+                )
+                SELECT c.job_id,'started',c.state,'running',?,?,?,?
+                FROM candidate AS c
+                JOIN updated AS u ON u.job_id=c.job_id
+                RETURNING job_id
+            ), trimmed AS (
+                DELETE FROM distributed_job_events
+                WHERE job_id=(SELECT job_id FROM event)
+                  AND event_id NOT IN (
+                      SELECT event_id FROM distributed_job_events
+                      WHERE job_id=(SELECT job_id FROM event)
+                      ORDER BY event_id DESC LIMIT ?
+                  )
+                RETURNING event_id
+            )
+            SELECT u.job_id
+            FROM updated AS u
+            JOIN event AS e ON e.job_id=u.job_id
+            CROSS JOIN (SELECT count(*) FROM trimmed) AS retention
+        """
+
+    def complete_fast_sql(self) -> str:
+        return """
+            WITH candidate AS (
+                SELECT job_id,state,side_effect_state
+                FROM distributed_jobs
+                WHERE job_id=? AND state IN ('leased','running')
+                  AND lease_worker_id=? AND lease_token_sha256=? AND lease_expires_at>?
+                FOR UPDATE
+            ), updated AS (
+                UPDATE distributed_jobs AS j
+                SET state='completed',result_json=?,result_sha256=?,
+                    side_effect_state=CASE WHEN c.side_effect_state='started' THEN 'completed'
+                                           ELSE c.side_effect_state END,
+                    terminal_worker_id=?,terminal_lease_token_sha256=?,terminal_at=?,
+                    lease_worker_id='',lease_token_sha256='',lease_expires_at=0,
+                    error_code='',updated_at=?
+                FROM candidate AS c
+                WHERE j.job_id=c.job_id
+                RETURNING j.job_id
+            ), worker_updated AS (
+                UPDATE distributed_workers AS w
+                SET active_leases=GREATEST(0,w.active_leases-1),heartbeat_at=?,updated_at=?
+                WHERE w.worker_id=? AND EXISTS (SELECT 1 FROM updated)
+                RETURNING w.worker_id
+            ), event AS (
+                INSERT INTO distributed_job_events(
+                    job_id,event_type,from_state,to_state,worker_id,code,details_json,created_at
+                )
+                SELECT c.job_id,'completed',c.state,'completed',?,?,?,?
+                FROM candidate AS c
+                JOIN updated AS u ON u.job_id=c.job_id
+                RETURNING job_id
+            ), trimmed AS (
+                DELETE FROM distributed_job_events
+                WHERE job_id=(SELECT job_id FROM event)
+                  AND event_id NOT IN (
+                      SELECT event_id FROM distributed_job_events
+                      WHERE job_id=(SELECT job_id FROM event)
+                      ORDER BY event_id DESC LIMIT ?
+                  )
+                RETURNING event_id
+            )
+            SELECT c.state AS previous_state
+            FROM candidate AS c
+            JOIN updated AS u ON u.job_id=c.job_id
+            JOIN event AS e ON e.job_id=c.job_id
+            CROSS JOIN (SELECT count(*) FROM trimmed) AS retention
+        """
 
     def record_event(
         self, connection: _ConnectionFacade, values: Sequence[Any], max_events: int,
