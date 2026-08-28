@@ -286,7 +286,7 @@ def test_legacy_security_and_packager_pins_match_win7_compatibility_window() -> 
     dev = (ROOT / "requirements-dev-win7.txt").read_text(encoding="utf-8")
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert "cryptography==42.0.7" in runtime
-    assert "cryptography>=44,<46" in pyproject
+    assert "cryptography>=50,<51" in pyproject
     assert "pyinstaller==4.10" in dev
     assert "pyinstaller-hooks-contrib==2024.4" in dev
     assert "pyinstaller>=6.11,<7" in pyproject

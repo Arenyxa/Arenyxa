@@ -1,4 +1,6 @@
 -r requirements.txt
+setuptools>=83,<84
+wheel>=0.46.2,<0.47
 pytest>=8.3,<10
 pytest-cov>=6,<8
 pytest-asyncio>=1,<2

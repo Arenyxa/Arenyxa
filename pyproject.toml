@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68,<76", "wheel>=0.41,<0.46"]
+requires = ["setuptools>=83,<84", "wheel>=0.46.2,<0.47"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -12,7 +12,7 @@ license = {text = "GPL-3.0-or-later"}
 authors = [{name = "Arenyxa Contributors"}]
 dependencies = [
   "tzdata>=2025.2; python_version >= '3.11'",
-  "cryptography>=44,<46; python_version >= '3.11'",
+  "cryptography>=50,<51; python_version >= '3.11'",
   "httpx>=0.28,<1; python_version >= '3.11'",
 ]
 
@@ -23,7 +23,7 @@ desktop = [
   "openpyxl>=3.1,<4; python_version >= '3.11'",
 ]
 analysis = [
-  "lxml>=5.3,<7; python_version >= '3.11'",
+  "lxml>=6.1,<7; python_version >= '3.11'",
   "cssselect>=1.2,<2; python_version >= '3.11'",
   "dnspython>=2.7,<3; python_version >= '3.11'",
 ]
@@ -55,7 +55,7 @@ telemetry = [
 full = [
   "PySide6>=6.8,<7; python_version >= '3.11'",
   "openpyxl>=3.1,<4; python_version >= '3.11'",
-  "lxml>=5.3,<7; python_version >= '3.11'",
+  "lxml>=6.1,<7; python_version >= '3.11'",
   "cssselect>=1.2,<2; python_version >= '3.11'",
   "dnspython>=2.7,<3; python_version >= '3.11'",
   "playwright>=1.49,<2; python_version >= '3.11'",
@@ -74,6 +74,8 @@ full = [
   "opentelemetry-exporter-otlp-proto-http>=1.30,<2; python_version >= '3.11'",
 ]
 dev = [
+  "setuptools>=83,<84; python_version >= '3.11'",
+  "wheel>=0.46.2,<0.47; python_version >= '3.11'",
   "pytest>=8.3,<10; python_version >= '3.11'",
   "pytest-cov>=6,<8; python_version >= '3.11'",
   "pytest-asyncio>=1,<2; python_version >= '3.11'",

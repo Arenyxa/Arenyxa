@@ -76,7 +76,7 @@ if (-not (Test-Path -LiteralPath $VenvPython)) {
     }
 }
 
-& $VenvPython -m pip install --upgrade pip 'setuptools>=68,<76' 'wheel>=0.41,<0.46'
+& $VenvPython -m pip install --upgrade pip 'setuptools>=83,<84' 'wheel>=0.46.2,<0.47'
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 & $VenvPython -m pip install -e "${ProjectRoot}[dev,desktop,analysis,server,capture,browser,database]"

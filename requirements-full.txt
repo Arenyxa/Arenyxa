@@ -2,7 +2,7 @@
 -r requirements.txt
 PySide6>=6.8,<7
 openpyxl>=3.1,<4
-lxml>=5.3,<7
+lxml>=6.1,<7
 cssselect>=1.2,<2
 dnspython>=2.7,<3
 playwright>=1.49,<2
