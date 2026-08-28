@@ -775,12 +775,8 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                       WHERE job_id=(SELECT job_id FROM event)
                       ORDER BY event_id DESC LIMIT ?
                   )
-                RETURNING event_id
             )
-            SELECT l.*
-            FROM leased AS l
-            JOIN event AS e ON e.job_id=l.job_id
-            CROSS JOIN (SELECT count(*) FROM trimmed) AS retention
+            SELECT * FROM leased
         """
 
     def start_job_fast_sql(self) -> str:
@@ -813,12 +809,8 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                       WHERE job_id=(SELECT job_id FROM event)
                       ORDER BY event_id DESC LIMIT ?
                   )
-                RETURNING event_id
             )
-            SELECT u.job_id
-            FROM updated AS u
-            JOIN event AS e ON e.job_id=u.job_id
-            CROSS JOIN (SELECT count(*) FROM trimmed) AS retention
+            SELECT * FROM updated
         """
 
     def complete_fast_sql(self) -> str:
@@ -861,13 +853,10 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                       WHERE job_id=(SELECT job_id FROM event)
                       ORDER BY event_id DESC LIMIT ?
                   )
-                RETURNING event_id
             )
             SELECT c.state AS previous_state
             FROM candidate AS c
             JOIN updated AS u ON u.job_id=c.job_id
-            JOIN event AS e ON e.job_id=c.job_id
-            CROSS JOIN (SELECT count(*) FROM trimmed) AS retention
         """
 
     def record_event(
