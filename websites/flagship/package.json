@@ -1,7 +1,0 @@
-{
-  "name":"arenyxa-v9-1-hybrid-flagship",
-  "version":"9.1.0",
-  "private":true,
-  "type":"module",
-  "scripts":{"build":"node scripts/build.mjs","start":"node server.mjs","dev":"node server.mjs"}
-}
