@@ -73,6 +73,27 @@ def test_simultaneous_workers_cannot_double_lease_one_job(tmp_path: Path) -> Non
     assert state["lease_worker_id"] == winners[0].worker_id
 
 
+def test_atomic_worker_admission_rolls_back_empty_poll_and_preserves_fencing(tmp_path: Path, monkeypatch) -> None:
+    queue = _queue(tmp_path, workers=1)
+    atomic_sql = (
+        "UPDATE distributed_workers SET active_leases=active_leases+1,heartbeat_at=?,updated_at=? "
+        "WHERE worker_id=? AND state='active' AND active_leases<max_slots "
+        "RETURNING protocol_min,protocol_max"
+    )
+    monkeypatch.setattr(queue._storage, "claim_worker_slot_for_lease_sql", lambda: atomic_sql)
+
+    assert queue.lease_next("worker-0") is None
+    worker = queue.worker("worker-0")
+    assert worker is not None and worker["active_leases"] == 0
+
+    job = _job(queue, "atomic-admission")
+    lease = queue.lease_next("worker-0")
+    assert lease is not None and lease.job_id == job
+    queue.start_job(job, "worker-0", lease.lease_token)
+    queue.complete(job, "worker-0", lease.lease_token, {"status": "completed"})
+    assert queue.job(job)["state"] == "completed"
+
+
 def test_runtime_clock_rollback_like_future_lease_fails_closed_and_health_surfaces_it(tmp_path: Path) -> None:
     queue = _queue(tmp_path, workers=1)
     job = _job(queue, "clock-rollback")

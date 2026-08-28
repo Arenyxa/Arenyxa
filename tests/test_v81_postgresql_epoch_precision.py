@@ -75,6 +75,21 @@ def test_postgresql_float8_epoch_columns_do_not_repeat_migration() -> None:
     assert not any(statement.startswith("ALTER TABLE") for statement in connection.statements)
 
 
+def test_postgresql_hot_paths_use_atomic_admission_and_one_event_statement() -> None:
+    backend = PostgreSQLDistributedRuntimeStorage("postgresql://user:pass@db/arenyxa")
+    assert "RETURNING protocol_min,protocol_max" in backend.claim_worker_slot_for_lease_sql()
+
+    connection = _RecordingConnection([])
+    backend.record_event(
+        connection,
+        ("job-1", "completed", "running", "completed", "worker-1", "", "{}", "now"),
+        128,
+    )
+    assert len(connection.statements) == 1
+    assert connection.statements[0].lstrip().startswith("WITH inserted AS")
+    assert "LIMIT ?" in connection.statements[0]
+
+
 def test_postgresql_gate_diagnostic_is_structured_without_exposing_lease_token(tmp_path: Path) -> None:
     queue = DurableDistributedQueue(tmp_path / "gate-diagnostic.sqlite")
     queue.register_worker("worker-a", _public_key(), {"diagnostic": True}, max_slots=1)

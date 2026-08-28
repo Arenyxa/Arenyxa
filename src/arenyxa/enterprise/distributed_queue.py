@@ -131,18 +131,10 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
             raise _fail("DISTRIBUTED_STATE_TRANSITION_INVALID", "Distributed job state transition is not permitted", from_state=source, to_state=target, event_type=str(event_type))
         event = _clean_token(event_type, "event type", 96)
         detail_json, _ = _bounded_json(details or {}, MAX_EVENT_DETAILS_BYTES, "distributed event details")
-        connection.execute(
-            """INSERT INTO distributed_job_events(
-                job_id,event_type,from_state,to_state,worker_id,code,details_json,created_at
-            ) VALUES(?,?,?,?,?,?,?,?)""",
+        self._storage.record_event(
+            connection,
             (str(job_id), event, str(from_state), str(to_state), str(worker_id), str(code)[:128], detail_json, utc_now()),
-        )
-
-        connection.execute(
-            """DELETE FROM distributed_job_events WHERE job_id=? AND event_id NOT IN (
-                SELECT event_id FROM distributed_job_events WHERE job_id=? ORDER BY event_id DESC LIMIT ?
-            )""",
-            (str(job_id), str(job_id), MAX_JOB_EVENTS_PER_JOB),
+            MAX_JOB_EVENTS_PER_JOB,
         )
 
     @staticmethod

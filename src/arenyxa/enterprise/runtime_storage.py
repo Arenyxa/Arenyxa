@@ -317,6 +317,24 @@ class DistributedRuntimeStorageBackend(ABC):
         """Return a backend-specific atomic worker admission statement, when available."""
         return None
 
+    def record_event(
+        self, connection: _ConnectionFacade, values: Sequence[Any], max_events: int,
+    ) -> None:
+        """Persist an event and enforce the per-job journal bound."""
+        connection.execute(
+            """INSERT INTO distributed_job_events(
+                job_id,event_type,from_state,to_state,worker_id,code,details_json,created_at
+            ) VALUES(?,?,?,?,?,?,?,?)""",
+            tuple(values),
+        )
+        job_id = str(values[0])
+        connection.execute(
+            """DELETE FROM distributed_job_events WHERE job_id=? AND event_id NOT IN (
+                SELECT event_id FROM distributed_job_events WHERE job_id=? ORDER BY event_id DESC LIMIT ?
+            )""",
+            (job_id, job_id, max(1, int(max_events))),
+        )
+
     def expired_lease_candidates_sql(self) -> str:
         return (
             "SELECT job_id,state,lease_worker_id,lease_token_sha256,lease_expires_at,side_effect_mode,side_effect_state,attempt,max_attempts "
@@ -536,7 +554,7 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                 reconnect_timeout=30.0,
                 reconnect_failed=self._on_reconnect_failed,
                 configure=self._configure_pool_connection,
-                check=self._check_pool_connection,
+                check=getattr(connection_pool, "check_connection", self._check_pool_connection),
                 open=False,
                 name="arenyxa-distributed-runtime",
             )
@@ -694,6 +712,28 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
             "UPDATE distributed_workers SET active_leases=active_leases+1,heartbeat_at=?,updated_at=? "
             "WHERE worker_id=? AND state='active' AND active_leases<max_slots "
             "RETURNING protocol_min,protocol_max"
+        )
+
+    def record_event(
+        self, connection: _ConnectionFacade, values: Sequence[Any], max_events: int,
+    ) -> None:
+        """Insert and trim one event in a single PostgreSQL round trip."""
+        keep = max(1, int(max_events) - 1)
+        connection.execute(
+            """WITH inserted AS (
+                INSERT INTO distributed_job_events(
+                    job_id,event_type,from_state,to_state,worker_id,code,details_json,created_at
+                ) VALUES(?,?,?,?,?,?,?,?)
+                RETURNING job_id
+            )
+            DELETE FROM distributed_job_events
+            WHERE job_id=(SELECT job_id FROM inserted)
+              AND event_id NOT IN (
+                  SELECT event_id FROM distributed_job_events
+                  WHERE job_id=(SELECT job_id FROM inserted)
+                  ORDER BY event_id DESC LIMIT ?
+              )""",
+            tuple(values) + (keep,),
         )
 
     def lease_for_update_sql(self) -> str:
