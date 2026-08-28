@@ -126,8 +126,34 @@ CREATE INDEX IF NOT EXISTS idx_distributed_jobs_worker
     ON distributed_jobs(lease_worker_id, state);
 """
 
-_POSTGRES_SCHEMA = _SQLITE_SCHEMA.replace(
-    "event_id INTEGER PRIMARY KEY AUTOINCREMENT", "event_id BIGSERIAL PRIMARY KEY"
+_POSTGRES_SCHEMA = (
+    _SQLITE_SCHEMA.replace(
+        "event_id INTEGER PRIMARY KEY AUTOINCREMENT", "event_id BIGSERIAL PRIMARY KEY"
+    )
+    # SQLite REAL is an 8-byte IEEE-754 value, while PostgreSQL REAL is only 4 bytes.
+    # Epoch timestamps need float8 precision so short leases and heartbeats are not rounded
+    # by roughly a minute at contemporary epoch values.
+    .replace("heartbeat_at REAL", "heartbeat_at DOUBLE PRECISION")
+    .replace("lease_expires_at REAL", "lease_expires_at DOUBLE PRECISION")
+)
+
+_POSTGRES_EPOCH_MIGRATIONS = (
+    (
+        "distributed_workers",
+        "heartbeat_at",
+        (
+            "ALTER TABLE distributed_workers ALTER COLUMN heartbeat_at TYPE DOUBLE PRECISION "
+            "USING heartbeat_at::DOUBLE PRECISION"
+        ),
+    ),
+    (
+        "distributed_jobs",
+        "lease_expires_at",
+        (
+            "ALTER TABLE distributed_jobs ALTER COLUMN lease_expires_at TYPE DOUBLE PRECISION "
+            "USING lease_expires_at::DOUBLE PRECISION"
+        ),
+    ),
 )
 
 
@@ -559,6 +585,21 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
             if statement:
                 raw_connection.execute(statement)
 
+    @staticmethod
+    def _migrate_epoch_columns_to_float8(connection: _ConnectionFacade) -> None:
+        """Upgrade legacy PostgreSQL float4 epoch columns without changing stored values."""
+        rows = connection.execute(
+            "SELECT table_name,column_name,data_type FROM information_schema.columns "
+            "WHERE table_schema=current_schema() AND ((table_name='distributed_workers' "
+            "AND column_name='heartbeat_at') OR (table_name='distributed_jobs' "
+            "AND column_name='lease_expires_at'))"
+        ).fetchall()
+        types = {(str(row[0]), str(row[1])): str(row[2]).casefold() for row in rows}
+        for table, column, migration_sql in _POSTGRES_EPOCH_MIGRATIONS:
+            if types.get((table, column)) != "real":
+                continue
+            connection.execute(migration_sql)
+
     def initialize_schema(self, schema: str, current_protocol: int, min_protocol: int) -> None:
         with self.connection() as connection:
             connection.execute("BEGIN")
@@ -566,6 +607,7 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                                          
             connection.execute("SELECT pg_advisory_xact_lock(?)", (self._SCHEMA_ADVISORY_LOCK,))
             connection.executescript(_POSTGRES_SCHEMA)
+            self._migrate_epoch_columns_to_float8(connection)
             schema_row = connection.execute("SELECT value FROM distributed_meta WHERE key='schema'").fetchone()
             if schema_row is None:
                 connection.execute("INSERT INTO distributed_meta(key,value) VALUES('schema',?)", (schema,))

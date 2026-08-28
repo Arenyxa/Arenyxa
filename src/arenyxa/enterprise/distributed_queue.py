@@ -596,7 +596,15 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
         now = self._clock.stable_epoch()
         expires = float(row["lease_expires_at"])
         if expires <= now:
-            raise _fail("DISTRIBUTED_LEASE_EXPIRED", "Distributed job lease has expired")
+            raise _fail(
+                "DISTRIBUTED_LEASE_EXPIRED",
+                "Distributed job lease has expired",
+                job_id=str(job_id),
+                worker_id=str(worker_id),
+                lease_expires_at=expires,
+                clock_stable_epoch=now,
+                lease_remaining_seconds=expires - now,
+            )
         if expires > now + MAX_LEASE_SECONDS + 60.0:
             raise _fail(
                 "DISTRIBUTED_LEASE_TIME_INVALID",

@@ -1,9 +1,10 @@
 from __future__ import annotations
-import logging
 
 import argparse
 import base64
+import hashlib
 import json
+import logging
 import os
 import statistics
 import threading
@@ -15,7 +16,10 @@ from typing import Any
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+from arenyxa.domain.errors import ArenyxaError
 from arenyxa.enterprise.distributed import DurableDistributedQueue
+
+_GATE_OPERATION_ERRORS = (ArenyxaError, OSError, RuntimeError, ValueError, TypeError, KeyError)
 
 
 def _public_key() -> str:
@@ -29,7 +33,7 @@ def _percentile(values: list[float], percentile: float) -> float:
     if not values:
         return 0.0
     ordered = sorted(values)
-    index = min(len(ordered) - 1, max(0, int(round((len(ordered) - 1) * percentile))))
+    index = min(len(ordered) - 1, max(0, round((len(ordered) - 1) * percentile)))
     return ordered[index]
 
 
@@ -38,6 +42,112 @@ def _close(queue: DurableDistributedQueue) -> None:
         queue.close()
     except Exception:
         logging.getLogger(__name__).debug("Suppressed non-fatal exception", exc_info=True)
+
+
+def _database_lease_diagnostic(
+    queue: DurableDistributedQueue, job_id: str, lease_token: str
+) -> dict[str, Any]:
+    with queue._connection() as connection:
+        row = connection.execute(
+            "SELECT state,lease_expires_at,lease_worker_id,lease_token_sha256 "
+            "FROM distributed_jobs WHERE job_id=?",
+            (str(job_id),),
+        ).fetchone()
+    if row is None:
+        return {
+            "database_job_state": None,
+            "database_lease_expires_at": None,
+            "database_lease_worker_id": None,
+            "database_lease_token_present": False,
+            "database_lease_token_hash_state": "job_missing",
+        }
+    stored_digest = str(row["lease_token_sha256"])
+    presented_digest = hashlib.sha256(str(lease_token).encode("utf-8")).hexdigest()
+    return {
+        "database_job_state": str(row["state"]),
+        "database_lease_expires_at": float(row["lease_expires_at"]),
+        "database_lease_worker_id": str(row["lease_worker_id"]),
+        "database_lease_token_present": bool(stored_digest),
+        "database_lease_token_hash_state": (
+            "matches_presented" if stored_digest and stored_digest == presented_digest
+            else "different_or_cleared"
+        ),
+    }
+
+
+def _lease_failure_diagnostic(
+    queue: DurableDistributedQueue,
+    worker_id: str,
+    phase: str,
+    exc: BaseException,
+    lease: Any | None,
+    timing: dict[str, float | None],
+) -> dict[str, Any]:
+    failure = queue._clock.snapshot()
+    lease_expires_at = None if lease is None else float(lease.lease_expires_at)
+    lease_token = "" if lease is None else str(lease.lease_token)
+    job_id = None if lease is None else str(lease.job_id)
+    database = (
+        {
+            "database_job_state": None,
+            "database_lease_expires_at": None,
+            "database_lease_worker_id": None,
+            "database_lease_token_present": False,
+            "database_lease_token_hash_state": "lease_not_returned",
+        }
+        if job_id is None
+        else _database_lease_diagnostic(queue, job_id, lease_token)
+    )
+    pool = queue.storage_metrics()
+    finished_perf = timing.get("lease_next_finished_perf") or time.perf_counter()
+    started_perf = timing.get("lease_next_started_perf") or finished_perf
+    returned_stable = timing.get("lease_next_finished_stable")
+    finished_wall = timing.get("lease_next_finished_wall")
+    if phase in {"lease_next", "fencing_lease_next"}:
+        returned_stable = returned_stable or failure.stable_epoch
+        finished_wall = finished_wall or failure.wall_epoch
+    start_stable = timing.get("start_job_started_stable")
+    return {
+        "phase": str(phase),
+        "worker_id": str(worker_id),
+        "job_id": job_id,
+        "error_type": type(exc).__name__,
+        "error_code": exc.code if isinstance(exc, ArenyxaError) else type(exc).__name__,
+        "error_message": str(exc),
+        "lease_expires_at": lease_expires_at,
+        "lease_next_started_perf": timing.get("lease_next_started_perf"),
+        "lease_next_finished_perf": finished_perf,
+        "lease_next_elapsed_ms": round((finished_perf - started_perf) * 1000.0, 3),
+        "lease_next_started_wall": timing.get("lease_next_started_wall"),
+        "lease_next_finished_wall": finished_wall,
+        "lease_next_started_stable": timing.get("lease_next_started_stable"),
+        "lease_next_finished_stable": returned_stable,
+        "start_job_started_wall": timing.get("start_job_started_wall"),
+        "start_job_started_stable": start_stable,
+        "failure_wall": failure.wall_epoch,
+        "failure_stable": failure.stable_epoch,
+        "lease_remaining_at_return_seconds": (
+            None if lease_expires_at is None or returned_stable is None
+            else lease_expires_at - returned_stable
+        ),
+        "lease_remaining_at_start_job_seconds": (
+            None if lease_expires_at is None or start_stable is None
+            else lease_expires_at - start_stable
+        ),
+        "lease_remaining_at_failure_seconds": (
+            None if lease_expires_at is None else lease_expires_at - failure.stable_epoch
+        ),
+        "clock_stable_epoch": failure.stable_epoch,
+        "clock_wall_epoch": failure.wall_epoch,
+        "clock_monotonic": failure.monotonic,
+        "clock_wall_drift_seconds": failure.wall_drift_seconds,
+        "pool_size": int(pool.get("pool_size", 0) or 0),
+        "pool_available": int(pool.get("pool_available", 0) or 0),
+        "requests_waiting": int(pool.get("requests_waiting", 0) or 0),
+        "requests_wait_ms": float(pool.get("requests_wait_ms", 0.0) or 0.0),
+        "acquisition_failures": int(pool.get("acquisition_failures", 0) or 0),
+        **database,
+    }
 
 
 def _postgres_fencing_probe(
@@ -58,24 +168,44 @@ def _postgres_fencing_probe(
     first_queue = clients[0]
     second_queue = clients[1 % len(clients)]
     first_worker, second_worker = worker_ids[0], worker_ids[1]
-    first = first_queue.lease_next(first_worker, lease_seconds=15)
+    lease_started = first_queue._clock.snapshot()
+    timing: dict[str, float | None] = {
+        "lease_next_started_perf": time.perf_counter(),
+        "lease_next_started_wall": lease_started.wall_epoch,
+        "lease_next_started_stable": lease_started.stable_epoch,
+    }
+    try:
+        first = first_queue.lease_next(first_worker, lease_seconds=15)
+    except _GATE_OPERATION_ERRORS as exc:
+        return {
+            "passed": False,
+            "detail": "first worker lease request failed",
+            **_lease_failure_diagnostic(
+                first_queue, first_worker, "fencing_lease_next", exc, None, timing
+            ),
+        }
+    lease_finished = first_queue._clock.snapshot()
+    timing.update({
+        "lease_next_finished_perf": time.perf_counter(),
+        "lease_next_finished_wall": lease_finished.wall_epoch,
+        "lease_next_finished_stable": lease_finished.stable_epoch,
+    })
     if first is None or first.job_id != job_id:
         return {"passed": False, "detail": "first worker could not lease fencing probe"}
+    start_snapshot = first_queue._clock.snapshot()
+    timing.update({
+        "start_job_started_wall": start_snapshot.wall_epoch,
+        "start_job_started_stable": start_snapshot.stable_epoch,
+    })
     try:
         first_queue.start_job(job_id, first_worker, first.lease_token)
-    except Exception as exc:
-        now_epoch = time.time()
+    except _GATE_OPERATION_ERRORS as exc:
         return {
             "passed": False,
             "detail": "first fencing lease expired before start_job",
-            "error_type": type(exc).__name__,
-            "error": str(exc),
-            "job_id": job_id,
-            "first_worker": first_worker,
-            "lease_expires_at": first.lease_expires_at,
-            "wall_epoch_at_failure": now_epoch,
-            "wall_remaining_seconds": first.lease_expires_at - now_epoch,
-            "job_state": coordinator.job(job_id),
+            **_lease_failure_diagnostic(
+                first_queue, first_worker, "fencing_start_job", exc, first, timing
+            ),
         }
 
     recovered = coordinator.recover_expired_leases(now=first.lease_expires_at + 1.0)
@@ -113,12 +243,18 @@ def _postgres_fencing_probe(
         }
 
     stale_rejected = False
+    stale_error_code = ""
     try:
         first_queue.complete(job_id, first_worker, first.lease_token, {"winner": "stale"})
-    except Exception:
-        stale_rejected = True
+    except ArenyxaError as exc:
+        stale_error_code = str(exc.code)
+        stale_rejected = stale_error_code == "DISTRIBUTED_LEASE_STALE"
     if not stale_rejected:
-        return {"passed": False, "detail": "stale worker completed after lease reassignment"}
+        return {
+            "passed": False,
+            "detail": "stale worker completion was not rejected by the lease-token fence",
+            "stale_error_code": stale_error_code,
+        }
 
     second_queue.start_job(job_id, second_worker, second.lease_token)
     result = {"winner": "fresh"}
@@ -126,15 +262,19 @@ def _postgres_fencing_probe(
     # Lost terminal ACK replay must be idempotent, while a conflicting replay must fail closed.
     second_queue.complete(job_id, second_worker, second.lease_token, result)
     conflict_rejected = False
+    conflict_error_code = ""
     try:
         second_queue.complete(job_id, second_worker, second.lease_token, {"winner": "conflict"})
-    except Exception:
-        conflict_rejected = True
+    except ArenyxaError as exc:
+        conflict_error_code = str(exc.code)
+        conflict_rejected = conflict_error_code == "DISTRIBUTED_TERMINAL_CONFLICT"
     final = coordinator.job(job_id)
     return {
         "passed": bool(stale_rejected and conflict_rejected and final and final.get("state") == "completed"),
         "stale_completion_rejected": stale_rejected,
+        "stale_completion_error_code": stale_error_code,
         "conflicting_terminal_replay_rejected": conflict_rejected,
+        "conflicting_terminal_replay_error_code": conflict_error_code,
         "exact_terminal_replay_idempotent": True,
         "final_state": None if final is None else final.get("state"),
     }
@@ -167,7 +307,7 @@ def run_gate(
         for index in range(jobs)
     ]
     latencies_ms: list[float] = []
-    errors: list[str] = []
+    errors: list[dict[str, Any]] = []
     completed = 0
     state_lock = threading.Lock()
     began = time.perf_counter()
@@ -182,22 +322,56 @@ def run_gate(
                 if completed >= jobs or errors:
                     return
             operation_start = time.perf_counter()
+            phase = "lease_next"
+            lease = None
+            lease_started = queue._clock.snapshot()
+            timing: dict[str, float | None] = {
+                "lease_next_started_perf": operation_start,
+                "lease_next_started_wall": lease_started.wall_epoch,
+                "lease_next_started_stable": lease_started.stable_epoch,
+            }
             try:
                 lease = queue.lease_next(worker_id, lease_seconds=60)
+                lease_finished = queue._clock.snapshot()
+                timing.update({
+                    "lease_next_finished_perf": time.perf_counter(),
+                    "lease_next_finished_wall": lease_finished.wall_epoch,
+                    "lease_next_finished_stable": lease_finished.stable_epoch,
+                })
                 if lease is None:
                     empty_rounds += 1
                     if empty_rounds > 500:
                         with state_lock:
-                            errors.append(f"{worker_id}: lease starvation")
+                            errors.append(_lease_failure_diagnostic(
+                                queue,
+                                worker_id,
+                                phase,
+                                ArenyxaError(
+                                    "DISTRIBUTED_LEASE_STARVATION",
+                                    "Worker could not obtain a lease within the bounded gate retry window",
+                                    domain="ENTERPRISE_DISTRIBUTED",
+                                ),
+                                None,
+                                timing,
+                            ))
                         return
                     time.sleep(0.002)
                     continue
                 empty_rounds = 0
+                phase = "start_job"
+                start_snapshot = queue._clock.snapshot()
+                timing.update({
+                    "start_job_started_wall": start_snapshot.wall_epoch,
+                    "start_job_started_stable": start_snapshot.stable_epoch,
+                })
                 queue.start_job(lease.job_id, worker_id, lease.lease_token)
+                phase = "complete"
                 queue.complete(lease.job_id, worker_id, lease.lease_token, {"status": "ok"})
-            except (OSError, RuntimeError, ValueError) as exc:
+            except _GATE_OPERATION_ERRORS as exc:
                 with state_lock:
-                    errors.append(f"{worker_id}: {type(exc).__name__}: {exc}")
+                    errors.append(
+                        _lease_failure_diagnostic(queue, worker_id, phase, exc, lease, timing)
+                    )
                 return
             elapsed = (time.perf_counter() - operation_start) * 1000.0
             with state_lock:
@@ -230,7 +404,7 @@ def run_gate(
             if row.get("backend") == "postgresql"
         )
         result = {
-            "schema": "arenyxa.postgresql-pool-concurrency-gate/v2",
+            "schema": "arenyxa.postgresql-pool-concurrency-gate/v3",
             "workers": workers,
             "concurrency": concurrency,
             "slots_per_worker": slots_per_worker,
