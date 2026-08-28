@@ -1,0 +1,2718 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#020306">
+<meta name="description" content="Arenyxa hybrid flagship WebGL experience combining cinematic motion with industrial product-grade modeling.">
+<title>Arenyxa — Hybrid Flagship Experience</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="assets/site.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.179.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.179.1/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body data-page="long" class="intro-active">
+
+  
+  <div class="loader intro-loader" id="loader">
+    <div class="intro-vignette" aria-hidden="true"></div>
+    <div class="intro-crosshair" id="introCrosshair" aria-hidden="true"><i></i></div>
+    <div class="intro-ui">
+      <div class="intro-brand">Arenyxa</div>
+      <div class="intro-status">
+        <span id="introPhase" class="intro-copy-in">DISCOVERING GLOBAL NETWORK</span>
+        <strong id="introRegion" class="intro-copy-in">GLOBAL NETWORK</strong>
+      </div>
+      <div class="intro-meta">
+        <span>DISCOVER</span><span>MAP</span><span>VERIFY</span><span>ENTER</span>
+      </div>
+    </div>
+  </div>
+  <div class="route-wipe" id="routeWipe" aria-hidden="true"></div><div class="webgl-error" id="webglError"></div>
+  <canvas id="webgl" aria-hidden="true"></canvas>
+  <div class="noise" aria-hidden="true"></div><div class="scan" aria-hidden="true"></div>
+
+  <header class="topbar" id="topbar">
+    <a class="brand" href="#scene-1"><span class="brand-mark"></span><span>Arenyxa</span></a>
+    <nav class="nav">
+      <a href="#scene-1" data-i18n="nav.core">Core</a>
+      <a href="#scene-4" data-i18n="nav.platform">Platform</a>
+      <a href="#scene-7" data-i18n="nav.security">Security</a>
+      <a href="#scene-10" data-i18n="nav.lab">Developer Lab</a>
+      <a class="nav-external" href="https://github.com/Arenyxa/Arenyxa" target="_blank" rel="noopener noreferrer"><span data-i18n="nav.github">Visit GitHub</span><span aria-hidden="true">↗</span></a>
+      <a class="nav-external" href="https://arenyxa.github.io/" target="_blank" rel="noopener noreferrer"><span data-i18n="nav.official">Official Introduction</span><span aria-hidden="true">↗</span></a>
+    </nav>
+    <div class="actions">
+      <div class="lang-switcher" id="langSwitcher" aria-label="Language selector">
+        <button type="button" class="lang-current" id="langCurrent" aria-haspopup="listbox" aria-expanded="false">
+          <span id="langCurrentLabel">EN</span><span class="lang-chevron">⌄</span>
+        </button>
+        <div class="lang-menu" id="langMenu" role="listbox" aria-label="Languages">
+          <button type="button" role="option" data-lang="en" aria-selected="true"><span>EN</span><small>English</small></button>
+          <button type="button" role="option" data-lang="zh-CN" aria-selected="false"><span>简中</span><small>简体中文</small></button>
+          <button type="button" role="option" data-lang="ja" aria-selected="false"><span>日本語</span><small>Japanese</small></button>
+          <button type="button" role="option" data-lang="zh-TW" aria-selected="false"><span>繁中</span><small>繁體中文</small></button>
+          <button type="button" role="option" data-lang="ko" aria-selected="false"><span>한국어</span><small>Korean</small></button>
+          <button type="button" role="option" data-lang="de" aria-selected="false"><span>DE</span><small>Deutsch</small></button>
+          <button type="button" role="option" data-lang="fr" aria-selected="false"><span>FR</span><small>Français</small></button>
+          <button type="button" role="option" data-lang="es" aria-selected="false"><span>ES</span><small>Español</small></button>
+          <button type="button" role="option" data-lang="ru" aria-selected="false"><span>RU</span><small>Русский</small></button>
+        </div>
+      </div>
+
+      <a class="pill ghost" href="#scene-2"><span data-i18n="nav.explore">Explore world</span></a>
+      <a class="pill primary" href="#scene-12"><span data-i18n="nav.final">Final scene ↓</span></a>
+      <button class="pill menu" id="menuButton" type="button" aria-label="Menu" aria-expanded="false">••</button>
+    </div>
+  </header>
+
+
+  <div class="hud">
+    <div class="hud-row"><strong id="hudScene">ARENYXA CORE</strong><span id="hudPct">000%</span></div>
+    <div class="hud-line"><i id="hudLine"></i></div>
+    <div class="hud-row"><span>camera timeline</span><span>01 / 12 scenes</span></div>
+  </div>
+  <div class="rail"><button type="button" data-target="#scene-1" class="active" aria-label="Scene 1"></button>
+<button type="button" data-target="#scene-2" class="" aria-label="Scene 2"></button>
+<button type="button" data-target="#scene-3" class="" aria-label="Scene 3"></button>
+<button type="button" data-target="#scene-4" class="" aria-label="Scene 4"></button>
+<button type="button" data-target="#scene-5" class="" aria-label="Scene 5"></button>
+<button type="button" data-target="#scene-6" class="" aria-label="Scene 6"></button>
+<button type="button" data-target="#scene-7" class="" aria-label="Scene 7"></button>
+<button type="button" data-target="#scene-8" class="" aria-label="Scene 8"></button>
+<button type="button" data-target="#scene-9" class="" aria-label="Scene 9"></button>
+<button type="button" data-target="#scene-10" class="" aria-label="Scene 10"></button>
+<button type="button" data-target="#scene-11" class="" aria-label="Scene 11"></button>
+<button type="button" data-target="#scene-12" class="" aria-label="Scene 12"></button></div>
+
+  <main>
+
+    <section class="film-scene hero" id="scene-1" data-scene="0">
+      <div class="scene-copy reveal">
+        <div class="kicker" data-i18n="scene.1.kicker">01 / ARENYXA CORE</div>
+        <h1 data-i18n-html="scene.1.title"><span class="shine">See every layer.</span><br><span class="dim">Control from one system.</span></h1>
+        <p><span data-i18n="scene.1.body">Arenyxa becomes a navigable security universe. Scroll is treated as a camera timeline: the interface stays quiet while the WebGL world carries the story.</span></p>
+        <div class="cta-row">
+          <a class="pill primary" href="#scene-4">Enter platform ↓</a>
+          <a class="pill" href="#scene-2">Scroll to explore</a>
+        </div>
+        <div class="micro"><span>Unified Workspace</span><span>Traffic Intelligence</span><span>Security Control</span></div>
+        <div class="network-origin" id="networkOrigin">
+          <span class="origin-pulse"></span>
+          <div><small>NETWORK ORIGIN</small><strong id="heroRegion">GLOBAL NETWORK</strong></div>
+        </div>
+      </div>
+      <div class="corner-note reveal"><strong>ORBITAL SIGIL</strong>Scene 01 · cinematic model · live render</div>
+    
+      <div class="earth-control" id="earthControl" tabindex="0" aria-label="Drag to rotate the Network Earth">
+        <div class="earth-drag-hint" id="earthDragHint" data-i18n="earth.drag">DRAG TO EXPLORE</div>
+      </div>
+</section>
+
+    <section class="film-scene" id="scene-2" data-scene="1">
+      <div class="scene-copy right reveal">
+        <div class="kicker" data-i18n="scene.2.kicker">02 / DATA SPINE</div>
+        <h2 data-i18n-html="scene.2.title">Process traffic at <span class="shine">depth.</span><br><span class="dim">Not just at the surface.</span></h2>
+        <p><span data-i18n="scene.2.body">A vertical particle sculpture maps packet direction, trust state and flow density into one continuous field rather than a dashboard of disconnected widgets.</span></p>
+        
+        <div class="micro"><span>Multi-source Capture</span><span>Flow Correlation</span><span>Session Pipeline</span></div>
+      </div>
+      <div class="corner-note reveal"><strong>DATA SPINE</strong>Scene 02 · cinematic model · live render</div>
+    </section>
+
+    <section class="film-scene" id="scene-3" data-scene="2">
+      <div class="scene-copy reveal">
+        <div class="kicker" data-i18n="scene.3.kicker">03 / SENSOR FIELD</div>
+        <h2 data-i18n-html="scene.3.title">Observe every <span class="shine">source.</span><br><span class="dim">Know what is healthy.</span></h2>
+        <p><span data-i18n="scene.3.body">Autonomous sensor forms drift through the dark field, each one representing an observable service, capture source or remote worker.</span></p>
+        
+        <div class="micro"><span>Capture Sources</span><span>Worker Health</span><span>Service Visibility</span></div>
+      </div>
+      <div class="corner-note reveal"><strong>JELLY SENSOR FIELD</strong>Scene 03 · cinematic model · live render</div>
+    </section>
+    <div class="chapter-break" aria-hidden="true"></div>
+
+    <section class="film-scene" id="scene-4" data-scene="3">
+      <div class="scene-copy right reveal">
+        <div class="kicker" data-i18n="scene.4.kicker">04 / CAPTURE TUNNEL</div>
+        <h2 data-i18n-html="scene.4.title"><span class="shine">Capture live traffic.</span><br><span class="dim">Filter what matters.</span></h2>
+        <p><span data-i18n="scene.4.body">A dense helix corridor turns packet acquisition into forward motion. Rings, packet sprites and longitudinal traces make depth and direction immediately visible.</span></p>
+        
+        <div class="micro"><span>Packet Capture</span><span>Traffic Filters</span><span>Session Inspection</span></div>
+      </div>
+      <div class="corner-note reveal"><strong>CAPTURE HELIX</strong>Scene 04 · cinematic model · live render</div>
+    </section>
+
+    <section class="film-scene" id="scene-5" data-scene="4">
+      <div class="scene-copy reveal">
+        <div class="kicker" data-i18n="scene.5.kicker">05 / INVESTIGATION SPACE</div>
+        <h2 data-i18n-html="scene.5.title">Turn traffic into <span class="shine">evidence.</span></h2>
+        <p><span data-i18n="scene.5.body">Floating transparent screens sit inside a particle cloud, representing sessions, requests, decoded evidence and correlated investigations without breaking the cinematic flow.</span></p>
+        
+        <div class="micro"><span>Evidence Correlation</span><span>Request / Response</span><span>Forensic Context</span></div>
+      </div>
+      <div class="corner-note reveal"><strong>HOLOGRAPHIC EVIDENCE</strong>Scene 05 · cinematic model · live render</div>
+    </section>
+
+    <section class="film-scene" id="scene-6" data-scene="5">
+      <div class="scene-copy right reveal">
+        <div class="kicker" data-i18n="scene.6.kicker">06 / PROTOCOL MACHINE</div>
+        <h2 data-i18n-html="scene.6.title">Decode modern <span class="shine">protocols.</span><br><span class="dim">Keep the context.</span></h2>
+        <p><span data-i18n="scene.6.body">TLS, HTTP/2, WebSocket and GraphQL become suspended technical slabs connected by luminous pipes and analysis nodes.</span></p>
+        
+        <div class="micro"><span>TLS 1.3</span><span>HTTP/2</span><span>WebSocket / GraphQL</span></div>
+      </div>
+      <div class="corner-note reveal"><strong>PROTOCOL MACHINE</strong>Scene 06 · cinematic model · live render</div>
+    </section>
+    <div class="chapter-break" aria-hidden="true"></div>
+
+    <section class="film-scene" id="scene-7" data-scene="6">
+      <div class="scene-copy reveal">
+        <div class="kicker" data-i18n="scene.7.kicker">07 / MITM GATE</div>
+        <h2 data-i18n-html="scene.7.title">Inspect encrypted <span class="shine">sessions.</span><br><span class="dim">Understand the full route.</span></h2>
+        <p><span data-i18n="scene.7.body">Client, inspection chamber and server exist as physical nodes. Curved transport paths make the trust boundary explicit instead of hiding it behind controls.</span></p>
+        
+        <div class="micro"><span>MITM Engine</span><span>TLS Inspection</span><span>Trust Boundary</span></div>
+      </div>
+      <div class="corner-note reveal"><strong>MITM GATE</strong>Scene 07 · cinematic model · live render</div>
+    </section>
+
+    <section class="film-scene" id="scene-8" data-scene="7">
+      <div class="scene-copy right reveal">
+        <div class="kicker" data-i18n="scene.8.kicker">08 / ZERO TRUST FIELD</div>
+        <h2 data-i18n-html="scene.8.title">Enforce <span class="shine">zero trust.</span><br><span class="dim">Fail closed by design.</span></h2>
+        <p><span data-i18n="scene.8.body">Threat shards, safe nodes and a moving scan plane form a security field. Accepted and rejected signals occupy different material states.</span></p>
+        
+        <div class="micro"><span>Zero Trust</span><span>Signed Policy</span><span>Fail Closed</span></div>
+      </div>
+      <div class="corner-note reveal"><strong>ZERO TRUST FIELD</strong>Scene 08 · cinematic model · live render</div>
+    </section>
+
+    <section class="film-scene" id="scene-9" data-scene="8">
+      <div class="scene-copy reveal">
+        <div class="kicker" data-i18n="scene.9.kicker">09 / ROOT AUTHORITY</div>
+        <h2 data-i18n-html="scene.9.title">Root authority without <span class="shine">product gates.</span></h2>
+        <p><span data-i18n="scene.9.body">A key-like crystalline relic hangs inside an architectural ring system. Root Developer power is visually separated from ordinary product modes while integrity checks remain central.</span></p>
+        
+        <div class="micro"><span>Root Developer</span><span>TPM Identity</span><span>Signed Integrity</span></div>
+      </div>
+      <div class="corner-note reveal"><strong>ROOT AUTHORITY CATHEDRAL</strong>Scene 09 · cinematic model · live render</div>
+    </section>
+    <div class="chapter-break" aria-hidden="true"></div>
+
+    <section class="film-scene" id="scene-10" data-scene="9">
+      <div class="scene-copy right reveal">
+        <div class="kicker" data-i18n="scene.10.kicker">10 / SECURITY INSTALLATION</div>
+        <h2 data-i18n-html="scene.10.title">Operate the platform as a <span class="shine">system.</span></h2>
+        <p><span data-i18n="scene.10.body">A wireframe installation, hanging core and cable structure turn the site into an interactive debugging chamber rather than a conventional product page.</span></p>
+        
+        <div class="micro"><span>Diagnostics</span><span>Recovery</span><span>Operational Control</span></div>
+      </div>
+      <div class="corner-note reveal"><strong>SECURITY INSTALLATION</strong>Scene 10 · cinematic model · live render</div>
+    </section>
+
+    <section class="film-scene" id="scene-11" data-scene="10">
+      <div class="scene-copy reveal">
+        <div class="kicker" data-i18n="scene.11.kicker">11 / PACKET EXPLOSION</div>
+        <h2 data-i18n-html="scene.11.title">Reconstruct what <span class="shine">actually happened.</span></h2>
+        <p><span data-i18n="scene.11.body">A luminous packet burst expands into thousands of particles, with peripheral analyzer forms orbiting the incident like independent forensic sensors.</span></p>
+        
+        <div class="micro"><span>Traffic Forensics</span><span>Incident Reconstruction</span><span>Event Correlation</span></div>
+      </div>
+      <div class="corner-note reveal"><strong>PACKET EXPLOSION</strong>Scene 11 · cinematic model · live render</div>
+    </section>
+
+    <section class="film-scene" id="scene-12" data-scene="11">
+      <div class="scene-copy right reveal">
+        <div class="kicker" data-i18n="scene.12.kicker">12 / DEVELOPER ORB</div>
+        <h2 data-i18n-html="scene.12.title">Control everything from the <span class="shine">developer layer.</span></h2>
+        <p><span data-i18n="scene.12.body">A compact orbital object sits beside terminal planes and diagnostics traces, representing CLI-first control, plugin sandboxing and developer authority.</span></p>
+        
+        <div class="micro"><span>CLI / Terminal</span><span>Plugin Sandbox</span><span>Developer Diagnostics</span></div>
+      </div>
+      <div class="corner-note reveal"><strong>DEVELOPER ORB</strong>Scene 12 · cinematic model · live render</div>
+    </section>
+
+    <section class="next-world reveal" data-word="ARENYXA">
+      <h2 data-i18n="final.title">One platform. Full network visibility.</h2>
+      <div class="next-bottom">
+        <p data-i18n="final.body">Capture traffic, decode protocols, inspect sessions, enforce security policy, investigate incidents and control advanced workflows from one Arenyxa environment.</p>
+      </div>
+    </section>
+  </main>
+
+
+  <footer>
+    <div>© 2026 Arenyxa · Hybrid Flagship WebGL Experience</div>
+    <div class="links">
+      <a href="#scene-1" data-i18n="nav.core">Core</a>
+      <a href="#scene-4" data-i18n="nav.platform">Platform</a>
+      <a href="#scene-7" data-i18n="nav.security">Security</a>
+      <a href="#scene-10" data-i18n="nav.lab">Developer Lab</a>
+      <a href="https://github.com/Arenyxa/Arenyxa" target="_blank" rel="noopener noreferrer" data-i18n="nav.github">Visit GitHub</a>
+      <a href="https://arenyxa.github.io/" target="_blank" rel="noopener noreferrer" data-i18n="nav.official">Official Introduction</a>
+    </div>
+  </footer>
+
+
+<script type="module">
+
+const PAGE = document.body.dataset.page;
+const webglError = document.getElementById('webglError');
+function showWebGLError(message){
+  if(!webglError) return;
+  webglError.textContent='WebGL scene error: '+message;
+  webglError.classList.add('show');
+}
+window.addEventListener('error',e=>{ if(e?.message) showWebGLError(e.message); });
+window.addEventListener('unhandledrejection',e=>showWebGLError(e?.reason?.message||String(e?.reason||'Unknown module error')));
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const loader = document.getElementById('loader');
+const topbar = document.getElementById('topbar');
+const hudLine = document.getElementById('hudLine');
+const hudPct = document.getElementById('hudPct');
+const hudScene = document.getElementById('hudScene');
+const railButtons = [...document.querySelectorAll('.rail button')];
+const sections = [...document.querySelectorAll('.film-scene')];
+const routeWipe = document.getElementById('routeWipe');
+
+
+const introPhase = document.getElementById('introPhase');
+const introRegion = document.getElementById('introRegion');
+const introCrosshair = document.getElementById('introCrosshair');
+const heroRegion = document.getElementById('heroRegion');
+const earthControl = document.getElementById('earthControl');
+const earthDragHint = document.getElementById('earthDragHint');
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function fadeIntroText(el,text){
+  if(!el || el.textContent===text) return;
+  el.classList.remove('intro-copy-in');
+  el.classList.add('intro-copy-out');
+  window.setTimeout(()=>{
+    el.textContent=text;
+    el.classList.remove('intro-copy-out');
+    // Force a new transition cycle without moving layout.
+    void el.offsetWidth;
+    el.classList.add('intro-copy-in');
+  },150);
+}
+
+const smoothstep01 = v => {
+  const x=Math.min(1,Math.max(0,v));
+  return x*x*(3-2*x);
+};
+
+// Set by buildDigitalEarth() after Three.js loads.
+let earthWorld=null;
+let earthOrient=null;
+let earthUserRig=null;
+let earthSpin=null;
+let earthClouds=null;
+let earthCoastlineGroup=null;
+let earthSurface=null;
+let earthAtmosphere=null;
+let earthLandPoints=null;
+let earthLandOriginal=null;
+let earthLandMorph=null;
+let earthNetworkGroup=null;
+let earthTargetMarker=null;
+let earthTargetQuaternion=null;
+let earthFadeMaterials=[];
+let earthPackets=[];
+let earthNodes=[];
+let earthSelectedNode=null;
+let earthHoveredNode=null;
+// Initialized immediately after Three.js finishes loading. Keeping these as
+// nullable bindings avoids touching the THREE module during its temporal dead zone.
+let earthRaycaster=null;
+let earthPointerNdc=null;
+let earthFocusNodeWorld=null;
+let earthFocusLookWorld=null;
+let earthFocusCenterWorld=null;
+let earthFocusAmount=0;
+let earthTapStartX=0,earthTapStartY=0,earthDraggedBeyondTap=false;
+let earthReadyResolve=()=>{};
+let earthReadyPromise=new Promise(resolve=>earthReadyResolve=resolve);
+
+let introRunning=true;
+let earthInteractionEnabled=false;
+let earthDragActive=false;
+let earthDragPointer=null;
+let earthDragLastX=0,earthDragLastY=0,earthDragLastT=0;
+let earthUserYaw=0,earthUserPitch=0;
+let earthYawVelocity=0,earthPitchVelocity=0;
+let earthAutoBlend=1;
+let earthLastInteraction=0;
+let introCamera={x:0,y:0,z:7.15};
+let introEarth={x:0,y:0,scale:1.46};
+
+function getHeroEarthPose(){
+  if(innerWidth<720) return {x:.55,y:-1.28,scale:.78};
+  if(innerWidth<1050) return {x:2.05,y:-.18,scale:.91};
+  return {x:3.05,y:.08,scale:1.02};
+}
+
+
+function screenToEarthNdc(event){
+  const rect=canvas.getBoundingClientRect();
+  earthPointerNdc.x=((event.clientX-rect.left)/rect.width)*2-1;
+  earthPointerNdc.y=-((event.clientY-rect.top)/rect.height)*2+1;
+}
+
+function getEarthNodeHit(event){
+  if(!earthCanInteract() || !earthNodes.length) return null;
+  screenToEarthNdc(event);
+  earthRaycaster.setFromCamera(earthPointerNdc,camera);
+  const hits=earthRaycaster.intersectObjects(earthNodes,false);
+  return hits[0]?.object || null;
+}
+
+function setEarthSelectedNode(node){
+  if(earthSelectedNode===node){
+    earthSelectedNode=null;
+    return;
+  }
+  earthSelectedNode=node;
+  earthLastInteraction=performance.now();
+  earthAutoBlend=0;
+
+  if(node && Number.isFinite(node.userData?.lat) && Number.isFinite(node.userData?.lon)){
+    const lon=node.userData.lon;
+    const lat=node.userData.lat;
+    // A light assist toward the clicked region. We rotate the user rig only,
+    // keeping the directed camera language intact.
+    const desiredYaw=-THREE.MathUtils.degToRad(lon)*.72;
+    const currentYaw=earthUserRig?.rotation.y ?? earthUserYaw;
+    // Always rotate toward the clicked region through the shortest angular path.
+    // This prevents a 360-degree spin when the current yaw has crossed ±PI
+    // after auto-rotation or user dragging.
+    const yawDelta=THREE.MathUtils.euclideanModulo(
+      desiredYaw-currentYaw+Math.PI,
+      Math.PI*2
+    )-Math.PI;
+    earthUserYaw=currentYaw+yawDelta;
+    earthUserPitch=THREE.MathUtils.clamp(THREE.MathUtils.degToRad(lat)*.45,-1.05,1.05);
+    earthYawVelocity=0;
+    earthPitchVelocity=0;
+  }
+}
+
+function pickEarthNode(event){
+  const hit=getEarthNodeHit(event);
+  if(hit){
+    setEarthSelectedNode(hit);
+    earthControl?.classList.add('used');
+  }else if(earthSelectedNode){
+    earthSelectedNode=null;
+  }
+}
+
+function updateEarthHover(event){
+  const hit=getEarthNodeHit(event);
+  earthHoveredNode=hit;
+  if(earthControl){
+    earthControl.style.cursor=hit ? 'pointer' : '';
+  }
+}
+
+function earthCanInteract(){
+  return earthInteractionEnabled && !introRunning && sections[0]?.classList.contains('scene-active');
+}
+
+function stopEarthDrag(pointerId=null){
+  if(!earthDragActive) return;
+  earthDragActive=false;
+  document.body.classList.remove('earth-dragging');
+  earthLastInteraction=performance.now();
+  if(pointerId!==null){
+    try{ earthControl?.releasePointerCapture(pointerId); }catch(e){}
+  }
+}
+
+earthControl?.addEventListener('pointerdown',e=>{
+  if(!earthCanInteract()) return;
+  earthDragActive=true;
+  earthDragPointer=e.pointerId;
+  earthDragLastX=e.clientX;
+  earthDragLastY=e.clientY;
+  earthTapStartX=e.clientX;
+  earthTapStartY=e.clientY;
+  earthDraggedBeyondTap=false;
+  earthDragLastT=performance.now();
+  earthYawVelocity=0;
+  earthPitchVelocity=0;
+  earthAutoBlend=0;
+  earthLastInteraction=earthDragLastT;
+  earthControl.classList.add('used');
+  document.body.classList.add('earth-dragging');
+  try{ earthControl.setPointerCapture(e.pointerId); }catch(err){}
+});
+
+earthControl?.addEventListener('pointermove',e=>{
+  if(!earthDragActive || e.pointerId!==earthDragPointer){
+    if(!earthDragActive) updateEarthHover(e);
+    return;
+  }
+  const now=performance.now();
+  const dt=Math.max(8,Math.min(40,now-earthDragLastT));
+  const dx=e.clientX-earthDragLastX;
+  const dy=e.clientY-earthDragLastY;
+
+  if(Math.hypot(e.clientX-earthTapStartX,e.clientY-earthTapStartY)>8){
+    earthDraggedBeyondTap=true;
+  }
+
+  const yawDelta=dx*.0045;
+  const pitchDelta=dy*.0036;
+  earthUserYaw+=yawDelta;
+  earthUserPitch=Math.max(-1.05,Math.min(1.05,earthUserPitch+pitchDelta));
+  earthYawVelocity=yawDelta*(16/dt);
+  earthPitchVelocity=pitchDelta*(16/dt);
+  earthDragLastX=e.clientX;
+  earthDragLastY=e.clientY;
+  earthDragLastT=now;
+  earthLastInteraction=now;
+});
+
+earthControl?.addEventListener('pointerup',e=>{
+  const shouldPick=!earthDraggedBeyondTap;
+  stopEarthDrag(e.pointerId);
+  if(shouldPick) pickEarthNode(e);
+});
+earthControl?.addEventListener('pointercancel',e=>stopEarthDrag(e.pointerId));
+earthControl?.addEventListener('lostpointercapture',()=>stopEarthDrag());
+earthControl?.addEventListener('pointerleave',()=>{
+  earthHoveredNode=null;
+  if(earthControl) earthControl.style.cursor='';
+});
+
+earthControl?.addEventListener('keydown',e=>{
+  if(!earthCanInteract()) return;
+  const step=.12;
+  if(e.key==='ArrowLeft'){earthUserYaw-=step;e.preventDefault();}
+  else if(e.key==='ArrowRight'){earthUserYaw+=step;e.preventDefault();}
+  else if(e.key==='ArrowUp'){earthUserPitch=Math.max(-1.05,earthUserPitch-step*.65);e.preventDefault();}
+  else if(e.key==='ArrowDown'){earthUserPitch=Math.min(1.05,earthUserPitch+step*.65);e.preventDefault();}
+  else return;
+  earthYawVelocity=0;earthPitchVelocity=0;earthAutoBlend=0;earthLastInteraction=performance.now();
+  earthControl.classList.add('used');
+});
+
+async function detectNetworkRegion(){
+  const controller = new AbortController();
+  const timeout = setTimeout(()=>controller.abort(), 1500);
+  try{
+    const response = await fetch('https://ipwho.is/', {signal:controller.signal, cache:'no-store'});
+    const data = await response.json();
+    if(!data?.success) throw new Error('region unavailable');
+    return {
+      country:data.country || '',
+      region:data.region || '',
+      city:data.city || '',
+      latitude:Number(data.latitude),
+      longitude:Number(data.longitude)
+    };
+  }catch(e){
+    return null;
+  }finally{
+    clearTimeout(timeout);
+  }
+}
+
+function tween(duration, update){
+  if(reducedMotion){update(1);return Promise.resolve();}
+  return new Promise(resolve=>{
+    const start=performance.now();
+    const tick=now=>{
+      const p=Math.min(1,(now-start)/duration);
+      update(smoothstep01(p));
+      if(p<1) requestAnimationFrame(tick);
+      else resolve();
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
+async function runIntro(){
+  if(!loader || !earthWorld || !earthOrient) return;
+  if(scrollY>0) scrollTo(0,0);
+
+  const regionPromise=detectNetworkRegion();
+  fadeIntroText(introPhase,'DISCOVERING GLOBAL NETWORK');
+
+  await Promise.race([earthReadyPromise,sleep(800)]);
+  await sleep(reducedMotion?60:360);
+  fadeIntroText(introPhase,'MAPPING GLOBAL ROUTES');
+  await sleep(reducedMotion?60:420);
+
+  const region=await regionPromise;
+  const hasCoords=region && Number.isFinite(region.latitude) && Number.isFinite(region.longitude);
+  const regionLabel=region
+    ? [region.country,region.region].filter(Boolean).join(' · ')
+    : 'GLOBAL NETWORK';
+
+  fadeIntroText(introRegion,regionLabel || 'GLOBAL NETWORK');
+  heroRegion && (heroRegion.textContent=regionLabel || 'GLOBAL NETWORK');
+
+  if(hasCoords) setEarthTarget(region.latitude,region.longitude);
+  fadeIntroText(introPhase,hasCoords?'NETWORK REGION DETECTED':'GLOBAL CONTEXT READY');
+  introCrosshair?.classList.add('show');
+
+  const qStart=earthOrient.quaternion.clone();
+  const qEnd=hasCoords && earthTargetQuaternion ? earthTargetQuaternion.clone() : qStart.clone();
+  const startZ=introCamera.z;
+  await tween(reducedMotion?1:1150,p=>{
+    earthOrient.quaternion.copy(qStart).slerp(qEnd,p);
+    introCamera.z=startZ+(6.15-startZ)*p;
+  });
+  fadeIntroText(introPhase,'VERIFYING SECURITY CONTEXT');
+  await sleep(reducedMotion?60:460);
+
+  // The same globe becomes the Hero visual. No scene cut.
+  fadeIntroText(introPhase,'ENTERING ARENYXA');
+  loader.classList.add('handoff');
+  document.body.classList.remove('intro-active');
+
+  const heroPose=getHeroEarthPose();
+  const sx=introEarth.x,sy=introEarth.y,ss=introEarth.scale,sz=introCamera.z;
+  await tween(reducedMotion?1:1250,p=>{
+    introEarth.x=sx+(heroPose.x-sx)*p;
+    introEarth.y=sy+(heroPose.y-sy)*p;
+    introEarth.scale=ss+(heroPose.scale-ss)*p;
+    introCamera.z=sz+(8.0-sz)*p;
+    if(p>.18){
+      document.querySelectorAll('#scene-1 .reveal').forEach(el=>el.classList.add('in'));
+    }
+  });
+  fadeIntroText(introPhase,'NETWORK CONTEXT READY');
+
+  earthWorld.userData.baseX=heroPose.x;
+  earthWorld.userData.baseY=heroPose.y;
+  earthWorld.userData.baseScale=heroPose.scale;
+  earthWorld.position.set(heroPose.x,heroPose.y,0);
+  earthWorld.scale.setScalar(heroPose.scale);
+
+  introRunning=false;
+  earthInteractionEnabled=true;
+  earthControl?.classList.add('ready');
+  introCrosshair?.classList.remove('show');
+  await sleep(reducedMotion?20:160);
+  loader.classList.add('done');
+
+  // After the first WebGL handoff, normal viewport lifecycle takes over.
+  // This keeps the Hero replayable when the user scrolls away and returns.
+  requestAnimationFrame(()=>{
+    document.querySelectorAll('#scene-1 .reveal').forEach(el=>{
+      const rect=el.getBoundingClientRect();
+      if(rect.bottom>innerHeight*.10 && rect.top<innerHeight*.90){
+        el.classList.add('in');
+      }
+    });
+  });
+}
+
+railButtons.forEach(btn=>btn.addEventListener('click',()=>document.querySelector(btn.dataset.target)?.scrollIntoView({behavior:reducedMotion?'auto':'smooth'})));
+
+
+const WORLD_NAMES = [...sections].map(s=>s.querySelector('.kicker')?.textContent.replace(/^\d+\s*\/\s*/,'')||'Scene');
+
+const revealObserver = new IntersectionObserver((entries) => {
+  for (const entry of entries) {
+    const isHeroDuringIntro =
+      document.body.classList.contains('intro-active') &&
+      entry.target.closest('#scene-1');
+
+    if(isHeroDuringIntro){
+      entry.target.classList.remove('in');
+      continue;
+    }
+
+    if(entry.isIntersecting){
+      entry.target.classList.add('in');
+    }else{
+      entry.target.classList.remove('in');
+    }
+  }
+}, { threshold: .16, rootMargin: '-4% 0px -8% 0px' });
+
+document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+
+let lastY=0;
+function updateUI(){
+  const y=scrollY, max=Math.max(1,document.documentElement.scrollHeight-innerHeight);
+  const pct=Math.min(100,Math.max(0,Math.round(y/max*100)));
+  hudLine?.style.setProperty('--p',pct+'%');
+  if(hudPct) hudPct.textContent=String(pct).padStart(3,'0')+'%';
+  if(topbar){
+    topbar.style.background=y>40?'rgba(4,7,12,.75)':'rgba(4,7,12,.52)';
+    topbar.style.transform=(y>280 && y>lastY)?'translate(-50%,-92px)':'translate(-50%,0)';
+  }
+  let active=0;
+  sections.forEach((s,i)=>{if(s.getBoundingClientRect().top<innerHeight*.48) active=i;});
+  if(hudScene) hudScene.textContent=WORLD_NAMES[active]||WORLD_NAMES[0];
+  railButtons.forEach((b,i)=>b.classList.toggle('active',i===active));
+  sections.forEach((s,i)=>s.classList.toggle('scene-active',i===active));
+  const hudTail=document.querySelector('.hud-row:last-child span:last-child');
+  if(hudTail) hudTail.textContent=String(active+1).padStart(2,'0')+' / '+String(sections.length).padStart(2,'0')+' scenes';
+  lastY=y;
+}
+addEventListener('scroll',updateUI,{passive:true}); updateUI();
+
+
+const I18N = {"en":{"nav.core":"Core","nav.platform":"Platform","nav.security":"Security","nav.lab":"Developer Lab","nav.explore":"Explore world","nav.final":"Final scene ↓","final.title":"One platform. Full network visibility.","final.body":"Capture traffic, decode protocols, inspect sessions, enforce security policy, investigate incidents and control advanced workflows from one Arenyxa environment.","final.return":"Return to core ↑","scene.1.kicker":"01 / ARENYXA CORE","scene.1.title":"<span class=\"shine\">See every layer.</span><br><span class=\"dim\">Control from one system.</span>","scene.1.body":"Arenyxa unifies traffic capture, protocol intelligence, MITM inspection, security policy, developer tooling and forensic analysis in one operational workspace.","scene.2.kicker":"02 / DATA SPINE","scene.2.title":"Process traffic at <span class=\"shine\">depth.</span><br><span class=\"dim\">Not just at the surface.</span>","scene.2.body":"The traffic pipeline ingests multiple capture sources, organizes flows, correlates sessions and prepares packets for protocol decoding and downstream analysis.","scene.3.kicker":"03 / SENSOR FIELD","scene.3.title":"Observe every <span class=\"shine\">source.</span><br><span class=\"dim\">Know what is healthy.</span>","scene.3.body":"Arenyxa tracks capture sources, workers and observable services so operators can see where traffic originates, which components are active and where collection is degraded.","scene.4.kicker":"04 / CAPTURE TUNNEL","scene.4.title":"<span class=\"shine\">Capture live traffic.</span><br><span class=\"dim\">Filter what matters.</span>","scene.4.body":"Network Capture provides packet acquisition, filtering and session-oriented inspection for live traffic, giving analysts a clean starting point for deeper protocol and forensic work.","scene.5.kicker":"05 / INVESTIGATION SPACE","scene.5.title":"Turn traffic into <span class=\"shine\">evidence.</span>","scene.5.body":"Investigation views correlate requests, responses, sessions and decoded artifacts so analysts can move from raw traffic to searchable evidence without losing context.","scene.6.kicker":"06 / PROTOCOL MACHINE","scene.6.title":"Decode modern <span class=\"shine\">protocols.</span><br><span class=\"dim\">Keep the context.</span>","scene.6.body":"Protocol Intelligence analyzes TLS, HTTP/2, WebSocket and GraphQL traffic, exposing protocol structure and application behavior beyond basic packet inspection.","scene.7.kicker":"07 / MITM GATE","scene.7.title":"Inspect encrypted <span class=\"shine\">sessions.</span><br><span class=\"dim\">Understand the full route.</span>","scene.7.body":"The MITM Engine provides controlled interception for authorized debugging and analysis, making client-to-server traffic inspectable while preserving explicit trust boundaries.","scene.8.kicker":"08 / ZERO TRUST FIELD","scene.8.title":"Enforce <span class=\"shine\">zero trust.</span><br><span class=\"dim\">Fail closed by design.</span>","scene.8.body":"Security policy separates identity, role, device and session context, applying signed policy decisions and fail-closed behavior to privileged operations.","scene.9.kicker":"09 / ROOT AUTHORITY","scene.9.title":"Root authority without <span class=\"shine\">product gates.</span>","scene.9.body":"Root Developer is the highest technical authority for validated development sessions, with hardware-backed identity and signed integrity policy protecting the authority itself.","scene.10.kicker":"10 / SECURITY INSTALLATION","scene.10.title":"Operate the platform as a <span class=\"shine\">system.</span>","scene.10.body":"Security orchestration, diagnostics, recovery and operational controls work together so the platform can be inspected, repaired and validated instead of behaving like a black box.","scene.11.kicker":"11 / PACKET EXPLOSION","scene.11.title":"Reconstruct what <span class=\"shine\">actually happened.</span>","scene.11.body":"Traffic forensics connects packet activity, sessions and protocol events into a coherent incident view, helping analysts investigate behavior instead of reading isolated records.","scene.12.kicker":"12 / DEVELOPER ORB","scene.12.title":"Control everything from the <span class=\"shine\">developer layer.</span>","scene.12.body":"Developer Mode exposes CLI-first control, terminal workflows, plugin sandboxing and diagnostics so advanced users can automate and inspect Arenyxa beyond the graphical interface.","earth.drag":"DRAG TO EXPLORE"},"zh-CN":{"nav.core":"核心","nav.platform":"平台","nav.security":"安全","nav.lab":"开发者实验室","nav.explore":"探索世界","nav.final":"最终场景 ↓","final.title":"一个平台。看清整个网络。","final.body":"在同一个 Arenyxa 环境中完成流量捕获、协议解码、会话检查、安全策略执行、事件调查与高级开发工作流。","final.return":"返回核心 ↑","scene.1.kicker":"01 / ARENYXA CORE","scene.1.title":"<span class=\"shine\">看见每一层。</span><br><span class=\"dim\">在一个系统中掌控全局。</span>","scene.1.body":"Arenyxa 将流量捕获、协议分析、MITM 检查、安全策略、开发者工具与流量取证统一到一个操作平台中。","scene.2.kicker":"02 / DATA SPINE","scene.2.title":"深入处理<span class=\"shine\">网络流量。</span><br><span class=\"dim\">不只停留在表面。</span>","scene.2.body":"流量处理管线可接入多个捕获来源，组织数据流、关联会话，并将数据包交给协议解码和后续分析模块。","scene.3.kicker":"03 / SENSOR FIELD","scene.3.title":"观察每一个<span class=\"shine\">数据来源。</span><br><span class=\"dim\">知道哪些节点正在健康运行。</span>","scene.3.body":"Arenyxa 持续跟踪抓包来源、Worker 与可观测服务，让操作人员清楚知道流量来自哪里、哪些组件在线，以及哪里出现采集异常。","scene.4.kicker":"04 / CAPTURE TUNNEL","scene.4.title":"<span class=\"shine\">捕获实时流量。</span><br><span class=\"dim\">只留下真正重要的内容。</span>","scene.4.body":"Network Capture 提供实时数据包采集、过滤与会话级检查，为后续协议分析和流量取证提供干净、可控的入口。","scene.5.kicker":"05 / INVESTIGATION SPACE","scene.5.title":"把网络流量变成<span class=\"shine\">可分析的证据。</span>","scene.5.body":"调查视图关联请求、响应、会话和解码结果，让分析人员从原始流量直接进入可搜索、可关联的证据链，同时保留上下文。","scene.6.kicker":"06 / PROTOCOL MACHINE","scene.6.title":"解码现代<span class=\"shine\">网络协议。</span><br><span class=\"dim\">同时保留完整上下文。</span>","scene.6.body":"Protocol Intelligence 面向 TLS、HTTP/2、WebSocket 与 GraphQL 等协议进行解析，让分析不再停留在数据包层，而是直接理解应用层行为。","scene.7.kicker":"07 / MITM GATE","scene.7.title":"检查加密<span class=\"shine\">会话。</span><br><span class=\"dim\">看清完整通信路径。</span>","scene.7.body":"MITM Engine 为授权调试与分析提供受控拦截能力，让客户端到服务器之间的通信可以被检查，同时明确区分信任边界。","scene.8.kicker":"08 / ZERO TRUST FIELD","scene.8.title":"执行<span class=\"shine\">零信任策略。</span><br><span class=\"dim\">默认拒绝，而不是默认放行。</span>","scene.8.body":"安全策略将身份、角色、设备与会话上下文分离，并通过签名策略和 Fail-Closed 机制控制高权限操作。","scene.9.kicker":"09 / ROOT AUTHORITY","scene.9.title":"Root 权限不受<span class=\"shine\">产品层级限制。</span>","scene.9.body":"Root Developer 是通过验证后的最高技术权限，可访问完整开发能力；权限本身仍由硬件身份、完整性校验和签名策略保护。","scene.10.kicker":"10 / SECURITY INSTALLATION","scene.10.title":"把 Arenyxa 当作一个<span class=\"shine\">完整系统</span>来运行。","scene.10.body":"安全编排、诊断、恢复与运行控制协同工作，让平台可以被检查、修复和验证，而不是一个无法解释的黑盒。","scene.11.kicker":"11 / PACKET EXPLOSION","scene.11.title":"重建网络中<span class=\"shine\">真正发生了什么。</span>","scene.11.body":"流量取证将数据包活动、会话与协议事件串联成完整事件视图，让分析人员调查行为本身，而不是逐条翻阅孤立记录。","scene.12.kicker":"12 / DEVELOPER ORB","scene.12.title":"从<span class=\"shine\">开发者层</span>直接控制整个系统。","scene.12.body":"Developer Mode 提供 CLI 优先控制、终端工作流、插件沙箱和诊断能力，让高级用户可以在 GUI 之外自动化并深入检查 Arenyxa。","earth.drag":"拖动探索地球"},"ja":{"nav.core":"コア","nav.platform":"プラットフォーム","nav.security":"セキュリティ","nav.lab":"開発者ラボ","nav.explore":"世界を探索","nav.final":"最終シーン ↓","final.title":"一つのプラットフォーム。ネットワーク全体を可視化。","final.body":"一つの Arenyxa 環境で、キャプチャ、プロトコル解析、セッション検査、ポリシー適用、インシデント調査、高度な開発ワークフローを実行できます。","final.return":"コアへ戻る ↑","scene.1.kicker":"01 / ARENYXA CORE","scene.1.title":"<span class=\"shine\">すべてのレイヤーを見る。</span><br><span class=\"dim\">一つのシステムで制御する。</span>","scene.1.body":"Arenyxa はトラフィックキャプチャ、プロトコル解析、MITM 検査、セキュリティポリシー、開発ツール、フォレンジック分析を一つの運用環境に統合します。","scene.2.kicker":"02 / DATA SPINE","scene.2.title":"トラフィックを<span class=\"shine\">深く処理する。</span><br><span class=\"dim\">表面だけでは終わらない。</span>","scene.2.body":"トラフィックパイプラインは複数のキャプチャソースを取り込み、フローとセッションを関連付け、プロトコル解析へ渡します。","scene.3.kicker":"03 / SENSOR FIELD","scene.3.title":"すべての<span class=\"shine\">ソースを監視する。</span><br><span class=\"dim\">稼働状態を把握する。</span>","scene.3.body":"Arenyxa はキャプチャソース、ワーカー、監視対象サービスを追跡し、トラフィックの起点と稼働状態を可視化します。","scene.4.kicker":"04 / CAPTURE TUNNEL","scene.4.title":"<span class=\"shine\">ライブトラフィックを取得。</span><br><span class=\"dim\">必要な情報だけを抽出する。</span>","scene.4.body":"Network Capture はリアルタイムのパケット取得、フィルタリング、セッション単位の検査を提供し、詳細解析の入口を作ります。","scene.5.kicker":"05 / INVESTIGATION SPACE","scene.5.title":"トラフィックを<span class=\"shine\">証拠へ変える。</span>","scene.5.body":"調査ビューはリクエスト、レスポンス、セッション、解析結果を関連付け、生のトラフィックを検索可能な証拠へ変換します。","scene.6.kicker":"06 / PROTOCOL MACHINE","scene.6.title":"最新の<span class=\"shine\">プロトコルを解析。</span><br><span class=\"dim\">コンテキストを維持する。</span>","scene.6.body":"Protocol Intelligence は TLS、HTTP/2、WebSocket、GraphQL を解析し、パケットを超えてアプリケーション挙動を可視化します。","scene.7.kicker":"07 / MITM GATE","scene.7.title":"暗号化<span class=\"shine\">セッションを検査。</span><br><span class=\"dim\">通信経路全体を理解する。</span>","scene.7.body":"MITM Engine は承認されたデバッグと解析のために制御されたインターセプトを提供し、信頼境界を明確に保ちます。","scene.8.kicker":"08 / ZERO TRUST FIELD","scene.8.title":"<span class=\"shine\">ゼロトラスト</span>を強制する。<br><span class=\"dim\">Fail-closed を前提に設計。</span>","scene.8.body":"セキュリティポリシーは ID、ロール、デバイス、セッションを分離し、署名済みポリシーと Fail-closed 制御を適用します。","scene.9.kicker":"09 / ROOT AUTHORITY","scene.9.title":"Root 権限を<span class=\"shine\">製品ゲートから分離。</span>","scene.9.body":"Root Developer は検証済み開発セッションにおける最高技術権限であり、ハードウェア ID と署名済み整合性ポリシーによって保護されます。","scene.10.kicker":"10 / SECURITY INSTALLATION","scene.10.title":"Arenyxa を<span class=\"shine\">一つのシステム</span>として運用する。","scene.10.body":"セキュリティ制御、診断、復旧、運用機能を統合し、プラットフォーム自体を検査・修復・検証できるようにします。","scene.11.kicker":"11 / PACKET EXPLOSION","scene.11.title":"実際に<span class=\"shine\">何が起きたかを再構築する。</span>","scene.11.body":"トラフィックフォレンジックはパケット、セッション、プロトコルイベントを一つのインシデントビューに統合します。","scene.12.kicker":"12 / DEVELOPER ORB","scene.12.title":"<span class=\"shine\">開発者レイヤー</span>から全体を制御する。","scene.12.body":"Developer Mode は CLI 主導制御、ターミナル、プラグインサンドボックス、診断機能を提供し、GUI を超えた操作を可能にします。","earth.drag":"ドラッグして探索"},"zh-TW":{"nav.core":"核心","nav.platform":"平台","nav.security":"安全","nav.lab":"開發者實驗室","nav.explore":"探索世界","nav.final":"最終場景 ↓","final.title":"一個平台。看清整個網路。","final.body":"在同一個 Arenyxa 環境中完成流量擷取、協定解碼、工作階段檢查、安全策略執行、事件調查與進階開發工作流程。","final.return":"返回核心 ↑","scene.1.kicker":"01 / ARENYXA CORE","scene.1.title":"<span class=\"shine\">看見每一層。</span><br><span class=\"dim\">在一個系統中掌控全局。</span>","scene.1.body":"Arenyxa 將流量擷取、協定分析、MITM 檢查、安全策略、開發者工具與流量鑑識統一到一個操作平台中。","scene.2.kicker":"02 / DATA SPINE","scene.2.title":"<span class=\"shine\">深入處理網路流量。</span><br><span class=\"dim\">不只停留在表面。</span>","scene.2.body":"流量處理管線接入多個擷取來源，組織資料流、關聯工作階段，並將封包交給協定解碼與後續分析。","scene.3.kicker":"03 / SENSOR FIELD","scene.3.title":"<span class=\"shine\">觀察每一個資料來源。</span><br><span class=\"dim\">知道哪些節點正在健康運行。</span>","scene.3.body":"Arenyxa 持續追蹤擷取來源、Worker 與可觀測服務，清楚呈現流量來源、元件狀態與採集異常。","scene.4.kicker":"04 / CAPTURE TUNNEL","scene.4.title":"<span class=\"shine\">擷取即時流量。</span><br><span class=\"dim\">只留下真正重要的內容。</span>","scene.4.body":"Network Capture 提供即時封包擷取、過濾與工作階段級檢查，為協定分析與鑑識提供可控入口。","scene.5.kicker":"05 / INVESTIGATION SPACE","scene.5.title":"<span class=\"shine\">把網路流量變成可分析的證據。</span>","scene.5.body":"調查視圖關聯請求、回應、工作階段與解碼結果，讓原始流量成為可搜尋、可關聯的證據鏈。","scene.6.kicker":"06 / PROTOCOL MACHINE","scene.6.title":"<span class=\"shine\">解碼現代網路協定。</span><br><span class=\"dim\">同時保留完整上下文。</span>","scene.6.body":"Protocol Intelligence 解析 TLS、HTTP/2、WebSocket 與 GraphQL，直接理解應用層行為。","scene.7.kicker":"07 / MITM GATE","scene.7.title":"<span class=\"shine\">檢查加密工作階段。</span><br><span class=\"dim\">看清完整通訊路徑。</span>","scene.7.body":"MITM Engine 為授權除錯與分析提供受控攔截能力，同時明確維持信任邊界。","scene.8.kicker":"08 / ZERO TRUST FIELD","scene.8.title":"<span class=\"shine\">執行零信任策略。</span><br><span class=\"dim\">預設拒絕，而不是預設放行。</span>","scene.8.body":"安全策略分離身分、角色、裝置與工作階段上下文，透過簽章策略與 Fail-Closed 機制控制高權限操作。","scene.9.kicker":"09 / ROOT AUTHORITY","scene.9.title":"<span class=\"shine\">Root 權限不受產品層級限制。</span>","scene.9.body":"Root Developer 是驗證後的最高技術權限，權限本身由硬體身分、完整性校驗與簽章策略保護。","scene.10.kicker":"10 / SECURITY INSTALLATION","scene.10.title":"<span class=\"shine\">把 Arenyxa 當作一個完整系統來運行。</span>","scene.10.body":"安全編排、診斷、復原與運行控制協同工作，讓平台可以被檢查、修復和驗證。","scene.11.kicker":"11 / PACKET EXPLOSION","scene.11.title":"<span class=\"shine\">重建網路中真正發生了什麼。</span>","scene.11.body":"流量鑑識將封包活動、工作階段與協定事件串聯成完整事件視圖。","scene.12.kicker":"12 / DEVELOPER ORB","scene.12.title":"<span class=\"shine\">從開發者層直接控制整個系統。</span>","scene.12.body":"Developer Mode 提供 CLI 優先控制、終端工作流程、外掛沙箱與診斷能力。","earth.drag":"拖曳探索地球"},"ko":{"nav.core":"코어","nav.platform":"플랫폼","nav.security":"보안","nav.lab":"개발자 랩","nav.explore":"세계 탐색","nav.final":"마지막 장면 ↓","final.title":"하나의 플랫폼. 전체 네트워크 가시성.","final.body":"하나의 Arenyxa 환경에서 트래픽 캡처, 프로토콜 디코딩, 세션 검사, 보안 정책 적용, 사고 조사와 고급 개발 워크플로를 수행합니다.","final.return":"코어로 돌아가기 ↑","scene.1.kicker":"01 / ARENYXA CORE","scene.1.title":"<span class=\"shine\">모든 계층을 보십시오.</span><br><span class=\"dim\">하나의 시스템에서 제어하십시오.</span>","scene.1.body":"Arenyxa는 트래픽 캡처, 프로토콜 인텔리전스, MITM 검사, 보안 정책, 개발자 도구와 포렌식 분석을 하나의 워크스페이스로 통합합니다.","scene.2.kicker":"02 / DATA SPINE","scene.2.title":"<span class=\"shine\">트래픽을 깊이 처리합니다.</span><br><span class=\"dim\">표면에서 멈추지 않습니다.</span>","scene.2.body":"여러 캡처 소스를 수집하고 플로와 세션을 연결한 뒤 프로토콜 디코딩과 후속 분석에 패킷을 전달합니다.","scene.3.kicker":"03 / SENSOR FIELD","scene.3.title":"<span class=\"shine\">모든 소스를 관찰합니다.</span><br><span class=\"dim\">상태를 정확히 파악합니다.</span>","scene.3.body":"캡처 소스, 워커와 서비스를 추적해 트래픽 출처와 구성 요소의 상태를 보여 줍니다.","scene.4.kicker":"04 / CAPTURE TUNNEL","scene.4.title":"<span class=\"shine\">실시간 트래픽을 캡처합니다.</span><br><span class=\"dim\">중요한 것만 남깁니다.</span>","scene.4.body":"Network Capture는 실시간 패킷 획득, 필터링과 세션 기반 검사를 제공합니다.","scene.5.kicker":"05 / INVESTIGATION SPACE","scene.5.title":"<span class=\"shine\">트래픽을 증거로 전환합니다.</span>","scene.5.body":"조사 뷰는 요청, 응답, 세션과 디코딩된 아티팩트를 연결해 검색 가능한 증거로 바꿉니다.","scene.6.kicker":"06 / PROTOCOL MACHINE","scene.6.title":"<span class=\"shine\">현대 프로토콜을 디코딩합니다.</span><br><span class=\"dim\">맥락을 유지합니다.</span>","scene.6.body":"TLS, HTTP/2, WebSocket, GraphQL을 분석해 애플리케이션 동작을 드러냅니다.","scene.7.kicker":"07 / MITM GATE","scene.7.title":"<span class=\"shine\">암호화된 세션을 검사합니다.</span><br><span class=\"dim\">전체 경로를 이해합니다.</span>","scene.7.body":"MITM Engine은 승인된 디버깅과 분석을 위한 통제된 인터셉션을 제공합니다.","scene.8.kicker":"08 / ZERO TRUST FIELD","scene.8.title":"<span class=\"shine\">제로 트러스트를 적용합니다.</span><br><span class=\"dim\">Fail-closed를 기본으로 설계합니다.</span>","scene.8.body":"ID, 역할, 장치와 세션 맥락을 분리하고 서명된 정책을 적용합니다.","scene.9.kicker":"09 / ROOT AUTHORITY","scene.9.title":"<span class=\"shine\">Root 권한을 제품 게이트와 분리합니다.</span>","scene.9.body":"Root Developer는 검증된 개발 세션의 최고 기술 권한입니다.","scene.10.kicker":"10 / SECURITY INSTALLATION","scene.10.title":"<span class=\"shine\">플랫폼을 하나의 시스템으로 운영합니다.</span>","scene.10.body":"오케스트레이션, 진단, 복구와 운영 제어가 플랫폼 자체를 검사하고 복구할 수 있게 합니다.","scene.11.kicker":"11 / PACKET EXPLOSION","scene.11.title":"<span class=\"shine\">실제로 무슨 일이 있었는지 재구성합니다.</span>","scene.11.body":"트래픽 포렌식은 패킷 활동, 세션과 프로토콜 이벤트를 하나의 사고 뷰로 연결합니다.","scene.12.kicker":"12 / DEVELOPER ORB","scene.12.title":"<span class=\"shine\">개발자 계층에서 전체를 제어합니다.</span>","scene.12.body":"Developer Mode는 CLI 우선 제어, 터미널, 플러그인 샌드박스와 진단 기능을 제공합니다.","earth.drag":"드래그하여 탐색"},"de":{"nav.core":"Core","nav.platform":"Plattform","nav.security":"Sicherheit","nav.lab":"Developer Lab","nav.explore":"Welt erkunden","nav.final":"Letzte Szene ↓","final.title":"Eine Plattform. Volle Netzwerksicht.","final.body":"Erfasse Traffic, dekodiere Protokolle, prüfe Sessions, setze Sicherheitsrichtlinien durch und steuere fortgeschrittene Workflows in einer Arenyxa-Umgebung.","final.return":"Zurück zum Core ↑","scene.1.kicker":"01 / ARENYXA CORE","scene.1.title":"<span class=\"shine\">See every layer.</span><br><span class=\"dim\">Control from one system.</span>","scene.1.body":"Arenyxa unifies traffic capture, protocol intelligence, MITM inspection, security policy, developer tooling and forensic analysis in one operational workspace.","scene.2.kicker":"02 / DATA SPINE","scene.2.title":"Process traffic at <span class=\"shine\">depth.</span><br><span class=\"dim\">Not just at the surface.</span>","scene.2.body":"The traffic pipeline ingests multiple capture sources, organizes flows, correlates sessions and prepares packets for protocol decoding and downstream analysis.","scene.3.kicker":"03 / SENSOR FIELD","scene.3.title":"Observe every <span class=\"shine\">source.</span><br><span class=\"dim\">Know what is healthy.</span>","scene.3.body":"Arenyxa tracks capture sources, workers and observable services so operators can see where traffic originates, which components are active and where collection is degraded.","scene.4.kicker":"04 / CAPTURE TUNNEL","scene.4.title":"<span class=\"shine\">Capture live traffic.</span><br><span class=\"dim\">Filter what matters.</span>","scene.4.body":"Network Capture provides packet acquisition, filtering and session-oriented inspection for live traffic, giving analysts a clean starting point for deeper protocol and forensic work.","scene.5.kicker":"05 / INVESTIGATION SPACE","scene.5.title":"Turn traffic into <span class=\"shine\">evidence.</span>","scene.5.body":"Investigation views correlate requests, responses, sessions and decoded artifacts so analysts can move from raw traffic to searchable evidence without losing context.","scene.6.kicker":"06 / PROTOCOL MACHINE","scene.6.title":"Decode modern <span class=\"shine\">protocols.</span><br><span class=\"dim\">Keep the context.</span>","scene.6.body":"Protocol Intelligence analyzes TLS, HTTP/2, WebSocket and GraphQL traffic, exposing protocol structure and application behavior beyond basic packet inspection.","scene.7.kicker":"07 / MITM GATE","scene.7.title":"Inspect encrypted <span class=\"shine\">sessions.</span><br><span class=\"dim\">Understand the full route.</span>","scene.7.body":"The MITM Engine provides controlled interception for authorized debugging and analysis, making client-to-server traffic inspectable while preserving explicit trust boundaries.","scene.8.kicker":"08 / ZERO TRUST FIELD","scene.8.title":"Enforce <span class=\"shine\">zero trust.</span><br><span class=\"dim\">Fail closed by design.</span>","scene.8.body":"Security policy separates identity, role, device and session context, applying signed policy decisions and fail-closed behavior to privileged operations.","scene.9.kicker":"09 / ROOT AUTHORITY","scene.9.title":"Root authority without <span class=\"shine\">product gates.</span>","scene.9.body":"Root Developer is the highest technical authority for validated development sessions, with hardware-backed identity and signed integrity policy protecting the authority itself.","scene.10.kicker":"10 / SECURITY INSTALLATION","scene.10.title":"Operate the platform as a <span class=\"shine\">system.</span>","scene.10.body":"Security orchestration, diagnostics, recovery and operational controls work together so the platform can be inspected, repaired and validated instead of behaving like a black box.","scene.11.kicker":"11 / PACKET EXPLOSION","scene.11.title":"Reconstruct what <span class=\"shine\">actually happened.</span>","scene.11.body":"Traffic forensics connects packet activity, sessions and protocol events into a coherent incident view, helping analysts investigate behavior instead of reading isolated records.","scene.12.kicker":"12 / DEVELOPER ORB","scene.12.title":"Control everything from the <span class=\"shine\">developer layer.</span>","scene.12.body":"Developer Mode exposes CLI-first control, terminal workflows, plugin sandboxing and diagnostics so advanced users can automate and inspect Arenyxa beyond the graphical interface.","earth.drag":"ZIEHEN ZUM ERKUNDEN"},"fr":{"nav.core":"Cœur","nav.platform":"Plateforme","nav.security":"Sécurité","nav.lab":"Lab développeur","nav.explore":"Explorer le monde","nav.final":"Scène finale ↓","final.title":"Une plateforme. Une visibilité réseau complète.","final.body":"Capturez le trafic, décodez les protocoles, inspectez les sessions, appliquez les politiques de sécurité et pilotez les workflows avancés depuis Arenyxa.","final.return":"Retour au cœur ↑","scene.1.kicker":"01 / ARENYXA CORE","scene.1.title":"<span class=\"shine\">See every layer.</span><br><span class=\"dim\">Control from one system.</span>","scene.1.body":"Arenyxa unifies traffic capture, protocol intelligence, MITM inspection, security policy, developer tooling and forensic analysis in one operational workspace.","scene.2.kicker":"02 / DATA SPINE","scene.2.title":"Process traffic at <span class=\"shine\">depth.</span><br><span class=\"dim\">Not just at the surface.</span>","scene.2.body":"The traffic pipeline ingests multiple capture sources, organizes flows, correlates sessions and prepares packets for protocol decoding and downstream analysis.","scene.3.kicker":"03 / SENSOR FIELD","scene.3.title":"Observe every <span class=\"shine\">source.</span><br><span class=\"dim\">Know what is healthy.</span>","scene.3.body":"Arenyxa tracks capture sources, workers and observable services so operators can see where traffic originates, which components are active and where collection is degraded.","scene.4.kicker":"04 / CAPTURE TUNNEL","scene.4.title":"<span class=\"shine\">Capture live traffic.</span><br><span class=\"dim\">Filter what matters.</span>","scene.4.body":"Network Capture provides packet acquisition, filtering and session-oriented inspection for live traffic, giving analysts a clean starting point for deeper protocol and forensic work.","scene.5.kicker":"05 / INVESTIGATION SPACE","scene.5.title":"Turn traffic into <span class=\"shine\">evidence.</span>","scene.5.body":"Investigation views correlate requests, responses, sessions and decoded artifacts so analysts can move from raw traffic to searchable evidence without losing context.","scene.6.kicker":"06 / PROTOCOL MACHINE","scene.6.title":"Decode modern <span class=\"shine\">protocols.</span><br><span class=\"dim\">Keep the context.</span>","scene.6.body":"Protocol Intelligence analyzes TLS, HTTP/2, WebSocket and GraphQL traffic, exposing protocol structure and application behavior beyond basic packet inspection.","scene.7.kicker":"07 / MITM GATE","scene.7.title":"Inspect encrypted <span class=\"shine\">sessions.</span><br><span class=\"dim\">Understand the full route.</span>","scene.7.body":"The MITM Engine provides controlled interception for authorized debugging and analysis, making client-to-server traffic inspectable while preserving explicit trust boundaries.","scene.8.kicker":"08 / ZERO TRUST FIELD","scene.8.title":"Enforce <span class=\"shine\">zero trust.</span><br><span class=\"dim\">Fail closed by design.</span>","scene.8.body":"Security policy separates identity, role, device and session context, applying signed policy decisions and fail-closed behavior to privileged operations.","scene.9.kicker":"09 / ROOT AUTHORITY","scene.9.title":"Root authority without <span class=\"shine\">product gates.</span>","scene.9.body":"Root Developer is the highest technical authority for validated development sessions, with hardware-backed identity and signed integrity policy protecting the authority itself.","scene.10.kicker":"10 / SECURITY INSTALLATION","scene.10.title":"Operate the platform as a <span class=\"shine\">system.</span>","scene.10.body":"Security orchestration, diagnostics, recovery and operational controls work together so the platform can be inspected, repaired and validated instead of behaving like a black box.","scene.11.kicker":"11 / PACKET EXPLOSION","scene.11.title":"Reconstruct what <span class=\"shine\">actually happened.</span>","scene.11.body":"Traffic forensics connects packet activity, sessions and protocol events into a coherent incident view, helping analysts investigate behavior instead of reading isolated records.","scene.12.kicker":"12 / DEVELOPER ORB","scene.12.title":"Control everything from the <span class=\"shine\">developer layer.</span>","scene.12.body":"Developer Mode exposes CLI-first control, terminal workflows, plugin sandboxing and diagnostics so advanced users can automate and inspect Arenyxa beyond the graphical interface.","earth.drag":"GLISSER POUR EXPLORER"},"es":{"nav.core":"Núcleo","nav.platform":"Plataforma","nav.security":"Seguridad","nav.lab":"Laboratorio dev","nav.explore":"Explorar mundo","nav.final":"Escena final ↓","final.title":"Una plataforma. Visibilidad total de la red.","final.body":"Captura tráfico, decodifica protocolos, inspecciona sesiones, aplica políticas de seguridad y controla flujos avanzados desde Arenyxa.","final.return":"Volver al núcleo ↑","scene.1.kicker":"01 / ARENYXA CORE","scene.1.title":"<span class=\"shine\">See every layer.</span><br><span class=\"dim\">Control from one system.</span>","scene.1.body":"Arenyxa unifies traffic capture, protocol intelligence, MITM inspection, security policy, developer tooling and forensic analysis in one operational workspace.","scene.2.kicker":"02 / DATA SPINE","scene.2.title":"Process traffic at <span class=\"shine\">depth.</span><br><span class=\"dim\">Not just at the surface.</span>","scene.2.body":"The traffic pipeline ingests multiple capture sources, organizes flows, correlates sessions and prepares packets for protocol decoding and downstream analysis.","scene.3.kicker":"03 / SENSOR FIELD","scene.3.title":"Observe every <span class=\"shine\">source.</span><br><span class=\"dim\">Know what is healthy.</span>","scene.3.body":"Arenyxa tracks capture sources, workers and observable services so operators can see where traffic originates, which components are active and where collection is degraded.","scene.4.kicker":"04 / CAPTURE TUNNEL","scene.4.title":"<span class=\"shine\">Capture live traffic.</span><br><span class=\"dim\">Filter what matters.</span>","scene.4.body":"Network Capture provides packet acquisition, filtering and session-oriented inspection for live traffic, giving analysts a clean starting point for deeper protocol and forensic work.","scene.5.kicker":"05 / INVESTIGATION SPACE","scene.5.title":"Turn traffic into <span class=\"shine\">evidence.</span>","scene.5.body":"Investigation views correlate requests, responses, sessions and decoded artifacts so analysts can move from raw traffic to searchable evidence without losing context.","scene.6.kicker":"06 / PROTOCOL MACHINE","scene.6.title":"Decode modern <span class=\"shine\">protocols.</span><br><span class=\"dim\">Keep the context.</span>","scene.6.body":"Protocol Intelligence analyzes TLS, HTTP/2, WebSocket and GraphQL traffic, exposing protocol structure and application behavior beyond basic packet inspection.","scene.7.kicker":"07 / MITM GATE","scene.7.title":"Inspect encrypted <span class=\"shine\">sessions.</span><br><span class=\"dim\">Understand the full route.</span>","scene.7.body":"The MITM Engine provides controlled interception for authorized debugging and analysis, making client-to-server traffic inspectable while preserving explicit trust boundaries.","scene.8.kicker":"08 / ZERO TRUST FIELD","scene.8.title":"Enforce <span class=\"shine\">zero trust.</span><br><span class=\"dim\">Fail closed by design.</span>","scene.8.body":"Security policy separates identity, role, device and session context, applying signed policy decisions and fail-closed behavior to privileged operations.","scene.9.kicker":"09 / ROOT AUTHORITY","scene.9.title":"Root authority without <span class=\"shine\">product gates.</span>","scene.9.body":"Root Developer is the highest technical authority for validated development sessions, with hardware-backed identity and signed integrity policy protecting the authority itself.","scene.10.kicker":"10 / SECURITY INSTALLATION","scene.10.title":"Operate the platform as a <span class=\"shine\">system.</span>","scene.10.body":"Security orchestration, diagnostics, recovery and operational controls work together so the platform can be inspected, repaired and validated instead of behaving like a black box.","scene.11.kicker":"11 / PACKET EXPLOSION","scene.11.title":"Reconstruct what <span class=\"shine\">actually happened.</span>","scene.11.body":"Traffic forensics connects packet activity, sessions and protocol events into a coherent incident view, helping analysts investigate behavior instead of reading isolated records.","scene.12.kicker":"12 / DEVELOPER ORB","scene.12.title":"Control everything from the <span class=\"shine\">developer layer.</span>","scene.12.body":"Developer Mode exposes CLI-first control, terminal workflows, plugin sandboxing and diagnostics so advanced users can automate and inspect Arenyxa beyond the graphical interface.","earth.drag":"ARRASTRA PARA EXPLORAR"}};
+Object.assign(I18N.en, {"nav.github":"Visit GitHub","nav.official":"Official Introduction"});
+Object.assign(I18N['zh-CN'], {"nav.github":"前往 GitHub","nav.official":"官方介绍"});
+Object.assign(I18N['zh-TW'], {"nav.github":"前往 GitHub","nav.official":"官方介紹"});
+Object.assign(I18N.ja, {"nav.github":"GitHub を見る","nav.official":"公式紹介"});
+Object.assign(I18N.ko, {"nav.github":"GitHub 보기","nav.official":"공식 소개"});
+Object.assign(I18N.de, {"nav.github":"GitHub ansehen","nav.official":"Offizielle Einführung"});
+Object.assign(I18N.fr, {"nav.github":"Voir GitHub","nav.official":"Présentation officielle"});
+Object.assign(I18N.es, {"nav.github":"Ver GitHub","nav.official":"Introducción oficial"});
+I18N.ru = Object.assign({}, I18N.en, {
+  "nav.core":"Ядро","nav.platform":"Платформа","nav.security":"Безопасность","nav.lab":"Лаборатория разработчика","nav.explore":"Исследовать мир","nav.final":"Финальная сцена ↓","nav.github":"Открыть GitHub","nav.official":"Официальное представление",
+  "final.title":"Одна платформа. Полная видимость сети.","final.body":"Захватывайте трафик, декодируйте протоколы, исследуйте сессии, применяйте политики безопасности и управляйте инженерными процессами в одной среде Arenyxa.","earth.drag":"ПЕРЕТАЩИТЕ, ЧТОБЫ ИССЛЕДОВАТЬ"
+});
+const LANG_LABELS = { "en":"EN", "zh-CN":"简中", "zh-TW":"繁中", "ja":"日本語", "ko":"한국어", "de":"DE", "fr":"FR", "es":"ES", "ru":"RU" };
+const langSwitcher = document.getElementById('langSwitcher');
+const langCurrent = document.getElementById('langCurrent');
+const langCurrentLabel = document.getElementById('langCurrentLabel');
+const langMenu = document.getElementById('langMenu');
+const nav = document.querySelector('.nav');
+const menuButton = document.getElementById('menuButton');
+
+function setMobileNav(open) {
+  if(!nav || !menuButton) return;
+  nav.classList.toggle('mobile-open', open);
+  menuButton.setAttribute('aria-expanded', String(open));
+  menuButton.setAttribute('aria-label', open ? 'Close menu' : 'Menu');
+}
+
+menuButton?.addEventListener('click', e => {
+  e.stopPropagation();
+  setMobileNav(!nav?.classList.contains('mobile-open'));
+});
+nav?.querySelectorAll('a').forEach(link => link.addEventListener('click', () => setMobileNav(false)));
+
+function applyLanguage(lang) {
+  const dict = I18N[lang] || I18N.en;
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const value = dict[el.dataset.i18n];
+    if(value !== undefined) el.textContent = value;
+  });
+  document.querySelectorAll('[data-i18n-html]').forEach(el => {
+    const value = dict[el.dataset.i18nHtml];
+    if(value !== undefined){
+      const parts=String(value).split(/<br\s*\/?>/i);
+      el.innerHTML=parts.map((part,i)=>`<span class="title-line" style="--line-index:${i}">${part}</span>`).join('');
+    }
+  });
+  if(langCurrentLabel) langCurrentLabel.textContent = LANG_LABELS[lang] || 'EN';
+  langMenu?.querySelectorAll('[data-lang]').forEach(btn => {
+    btn.setAttribute('aria-selected', String(btn.dataset.lang === lang));
+  });
+  try { localStorage.setItem('arenyxa-language', lang); } catch(e) {}
+}
+
+function closeLanguageMenu() {
+  langMenu?.classList.remove('open');
+  langCurrent?.setAttribute('aria-expanded','false');
+}
+
+langCurrent?.addEventListener('click', e => {
+  e.stopPropagation();
+  const open = !langMenu?.classList.contains('open');
+  langMenu?.classList.toggle('open', open);
+  langCurrent.setAttribute('aria-expanded', String(open));
+});
+
+langMenu?.querySelectorAll('[data-lang]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    applyLanguage(btn.dataset.lang);
+    closeLanguageMenu();
+  });
+});
+
+document.addEventListener('click', e => {
+  if(!langSwitcher?.contains(e.target)) closeLanguageMenu();
+  if(!topbar?.contains(e.target)) setMobileNav(false);
+});
+
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape') closeLanguageMenu();
+});
+
+let initialLang = 'en';
+try {
+  const saved = localStorage.getItem('arenyxa-language');
+  if(saved && I18N[saved]) initialLang = saved;
+  else if(navigator.language?.toLowerCase().startsWith('zh-tw') || navigator.language?.toLowerCase().startsWith('zh-hk')) initialLang = 'zh-TW';
+  else if(navigator.language?.startsWith('zh')) initialLang = 'zh-CN';
+  else if(navigator.language?.startsWith('ja')) initialLang = 'ja';
+  else if(navigator.language?.startsWith('ko')) initialLang = 'ko';
+  else if(navigator.language?.startsWith('de')) initialLang = 'de';
+  else if(navigator.language?.startsWith('fr')) initialLang = 'fr';
+  else if(navigator.language?.startsWith('es')) initialLang = 'es';
+  else if(navigator.language?.startsWith('ru')) initialLang = 'ru';
+} catch(e) {}
+applyLanguage(initialLang);
+
+const THREE = await import('three');
+earthRaycaster=new THREE.Raycaster();
+earthPointerNdc=new THREE.Vector2();
+earthFocusNodeWorld=new THREE.Vector3();
+earthFocusLookWorld=new THREE.Vector3();
+earthFocusCenterWorld=new THREE.Vector3();
+const {EffectComposer} = await import('three/addons/postprocessing/EffectComposer.js');
+const {RenderPass} = await import('three/addons/postprocessing/RenderPass.js');
+const {UnrealBloomPass} = await import('three/addons/postprocessing/UnrealBloomPass.js');
+const {AfterimagePass} = await import('three/addons/postprocessing/AfterimagePass.js');
+const {RoundedBoxGeometry} = await import('three/addons/geometries/RoundedBoxGeometry.js');
+const {RoomEnvironment} = await import('three/addons/environments/RoomEnvironment.js');
+
+const canvas=document.getElementById('webgl');
+const scene=new THREE.Scene();
+scene.fog=new THREE.FogExp2(0x020306,.035);
+const camera=new THREE.PerspectiveCamera(42,1,.1,120);
+camera.position.set(0,0,8);
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,powerPreference:'high-performance'});
+renderer.setClearColor(0x000000,0);
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.65));
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.02;
+renderer.shadowMap.enabled=innerWidth>900;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+const pmremGenerator=new THREE.PMREMGenerator(renderer);
+const roomMap=pmremGenerator.fromScene(new RoomEnvironment(),.04).texture;
+scene.environment=roomMap;
+pmremGenerator.dispose();
+
+const composer=new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+const bloom=new UnrealBloomPass(new THREE.Vector2(1,1),.65,.58,.22);
+bloom.threshold=.24;bloom.strength=.64;bloom.radius=.56;composer.addPass(bloom);
+const after=new AfterimagePass(); after.uniforms['damp'].value=.875; composer.addPass(after);
+
+const ambient=new THREE.AmbientLight(0xb9efff,.30);scene.add(ambient);
+const key=new THREE.PointLight(0xd9fbff,16,30,2);key.position.set(3.8,4.6,5.8);key.castShadow=renderer.shadowMap.enabled;if(key.shadow){key.shadow.mapSize.set(1024,1024);key.shadow.bias=-.0005;}scene.add(key);
+const rim=new THREE.PointLight(0x6d68ff,10,28,2);rim.position.set(-5.4,-2.2,2.0);scene.add(rim);
+const topFill=new THREE.DirectionalLight(0x8feeff,1.15);topFill.position.set(-1,5,3);scene.add(topFill);
+const sideFill=new THREE.DirectionalLight(0x5f6eff,.75);sideFill.position.set(5,-1,-4);scene.add(sideFill);
+
+
+function hybridSurfaceTexture(base='#263437',direction='horizontal'){
+  const c=document.createElement('canvas');c.width=c.height=96;const ctx=c.getContext('2d');ctx.fillStyle=base;ctx.fillRect(0,0,96,96);
+  for(let i=0;i<1200;i++){const x=(i*47)%96,y=(i*71)%96,a=((i*13)%17)/1700;ctx.fillStyle=i%3?`rgba(255,255,255,${a})`:'rgba(0,0,0,.02)';ctx.fillRect(x,y,1,1);}
+  ctx.strokeStyle='rgba(255,255,255,.02)';ctx.lineWidth=.5;for(let i=0;i<16;i++){ctx.beginPath();if(direction==='vertical'){ctx.moveTo(i*6+.5,0);ctx.lineTo(i*6+.5,96);}else{ctx.moveTo(0,i*6+.5);ctx.lineTo(96,i*6+.5);}ctx.stroke();}
+  const tex=new THREE.CanvasTexture(c);tex.wrapS=tex.wrapT=THREE.RepeatWrapping;tex.repeat.set(2,2);tex.colorSpace=THREE.SRGBColorSpace;return tex;
+}
+const hybridBlackSurface=hybridSurfaceTexture('#263235');
+const hybridMetalSurface=hybridSurfaceTexture('#697875','vertical');
+function matBlack(accent=0x69eaff,opacity=.96){return new THREE.MeshPhysicalMaterial({color:0x0b1316,map:hybridBlackSurface,emissive:accent,emissiveIntensity:.014,metalness:.84,roughness:.34,clearcoat:.22,clearcoatRoughness:.38,envMapIntensity:1.2,transparent:true,opacity});}
+function matSatin(opacity=.96){return new THREE.MeshPhysicalMaterial({color:0x788783,map:hybridMetalSurface,metalness:.92,roughness:.23,clearcoat:.12,envMapIntensity:1.3,transparent:true,opacity});}
+function matPoly(opacity=.96){return new THREE.MeshStandardMaterial({color:0x0d1417,metalness:.06,roughness:.78,transparent:true,opacity});}
+function matCeramic(accent=0x69eaff,opacity=.96){return new THREE.MeshPhysicalMaterial({color:0x171d20,emissive:accent,emissiveIntensity:.012,metalness:.06,roughness:.22,clearcoat:.62,clearcoatRoughness:.16,transparent:true,opacity});}
+function matPcb(opacity=.94){return new THREE.MeshPhysicalMaterial({color:0x12332d,metalness:.13,roughness:.56,clearcoat:.24,transparent:true,opacity});}
+function matSignal(color=0x69eaff,opacity=.95){return new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.38,metalness:.18,roughness:.34,transparent:true,opacity});}
+function rgeo(w,h,d,r=.05,segments=4){return new RoundedBoxGeometry(w,h,d,segments,Math.min(r,w*.22,h*.22,d*.22));}
+function rmesh(w,h,d,r,material){const m=new THREE.Mesh(rgeo(w,h,d,r),material);m.castShadow=renderer.shadowMap.enabled;m.receiveShadow=renderer.shadowMap.enabled;return m;}
+function portGeometry(width=.105,height=.065,depth=.055){const sh=new THREE.Shape(),b=Math.min(width,height)*.16;sh.moveTo(-width/2+b,-height/2);sh.lineTo(width/2-b,-height/2);sh.lineTo(width/2,-height/2+b);sh.lineTo(width/2,height/2);sh.lineTo(-width/2,height/2);sh.lineTo(-width/2,-height/2+b);sh.closePath();const g=new THREE.ExtrudeGeometry(sh,{depth,steps:1,bevelEnabled:true,bevelSegments:2,bevelSize:.006,bevelThickness:.006});g.center();return g;}
+function portBank(count,spacing=.08,rows=1){const per=Math.ceil(count/rows),m=new THREE.InstancedMesh(portGeometry(),matPoly(.98),count),mx=new THREE.Matrix4();for(let i=0;i<count;i++){const row=Math.floor(i/per),col=i%per;mx.makeTranslation((col-(per-1)/2)*spacing,(row-(rows-1)/2)*.105,0);m.setMatrixAt(i,mx);}m.instanceMatrix.needsUpdate=true;return m;}
+function ventField(cols,rows,spacing=.06,radius=.010){const geo=new THREE.CylinderGeometry(radius,radius,.018,8);geo.rotateX(Math.PI/2);const m=new THREE.InstancedMesh(geo,matPoly(.98),cols*rows),mx=new THREE.Matrix4();let n=0;for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){mx.makeTranslation((x-(cols-1)/2)*spacing,(y-(rows-1)/2)*spacing,0);m.setMatrixAt(n++,mx);}m.instanceMatrix.needsUpdate=true;return m;}
+function labelTexture(title,subtitle=''){const c=document.createElement('canvas');c.width=1024;c.height=256;const ctx=c.getContext('2d');ctx.fillStyle='#061014';ctx.fillRect(0,0,1024,256);ctx.fillStyle='#ebffff';ctx.font='700 72px Arial';ctx.fillText(title,52,104);ctx.fillStyle='#68dcd2';ctx.font='500 28px Arial';ctx.fillText(subtitle,54,172);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;}
+function instrumentDisplayTexture(){const c=document.createElement('canvas');c.width=1024;c.height=520;const ctx=c.getContext('2d');ctx.fillStyle='#041010';ctx.fillRect(0,0,1024,520);ctx.strokeStyle='rgba(94,220,204,.12)';for(let x=32;x<1024;x+=48){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,520);ctx.stroke();}for(let y=28;y<520;y+=42){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(1024,y);ctx.stroke();}ctx.strokeStyle='#72e8dc';ctx.lineWidth=5;ctx.beginPath();for(let x=0;x<1024;x+=8){const y=225+Math.sin(x*.025)*42+Math.sin(x*.081)*24+Math.sin(x*.011)*12;x?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();ctx.fillStyle='#9ff8ef';ctx.font='600 28px monospace';ctx.fillText('ARENYXA / LIVE MEASUREMENT',38,52);ctx.font='500 21px monospace';ctx.fillStyle='rgba(190,245,238,.78)';ctx.fillText('LATENCY 8.6 ms     LOSS 0.02%     PROTOCOL TLS 1.3',38,470);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;}
+
+function basicMat(color,opacity=.5){
+  return new THREE.MeshPhysicalMaterial({
+    color:0x08131c,emissive:color,emissiveIntensity:.025,metalness:.74,roughness:.28,
+    transparent:true,opacity:Math.min(1,.46+opacity*.52),transmission:.008,
+    clearcoat:.82,clearcoatRoughness:.16,ior:1.42
+  });
+}
+function line(points,color=0x69eaff,opacity=.3){
+  return new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),new THREE.LineBasicMaterial({color,transparent:true,opacity}));
+}
+function tube(points,r=.018,color=0x69eaff,opacity=.45){
+  const curve=new THREE.CatmullRomCurve3(points);
+  return new THREE.Mesh(new THREE.TubeGeometry(curve,120,r,6,false),new THREE.MeshBasicMaterial({color,transparent:true,opacity}));
+}
+function sphere(r,color=0xb9f9ff,opacity=.65){
+  return new THREE.Mesh(new THREE.SphereGeometry(r,28,18),basicMat(color,opacity));
+}
+function starField(count=1400,spread=22){
+  const pos=new Float32Array(count*3);
+  for(let i=0;i<count;i++){pos[i*3]=(Math.random()-.5)*spread;pos[i*3+1]=(Math.random()-.5)*spread*.65;pos[i*3+2]=(Math.random()-.5)*spread;}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  return new THREE.Points(g,new THREE.PointsMaterial({color:0xa8e9f5,size:.022,transparent:true,opacity:.42,sizeAttenuation:true}));
+}
+scene.add(starField(innerWidth<720?700:1500,28));
+
+function ringLoop(rx=2.2,ry=1.1,tilt=.4,color=0x69eaff){
+  const pts=[];
+  for(let i=0;i<180;i++){const t=i/179*Math.PI*2;pts.push(new THREE.Vector3(Math.sin(t)*rx,Math.sin(t*2)*ry,Math.cos(t)*.5));}
+  const obj=tube(pts,.015,color,.52);obj.rotation.z=tilt;return obj;
+}
+function jelly(x,y,z,s=1,color=0x69eaff){
+  const g=new THREE.Group();g.position.set(x,y,z);g.scale.setScalar(s);
+  const cap=new THREE.Mesh(new THREE.SphereGeometry(.32,28,14,0,Math.PI*2,0,Math.PI*.55),basicMat(color,.34));cap.scale.y=.7;g.add(cap);
+  for(let i=0;i<7;i++){
+    const a=(i/6-.5)*.48;const pts=[];
+    for(let j=0;j<22;j++){const yy=-j*.055;pts.push(new THREE.Vector3(a+Math.sin(j*.4+i)*.035,yy,Math.cos(j*.25+i)*.04));}
+    g.add(line(pts,color,.28));
+  }
+  const core=sphere(.07,0xdffcff,.95);core.position.y=.02;g.add(core);
+  return g;
+}
+function screenPanel(w,h,color=0x69eaff){
+  const g=new THREE.Group();
+  const back=new THREE.Mesh(new THREE.BoxGeometry(w*1.045,h*1.065,.075),new THREE.MeshPhysicalMaterial({color:0x050b10,metalness:.72,roughness:.30,clearcoat:.62,clearcoatRoughness:.22}));back.position.z=-.035;g.add(back);
+  const pane=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshPhysicalMaterial({color:0x06131c,emissive:color,emissiveIntensity:.055,metalness:.18,roughness:.16,transparent:true,opacity:.62,transmission:.04,side:THREE.DoubleSide,clearcoat:.92,clearcoatRoughness:.08}));
+  pane.position.z=.012;g.add(pane);
+  const edges=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(w,h)),new THREE.LineBasicMaterial({color,transparent:true,opacity:.34}));edges.position.z=.018;g.add(edges);
+  for(let i=0;i<5;i++){const y=h*.32-i*h*.14;const l=line([new THREE.Vector3(-w*.34,y,.024),new THREE.Vector3(w*(.05+Math.random()*.28),y,.024)],i===0?0xe8fdff:color,.24);g.add(l);}
+  for(let x=0;x<4;x++){const gx=-w*.30+x*w*.20;g.add(line([new THREE.Vector3(gx,-h*.34,.020),new THREE.Vector3(gx,h*.34,.020)],color,.06));}
+  return g;
+}
+function shardField(count=32){
+  const g=new THREE.Group();
+  for(let i=0;i<count;i++){
+    const danger=i%6===0;
+    const m=new THREE.Mesh(new THREE.TetrahedronGeometry(.16+Math.random()*.28),basicMat(danger?0xff6b91:0x69eaff,danger?.5:.25));
+    m.position.set((Math.random()-.5)*5.8,(Math.random()-.5)*3.6,(Math.random()-.5)*3.8);
+    m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
+    m.scale.y=.4+Math.random()*2.2;g.add(m);
+  }
+  return g;
+}
+function particleCloud(count=2200,radius=2.8,color=0xb9f9ff){
+  const pos=new Float32Array(count*3);
+  for(let i=0;i<count;i++){
+    const u=Math.random(),v=Math.random(),theta=u*Math.PI*2,phi=Math.acos(2*v-1),r=radius*Math.pow(Math.random(),.38);
+    pos[i*3]=r*Math.sin(phi)*Math.cos(theta);pos[i*3+1]=r*.68*Math.cos(phi);pos[i*3+2]=r*Math.sin(phi)*Math.sin(theta);
+  }
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  return new THREE.Points(g,new THREE.PointsMaterial({color,size:.025,transparent:true,opacity:.52,sizeAttenuation:true}));
+}
+
+const worldRoot=new THREE.Group();scene.add(worldRoot);
+const worlds=[];
+function addWorld(g,index){const worldIndex=worlds.length;g.position.z=-worldIndex*14;g.userData.worldIndex=worldIndex;worldRoot.add(g);worlds.push(g);}
+
+
+function latLonToVec3(lat,lon,r=1.78){
+  const phi=(90-lat)*Math.PI/180;
+  const theta=(lon+180)*Math.PI/180;
+  return new THREE.Vector3(
+    -r*Math.sin(phi)*Math.cos(theta),
+     r*Math.cos(phi),
+     r*Math.sin(phi)*Math.sin(theta)
+  );
+}
+
+function makeAtmosphere(radius=1.88){
+  const material=new THREE.ShaderMaterial({
+    transparent:true,
+    side:THREE.BackSide,
+    blending:THREE.AdditiveBlending,
+    depthWrite:false,
+    uniforms:{
+      glowColor:{value:new THREE.Color(0x69eaff)},
+      intensity:{value:.58}
+    },
+    vertexShader:`
+      varying vec3 vNormal;
+      void main(){
+        vNormal=normalize(normalMatrix*normal);
+        gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);
+      }
+    `,
+    fragmentShader:`
+      varying vec3 vNormal;
+      uniform vec3 glowColor;
+      uniform float intensity;
+      void main(){
+        float facing=max(0.0,dot(vNormal,vec3(0.0,0.0,1.0)));
+        float fresnel=pow(1.0-facing,2.35);
+        gl_FragColor=vec4(glowColor,fresnel*intensity);
+      }
+    `
+  });
+  material.userData.baseOpacity=1;
+  earthFadeMaterials.push(material);
+  return new THREE.Mesh(new THREE.SphereGeometry(radius,72,56),material);
+}
+
+function addEarthGrid(parent,r=1.805){
+  for(let lat=-60;lat<=60;lat+=20){
+    const mat=new THREE.LineBasicMaterial({color:0x8fefff,transparent:true,opacity:.040});
+    mat.userData.baseOpacity=mat.opacity;
+    earthFadeMaterials.push(mat);
+    const pts=[];
+    for(let lon=-180;lon<=180;lon+=3) pts.push(latLonToVec3(lat,lon,r));
+    parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),mat));
+  }
+  for(let lon=-150;lon<=180;lon+=30){
+    const mat=new THREE.LineBasicMaterial({color:0x6bcfe7,transparent:true,opacity:.032});
+    mat.userData.baseOpacity=mat.opacity;
+    earthFadeMaterials.push(mat);
+    const pts=[];
+    for(let lat=-88;lat<=88;lat+=3) pts.push(latLonToVec3(lat,lon,r));
+    parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),mat));
+  }
+}
+
+function makeArc(parent,a,b,color=0x69eaff,opacity=.32,height=.55,packet=true){
+  const p1=latLonToVec3(a[0],a[1],1.815);
+  const p2=latLonToVec3(b[0],b[1],1.815);
+  let mid=p1.clone().add(p2);
+  if(mid.lengthSq()<.08) mid=p1.clone().cross(new THREE.Vector3(0,1,0));
+  mid.normalize().multiplyScalar(1.815+height);
+  const curve=new THREE.QuadraticBezierCurve3(p1,mid,p2);
+
+  const material=new THREE.LineBasicMaterial({
+    color,transparent:true,opacity,blending:THREE.AdditiveBlending,depthWrite:false
+  });
+  material.userData.baseOpacity=opacity;
+  earthFadeMaterials.push(material);
+
+  const arc=new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(curve.getPoints(82)),
+    material
+  );
+  parent.add(arc);
+
+  if(packet){
+    const dot=new THREE.Mesh(
+      new THREE.SphereGeometry(.021,8,8),
+      new THREE.MeshBasicMaterial({
+        color:0xe8fdff,transparent:true,opacity:.95,
+        blending:THREE.AdditiveBlending,depthWrite:false
+      })
+    );
+    dot.userData.arcCurve=curve;
+    dot.userData.arcSpeed=.045+Math.random()*.070;
+    dot.userData.arcOffset=Math.random();
+    parent.add(dot);
+    earthPackets.push(dot);
+  }
+  return curve;
+}
+
+function buildLandPointsFromImage(image,parent){
+  try{
+    const c=document.createElement('canvas');
+    c.width=512;c.height=256;
+    const ctx=c.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(image,0,0,c.width,c.height);
+    const px=ctx.getImageData(0,0,c.width,c.height).data;
+    const points=[];
+
+    for(let y=2;y<c.height-2;y+=2){
+      for(let x=2;x<c.width-2;x+=2){
+        const k=(y*c.width+x)*4;
+        const r=px[k],g=px[k+1],b=px[k+2];
+        // Suppress the blue ocean; keep land / ice / urban brightness.
+        const land=((r+g*.90)-b*1.30)>18 && (r+g)>68;
+        if(!land || Math.random()>.31) continue;
+        const lat=90-(y/c.height)*180;
+        const lon=(x/c.width)*360-180;
+        points.push(latLonToVec3(lat,lon,1.825));
+      }
+    }
+
+    if(points.length<650) return;
+
+    const capped=points.slice(0,6200);
+    const pos=new Float32Array(capped.length*3);
+    const morph=new Float32Array(capped.length*3);
+    capped.forEach((p,i)=>{
+      const j=i*3;
+      pos[j]=p.x;pos[j+1]=p.y;pos[j+2]=p.z;
+
+      const f=i/Math.max(1,capped.length-1);
+      const a=i*.092;
+      const radius=.34+.22*Math.sin(i*.041)+.08*Math.cos(i*.017);
+      morph[j]=Math.cos(a)*radius;
+      morph[j+1]=(f-.5)*5.45;
+      morph[j+2]=Math.sin(a)*radius;
+    });
+
+    earthLandOriginal=pos.slice();
+    earthLandMorph=morph;
+
+    const geom=new THREE.BufferGeometry();
+    geom.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    const mat=new THREE.PointsMaterial({
+      color:0xc9f8ff,
+      size:.017,
+      transparent:true,
+      opacity:.72,
+      sizeAttenuation:true,
+      depthWrite:false,
+      blending:THREE.AdditiveBlending
+    });
+    earthLandPoints=new THREE.Points(geom,mat);
+    parent.add(earthLandPoints);
+  }catch(e){
+    // The textured sphere and global network remain the fallback.
+  }
+}
+
+
+function buildLandPointsFromLonLat(points,parent){
+  if(!Array.isArray(points) || !points.length) return;
+  const pos=new Float32Array(points.length*3);
+  const morph=new Float32Array(points.length*3);
+  points.forEach((ll,i)=>{
+    const p=latLonToVec3(ll[1],ll[0],1.827);
+    const j=i*3;
+    pos[j]=p.x;pos[j+1]=p.y;pos[j+2]=p.z;
+
+    const f=i/Math.max(1,points.length-1);
+    const a=i*.0915;
+    const rr=.33+.22*Math.sin(i*.041)+.07*Math.cos(i*.019);
+    morph[j]=Math.cos(a)*rr;
+    morph[j+1]=(f-.5)*5.45;
+    morph[j+2]=Math.sin(a)*rr;
+  });
+  earthLandOriginal=pos.slice();
+  earthLandMorph=morph;
+
+  const geom=new THREE.BufferGeometry();
+  geom.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const mat=new THREE.PointsMaterial({
+    color:0xcdf9ff,size:.018,transparent:true,opacity:.68,
+    sizeAttenuation:true,depthWrite:false,blending:THREE.AdditiveBlending
+  });
+  earthLandPoints=new THREE.Points(geom,mat);
+  parent.add(earthLandPoints);
+}
+
+function coastSegmentsFromRing(ring){
+  const segments=[];
+  let current=[];
+  let prevLon=null;
+  for(const pair of ring){
+    const lon=Number(pair[0]),lat=Number(pair[1]);
+    if(!Number.isFinite(lon)||!Number.isFinite(lat)) continue;
+    if(prevLon!==null && Math.abs(lon-prevLon)>180){
+      if(current.length>1) segments.push(current);
+      current=[];
+    }
+    current.push(latLonToVec3(lat,lon,1.842));
+    prevLon=lon;
+  }
+  if(current.length>1) segments.push(current);
+  return segments;
+}
+
+function addContinentGeometry(group,geometry,color){
+  if(!geometry) return;
+  const polygons=geometry.type==='Polygon'?[geometry.coordinates]:geometry.coordinates;
+  polygons.forEach(poly=>{
+    if(!Array.isArray(poly)||!poly.length) return;
+    const outer=poly[0];
+    coastSegmentsFromRing(outer).forEach(points=>{
+      const mat=new THREE.LineBasicMaterial({
+        color,transparent:true,opacity:.86,
+        blending:THREE.AdditiveBlending,depthWrite:false
+      });
+      mat.userData.baseOpacity=mat.opacity;
+      earthFadeMaterials.push(mat);
+      group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),mat));
+    });
+  });
+}
+
+async function loadEarthGeography(parent){
+  const [geoResponse,pointsResponse]=await Promise.all([
+    fetch('assets/continents.geojson',{cache:'force-cache'}),
+    fetch('assets/earth_land_points.json',{cache:'force-cache'})
+  ]);
+  const [geo,points]=await Promise.all([geoResponse.json(),pointsResponse.json()]);
+
+  const coastGroup=new THREE.Group();
+  coastGroup.userData.coastlines=true;
+  parent.add(coastGroup);
+  earthCoastlineGroup=coastGroup;
+
+  const colors={
+    'Africa':0x7eeaf1,'Asia':0x6ddcff,'Europe':0x99f0ff,
+    'North America':0x72d8ff,'South America':0x69eaff,
+    'Oceania':0x85e2ff,'Antarctica':0xb5f6ff
+  };
+  (geo.features||[]).forEach(feature=>{
+    const continent=feature.properties?.continent||'Land';
+    const g=new THREE.Group();
+    g.userData.continent=continent;
+    coastGroup.add(g);
+    addContinentGeometry(g,feature.geometry,colors[continent]||0x78e8f4);
+  });
+
+  buildLandPointsFromLonLat(points,parent);
+}
+
+function addEarthNode(parent,lat,lon,size=.034,color=0xdffcff,label=''){
+  const p=latLonToVec3(lat,lon,1.845);
+  const node=new THREE.Mesh(
+    new THREE.SphereGeometry(size,12,12),
+    new THREE.MeshBasicMaterial({
+      color,transparent:true,opacity:.92,
+      blending:THREE.AdditiveBlending,depthWrite:false
+    })
+  );
+  node.position.copy(p);
+  node.userData.earthNode=true;
+  node.userData.lat=lat;
+  node.userData.lon=lon;
+  node.userData.label=label;
+  node.userData.baseScale=1;
+  node.userData.targetScale=1;
+  node.userData.baseOpacity=node.material.opacity;
+
+  const halo=new THREE.Mesh(
+    new THREE.SphereGeometry(size*2.15,14,14),
+    new THREE.MeshBasicMaterial({
+      color,transparent:true,opacity:0,
+      blending:THREE.AdditiveBlending,depthWrite:false
+    })
+  );
+  halo.userData.isHalo=true;
+  node.add(halo);
+  node.userData.halo=halo;
+
+  parent.add(node);
+  earthNodes.push(node);
+  return node;
+}
+
+function setEarthTarget(lat,lon){
+  if(!earthSpin || !earthOrient) return;
+
+  const targetVec=latLonToVec3(lat,lon,1).normalize();
+  earthTargetQuaternion=new THREE.Quaternion().setFromUnitVectors(
+    targetVec,
+    new THREE.Vector3(0,0,1)
+  );
+
+  if(earthTargetMarker) earthSpin.remove(earthTargetMarker);
+
+  const p=latLonToVec3(lat,lon,1.865);
+  const marker=new THREE.Group();
+  marker.position.copy(p);
+  marker.quaternion.setFromUnitVectors(
+    new THREE.Vector3(0,0,1),
+    p.clone().normalize()
+  );
+
+  const m1=new THREE.MeshBasicMaterial({
+    color:0x69eaff,transparent:true,opacity:.84,
+    blending:THREE.AdditiveBlending,depthWrite:false
+  });
+  const m2=m1.clone();m2.opacity=.30;
+
+  const r1=new THREE.Mesh(new THREE.TorusGeometry(.10,.006,8,54),m1);
+  const r2=new THREE.Mesh(new THREE.TorusGeometry(.19,.004,8,54),m2);
+  marker.add(r1,r2);
+
+  const core=new THREE.Mesh(
+    new THREE.SphereGeometry(.032,10,10),
+    new THREE.MeshBasicMaterial({
+      color:0xffffff,transparent:true,opacity:1,
+      blending:THREE.AdditiveBlending,depthWrite:false
+    })
+  );
+  marker.add(core);
+  marker.userData.targetMarker=true;
+  earthSpin.add(marker);
+  earthTargetMarker=marker;
+
+  const hubs=[
+    [51.5074,-.1278],[40.7128,-74.0060],[37.7749,-122.4194],
+    [35.6762,139.6503],[1.3521,103.8198],[50.1109,8.6821],
+    [25.2048,55.2708],[19.0760,72.8777]
+  ];
+  hubs.slice(0,6).forEach((hub,i)=>makeArc(
+    earthNetworkGroup,
+    hub,[lat,lon],
+    i%2?0x5872ff:0x69eaff,
+    .30,
+    .46+i*.036,
+    true
+  ));
+}
+
+function buildDigitalEarth(){
+  const world=new THREE.Group();
+  world.userData.worldType='networkEarth';
+  const heroPose=getHeroEarthPose();
+  world.userData.baseX=heroPose.x;
+  world.userData.baseY=heroPose.y;
+  world.userData.baseScale=heroPose.scale;
+
+  const orient=new THREE.Group();
+  const userRig=new THREE.Group();
+  const spin=new THREE.Group();
+  orient.add(userRig);
+  userRig.add(spin);
+  world.add(orient);
+
+  earthWorld=world;
+  earthOrient=orient;
+  earthUserRig=userRig;
+  earthSpin=spin;
+
+  const surfaceMat=new THREE.MeshPhysicalMaterial({
+    color:0x9ab7bd,
+    emissive:0x07181d,
+    emissiveIntensity:.24,
+    roughness:.76,
+    metalness:.06,
+    transparent:true,
+    opacity:.76,
+    clearcoat:.12,
+    clearcoatRoughness:.78
+  });
+  surfaceMat.userData.baseOpacity=surfaceMat.opacity;
+  earthFadeMaterials.push(surfaceMat);
+
+  earthSurface=new THREE.Mesh(
+    new THREE.SphereGeometry(1.77,96,72),
+    surfaceMat
+  );
+  spin.add(earthSurface);
+
+  const shellMat=new THREE.MeshBasicMaterial({
+    color:0x69eaff,
+    wireframe:true,
+    transparent:true,
+    opacity:.014
+  });
+  shellMat.userData.baseOpacity=shellMat.opacity;
+  earthFadeMaterials.push(shellMat);
+  spin.add(new THREE.Mesh(new THREE.IcosahedronGeometry(1.79,5),shellMat));
+
+  addEarthGrid(spin,1.802);
+  earthAtmosphere=makeAtmosphere(1.89);
+  spin.add(earthAtmosphere);
+
+  const network=new THREE.Group();
+  spin.add(network);
+  earthNetworkGroup=network;
+
+  const hubs=[
+    {name:'New York',lat:40.7128,lon:-74.0060},
+    {name:'San Francisco',lat:37.7749,lon:-122.4194},
+    {name:'London',lat:51.5074,lon:-0.1278},
+    {name:'Frankfurt',lat:50.1109,lon:8.6821},
+    {name:'Tokyo',lat:35.6762,lon:139.6503},
+    {name:'Singapore',lat:1.3521,lon:103.8198},
+    {name:'Sydney',lat:-33.8688,lon:151.2093},
+    {name:'Sao Paulo',lat:-23.5505,lon:-46.6333},
+    {name:'Dubai',lat:25.2048,lon:55.2708},
+    {name:'Mumbai',lat:19.0760,lon:72.8777},
+    {name:'Johannesburg',lat:-26.2041,lon:28.0473},
+    {name:'Hong Kong',lat:22.3193,lon:114.1694}
+  ];
+
+  hubs.forEach((h,i)=>addEarthNode(
+    network,h.lat,h.lon,
+    i%4===0?.043:.031,
+    i%3===0?0xffffff:0xb9f9ff,
+    h.name
+  ));
+
+  const links=[
+    [0,2],[0,1],[2,3],[3,4],[4,5],[5,6],[5,9],[3,8],
+    [8,9],[2,11],[1,7],[7,10],[10,8],[6,7],[11,4]
+  ];
+  links.forEach((pair,i)=>makeArc(
+    network,
+    [hubs[pair[0]].lat,hubs[pair[0]].lon],[hubs[pair[1]].lat,hubs[pair[1]].lon],
+    i%3===0?0x9a68ff:(i%2?0x5872ff:0x69eaff),
+    .22,
+    .36+(i%4)*.06,
+    true
+  ));
+
+  const textureLoader=new THREE.TextureLoader();
+  const loadTexture=url=>new Promise(resolve=>{
+    textureLoader.load(url,tex=>resolve(tex),undefined,()=>resolve(null));
+  });
+
+  Promise.all([
+    loadTexture('assets/earth_surface.png'),
+    loadTexture('assets/earth_bump.png'),
+    loadTexture('assets/earth_clouds.png'),
+    loadTexture('assets/earth_continents.png'),
+    loadEarthGeography(spin)
+  ]).then(([surfaceTex,bumpTex,cloudTex,continentTex])=>{
+    if(surfaceTex){
+      surfaceTex.colorSpace=THREE.SRGBColorSpace;
+      surfaceMat.map=surfaceTex;
+    }
+    if(bumpTex){
+      surfaceMat.bumpMap=bumpTex;
+      surfaceMat.bumpScale=.055;
+    }
+    surfaceMat.needsUpdate=true;
+
+    if(continentTex){
+      continentTex.colorSpace=THREE.SRGBColorSpace;
+      const continentMat=new THREE.MeshBasicMaterial({
+        map:continentTex,
+        transparent:true,
+        opacity:.92,
+        depthWrite:false,
+        blending:THREE.NormalBlending
+      });
+      continentMat.userData.baseOpacity=continentMat.opacity;
+      earthFadeMaterials.push(continentMat);
+
+      const continentShell=new THREE.Mesh(
+        new THREE.SphereGeometry(1.783,96,72),
+        continentMat
+      );
+      continentShell.userData.continentShell=true;
+      spin.add(continentShell);
+    }
+
+    if(cloudTex){
+      cloudTex.colorSpace=THREE.SRGBColorSpace;
+      const cloudMat=new THREE.MeshBasicMaterial({
+        map:cloudTex,transparent:true,opacity:.12,
+        depthWrite:false,blending:THREE.AdditiveBlending
+      });
+      cloudMat.userData.baseOpacity=cloudMat.opacity;
+      earthFadeMaterials.push(cloudMat);
+      earthClouds=new THREE.Mesh(new THREE.SphereGeometry(1.787,80,56),cloudMat);
+      spin.add(earthClouds);
+    }
+    earthReadyResolve();
+  }).catch(()=>earthReadyResolve());
+
+  world.position.set(heroPose.x,heroPose.y,0);
+  world.scale.setScalar(heroPose.scale);
+  return world;
+}
+
+function updateEarthWorld(t,scenePos){
+  if(!earthWorld || !earthSpin) return;
+
+  earthNodes.forEach((node,i)=>{
+    const isSelected=node===earthSelectedNode;
+    const isHovered=node===earthHoveredNode;
+    const halo=node.userData.halo;
+    const baseOpacity=node.userData.baseOpacity ?? .92;
+
+    let desiredScale=1;
+    if(isSelected) desiredScale=1.36 + Math.sin(t*3.6)*.05;
+    else if(isHovered) desiredScale=1.18 + Math.sin(t*4.2+i*.2)*.03;
+
+    const currentScale=node.scale.x || 1;
+    const nextScale=currentScale+(desiredScale-currentScale)*.18;
+    node.scale.setScalar(nextScale);
+
+    node.material.opacity=baseOpacity*(isSelected ? 1 : (isHovered ? .98 : .90));
+
+    if(halo){
+      const haloTarget=isSelected ? .34 + Math.sin(t*4.0)*.07 : (isHovered ? .12 : 0);
+      halo.material.opacity += (haloTarget-halo.material.opacity)*.18;
+      const haloScaleTarget=isSelected ? 1.72 : (isHovered ? 1.22 : 1);
+      halo.scale.setScalar(halo.scale.x + (haloScaleTarget-halo.scale.x)*.18);
+    }
+  });
+
+  if(earthTargetMarker){
+    const pulse=.90+Math.sin(t*3.1)*.10;
+    earthTargetMarker.scale.setScalar(pulse);
+    earthTargetMarker.rotation.z=t*.18;
+  }
+
+  const now=performance.now();
+  if(!earthDragActive){
+    earthUserYaw+=earthYawVelocity;
+    earthUserPitch=Math.max(-1.05,Math.min(1.05,earthUserPitch+earthPitchVelocity));
+    earthYawVelocity*=.945;
+    earthPitchVelocity*=.915;
+    if(Math.abs(earthYawVelocity)<.00002) earthYawVelocity=0;
+    if(Math.abs(earthPitchVelocity)<.00002) earthPitchVelocity=0;
+  }
+
+  if(!introRunning && now-earthLastInteraction>1700 && !earthDragActive){
+    earthAutoBlend+=(1-earthAutoBlend)*.016;
+  }
+
+  if(earthUserRig){
+    earthUserRig.rotation.y+=(earthUserYaw-earthUserRig.rotation.y)*.18;
+    earthUserRig.rotation.x+=(earthUserPitch-earthUserRig.rotation.x)*.18;
+  }
+
+  if(!reducedMotion){
+    const autoSpeed=(introRunning?.00030:.00042)*earthAutoBlend;
+    earthSpin.rotation.y+=autoSpeed;
+    if(earthClouds) earthClouds.rotation.y+=.00011;
+  }
+
+  const morph=smoothstep01((scenePos-.08)/.86);
+
+  if(earthLandPoints && earthLandOriginal && earthLandMorph){
+    const arr=earthLandPoints.geometry.attributes.position.array;
+    for(let i=0;i<arr.length;i++){
+      arr[i]=earthLandOriginal[i]+(earthLandMorph[i]-earthLandOriginal[i])*morph;
+    }
+    earthLandPoints.geometry.attributes.position.needsUpdate=true;
+    earthLandPoints.material.opacity=.72*(1-Math.max(0,(morph-.62)/.38));
+  }
+
+  earthFadeMaterials.forEach(mat=>{
+    if(mat.uniforms?.intensity){
+      mat.uniforms.intensity.value=.58*(1-morph*.94);
+      return;
+    }
+    const base=mat.userData.baseOpacity ?? mat.opacity ?? 1;
+    mat.opacity=base*(1-morph*.94);
+  });
+
+  if(earthTargetMarker) earthTargetMarker.visible=morph<.78;
+}
+
+
+function makeFrameBox(w,h,d,color=0x69eaff,opacity=.18){const g=new THREE.Group();const shell=rmesh(w,h,d,Math.min(.10,w*.08,h*.12,d*.10),matBlack(color,Math.min(.94,.58+opacity*1.15)));g.add(shell);const band=rmesh(Math.max(.02,w*.80),Math.max(.012,h*.05),d*1.012,.01,matSignal(color,.20));band.position.y=-h*.34;g.add(band);const e=new THREE.LineSegments(new THREE.EdgesGeometry(rgeo(w*1.01,h*1.01,d*1.01,Math.min(.10,w*.08,h*.12,d*.10),3)),new THREE.LineBasicMaterial({color,transparent:true,opacity:Math.min(.44,.17+opacity*1.25)}));g.add(e);return g;}
+function makeRod(length=.8,color=0xb9f9ff,opacity=.24){
+  return new THREE.Mesh(
+    new THREE.CylinderGeometry(.026,.026,length,10),
+    new THREE.MeshPhysicalMaterial({color,emissive:color,emissiveIntensity:.06,metalness:.42,roughness:.28,transparent:true,opacity})
+  );
+}
+function makeMicroNode(r=.06,color=0xe6fbff,opacity=.95){
+  return new THREE.Mesh(
+    new THREE.SphereGeometry(r,20,14),
+    new THREE.MeshBasicMaterial({color,transparent:true,opacity,blending:THREE.AdditiveBlending,depthWrite:false})
+  );
+}
+function makePillarArray(parent,positions,height=2.8,color=0x69eaff,opacity=.18){
+  positions.forEach(([x,z])=>{
+    const p=makeRod(height,color,opacity);
+    p.position.set(x,0,z);
+    parent.add(p);
+  });
+}
+function makePacketBlock(w=.26,h=.12,d=.12,color=0xb9f9ff){const g=new THREE.Group();g.add(rmesh(w,h,d,Math.min(.028,h*.22,d*.18),matBlack(color,.92)));const cap=rmesh(w*.74,Math.max(.012,h*.10),d*1.01,.008,matSignal(color,.65));cap.position.y=h*.12;g.add(cap);return g;}
+function makeServerRack(height=1.5,levels=4,color=0x69eaff){
+  const g=new THREE.Group();
+  const outer=makeFrameBox(.82,height,.72,color,.18);
+  g.add(outer);
+  const innerRailL=makeRod(height*.88,color,.10); innerRailL.position.set(-.26,0,.18); g.add(innerRailL);
+  const innerRailR=makeRod(height*.88,color,.10); innerRailR.position.set(.26,0,.18); g.add(innerRailR);
+  for(let i=0;i<levels;i++){
+    const y=(i-(levels-1)/2)*(height*.74/Math.max(1,levels-1));
+    const bay=new THREE.Mesh(
+      new THREE.BoxGeometry(.56,.15,.48),
+      new THREE.MeshPhysicalMaterial({color:0x09141d,emissive:color,emissiveIntensity:.06,metalness:.28,roughness:.32,transparent:true,opacity:.34})
+    );
+    bay.position.set(0,y,.01);
+    g.add(bay);
+    const tray=new THREE.Mesh(new THREE.BoxGeometry(.60,.018,.20),new THREE.MeshBasicMaterial({color:0xb9f9ff,transparent:true,opacity:.20}));
+    tray.position.set(0,y-.06,.17); g.add(tray);
+    const led=new THREE.Mesh(
+      new THREE.BoxGeometry(.52,.028,.04),
+      new THREE.MeshBasicMaterial({color:i%2?0xb9f9ff:0x69eaff,transparent:true,opacity:.82})
+    );
+    led.position.set(0,y+.03,.28);
+    led.userData.serverLed={index:i,baseOpacity:led.material.opacity};
+    g.add(led);
+    const slot=new THREE.Mesh(
+      new THREE.BoxGeometry(.16,.036,.04),
+      new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.62})
+    );
+    slot.position.set(.22,y-.035,.28);
+    g.add(slot);
+    for(let j=0;j<3;j++){
+      const vent=new THREE.Mesh(new THREE.BoxGeometry(.06,.012,.03),new THREE.MeshBasicMaterial({color:color,transparent:true,opacity:.34}));
+      vent.position.set(-.18 + j*.12,y-.02,.28);
+      g.add(vent);
+    }
+  }
+  const cap=new THREE.Mesh(new THREE.BoxGeometry(.68,.05,.56),basicMat(color,.10)); cap.position.y=height*.50; g.add(cap);
+  const footL=makeRod(.16,color,.18); footL.position.set(-.24,-height*.54,.24); g.add(footL);
+  const footR=makeRod(.16,color,.18); footR.position.set(.24,-height*.54,.24); g.add(footR);
+  g.userData.serverRack=true;
+  return g;
+}
+function makeEndpointNode(color=0x69eaff){const g=new THREE.Group();const base=rmesh(.78,.08,.46,.045,matSatin(.94));base.position.y=-.47;g.add(base);const stem=rmesh(.09,.52,.09,.025,matSatin(.92));stem.position.y=-.20;stem.rotation.x=-.08;g.add(stem);const screen=rmesh(.84,.53,.10,.055,matBlack(color,.96));screen.position.y=.15;g.add(screen);const glass=rmesh(.75,.43,.022,.032,new THREE.MeshPhysicalMaterial({color:0x071516,emissive:color,emissiveIntensity:.035,metalness:.05,roughness:.08,clearcoat:1,clearcoatRoughness:.05,transparent:true,opacity:.90}));glass.position.set(0,.15,.061);g.add(glass);for(let i=0;i<3;i++){const ui=new THREE.Mesh(new THREE.BoxGeometry(.40-i*.07,.018,.008),new THREE.MeshBasicMaterial({color:i===0?0xeaffff:color,transparent:true,opacity:.62}));ui.position.set(0,.24-i*.09,.081);g.add(ui);}const pulse=makeMicroNode(.045,0xe8fdff,.92);pulse.position.set(.29,-.40,.25);pulse.userData.endpointPulse=true;g.add(pulse);g.userData.endpointNode=true;return g;}
+function makeGatewayTower(color=0x69eaff){
+  const g=new THREE.Group();
+  const body=makeFrameBox(.58,1.16,.54,color,.18); g.add(body);
+  const arch=new THREE.Mesh(new THREE.BoxGeometry(.18,.72,.16),basicMat(0xe8fdff,.36)); arch.position.y=.04; g.add(arch);
+  const ringA=new THREE.Mesh(new THREE.TorusGeometry(.26,.022,10,80),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.42}));
+  ringA.rotation.x=Math.PI/2; ringA.position.y=.02; ringA.userData.gatewayRing=true; g.add(ringA);
+  const ringB=new THREE.Mesh(new THREE.TorusGeometry(.18,.012,10,60),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.28}));
+  ringB.rotation.x=Math.PI/2; ringB.position.y=.02; ringB.userData.gatewayRing=true; g.add(ringB);
+  const postL=makeRod(.92,color,.10); postL.position.set(-.16,0,.08); g.add(postL);
+  const postR=makeRod(.92,color,.10); postR.position.set(.16,0,.08); g.add(postR);
+  return g;
+}
+function makeCloudNode(color=0xb9f9ff){
+  const g=new THREE.Group();
+  [[-.18,0,.02,.17],[0,.08,0,.22],[.18,0,.03,.16],[0,-.05,0,.24]].forEach(v=>{
+    const puff=new THREE.Mesh(new THREE.SphereGeometry(v[3],20,14),basicMat(color,.28));
+    puff.position.set(v[0],v[1],v[2]);
+    g.add(puff);
+  });
+  const halo=new THREE.Mesh(new THREE.TorusGeometry(.30,.010,8,100),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.24}));
+  halo.rotation.x=Math.PI/2; g.add(halo);
+  const base=new THREE.Mesh(new THREE.BoxGeometry(.72,.10,.28),basicMat(color,.18)); base.position.y=-.18; g.add(base);
+  g.userData.cloudNode=true;
+  return g;
+}
+function makeHexWorker(color=0x5872ff){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(.24,.24,.24,6),basicMat(color,.26));
+  body.rotation.z=Math.PI/2; g.add(body);
+  const capL=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,.05,6),basicMat(0xb9f9ff,.18)); capL.rotation.z=Math.PI/2; capL.position.x=-.10; g.add(capL);
+  const capR=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,.05,6),basicMat(0xb9f9ff,.18)); capR.rotation.z=Math.PI/2; capR.position.x=.10; g.add(capR);
+  const core=makeMicroNode(.08,0xffffff,.92); core.userData.workerCore=true; g.add(core);
+  const rim=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.CylinderGeometry(.26,.26,.26,6)),new THREE.LineBasicMaterial({color,transparent:true,opacity:.58}));
+  rim.rotation.z=Math.PI/2; g.add(rim);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(.17,.012,8,60),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.30}));
+  ring.rotation.y=Math.PI/2; g.add(ring);
+  g.userData.workerNode=true;
+  return g;
+}
+function makeShieldToken(color=0x69eaff){
+  const shape=new THREE.Shape();
+  shape.moveTo(0,.34); shape.lineTo(.24,.16); shape.lineTo(.18,-.20); shape.lineTo(0,-.34); shape.lineTo(-.18,-.20); shape.lineTo(-.24,.16); shape.lineTo(0,.34);
+  const geom=new THREE.ExtrudeGeometry(shape,{depth:.08,bevelEnabled:false});
+  const mesh=new THREE.Mesh(geom,basicMat(color,.26));
+  mesh.geometry.center();
+  const lineMat=new THREE.LineBasicMaterial({color,transparent:true,opacity:.48});
+  const edge=new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry),lineMat);
+  const g=new THREE.Group();
+  g.add(mesh,edge);
+  return g;
+}
+function makeChipBase(w=2.3,h=.22,d=1.55,color=0x69eaff){
+  const g=makeFrameBox(w,h,d,color,.16);
+  for(let i=0;i<8;i++){
+    const pin=new THREE.Mesh(new THREE.BoxGeometry(.06,.12,.10),basicMat(0xb9f9ff,.24));
+    pin.position.set(-w*.46 + i*(w*.92/7),-.16,d*.54); g.add(pin);
+    const pin2=pin.clone(); pin2.position.z=-d*.54; g.add(pin2);
+  }
+  return g;
+}
+function makeDiamondCore(size=.36,color=0xe8fdff){
+  const g=new THREE.Group();
+  const core=new THREE.Mesh(new THREE.OctahedronGeometry(size,2),basicMat(color,.58));
+  const shell=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.OctahedronGeometry(size*1.16,1)),new THREE.LineBasicMaterial({color,transparent:true,opacity:.42}));
+  g.add(core,shell);
+  return g;
+}
+function makeLayerPlate(w,h,d,color=0x69eaff,accent=0xffffff){
+  const g=makeFrameBox(w,h,d,color,.16);
+  const stripe=new THREE.Mesh(new THREE.BoxGeometry(w*.78,h*.10,d*.08),new THREE.MeshBasicMaterial({color:accent,transparent:true,opacity:.58}));
+  stripe.position.z=d*.42;
+  g.add(stripe);
+  return g;
+}
+function makeHashBar(color=0xb9f9ff){
+  const g=new THREE.Group();
+  const a=makePacketBlock(.18,.08,.08,color); a.position.x=-.15;
+  const b=makePacketBlock(.18,.08,.08,color); b.position.x=.15;
+  const link=new THREE.Mesh(new THREE.BoxGeometry(.16,.03,.03),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.55}));
+  g.add(a,b,link);
+  return g;
+}
+function makeServerRackDeep(height=1.7,levels=5,color=0x69eaff){const g=new THREE.Group();for(const x of [-.38,.38])for(const z of [-.31,.31]){const rail=rmesh(.045,height*.94,.045,.012,matSatin(.88));rail.position.set(x,0,z);g.add(rail);}const top=rmesh(.86,.055,.68,.02,matSatin(.88));top.position.y=height*.49;g.add(top);const bottom=top.clone();bottom.material=matSatin(.88);bottom.position.y=-height*.49;g.add(bottom);for(let i=0;i<levels;i++){const y=(i-(levels-1)/2)*(height*.72/Math.max(1,levels-1));const blade=rmesh(.72,.18,.58,.035,matBlack(i%2?color:0x5872ff,.95));blade.position.y=y;g.add(blade);const face=rmesh(.66,.13,.028,.018,matPoly(.96));face.position.set(0,y,.305);g.add(face);const ports=portBank(6,.075,2);ports.scale.set(.62,.62,.62);ports.position.set(-.12,y-.008,.329);g.add(ports);const vent=ventField(3,2,.052,.010);vent.position.set(.18,y,.329);g.add(vent);for(let j=0;j<3;j++){const led=makeMicroNode(.010,j===0?0xeaffff:color,.80);led.position.set(.27+j*.03,y+.045,.333);led.userData.serverLed={index:i*3+j};g.add(led);}}const fan=new THREE.Mesh(new THREE.TorusGeometry(.17,.014,8,48),matSignal(color,.32));fan.rotation.x=Math.PI/2;fan.position.set(0,height*.37,-.34);fan.userData.rackFan=true;g.add(fan);g.userData.serverRack=true;return g;}
+function makeProtocolLayerDeep(index,w,d,color){ const g=makeLayerPlate(w,.12,d,color,0xffffff); for(let i=0;i<4;i++){ const c=new THREE.Mesh(new THREE.BoxGeometry(w*.12,.025,d*.12),new THREE.MeshBasicMaterial({color:i%2?0xffffff:color,transparent:true,opacity:.34})); c.position.set(-w*.30+i*w*.20,.075,-d*.25+(i%2)*d*.28); g.add(c); } const s=new THREE.Mesh(new THREE.BoxGeometry(w*.72,.018,.025),new THREE.MeshBasicMaterial({color:0xe8fdff,transparent:true,opacity:.42})); s.position.z=d*.40; g.add(s); g.userData.protocolLayer={index,baseY:0,baseDepth:d}; return g; }
+function makeEvidenceCapsule(color=0x69eaff){ const g=new THREE.Group(); const shell=new THREE.Mesh(new THREE.CapsuleGeometry(.16,.34,6,16),basicMat(color,.16)); shell.rotation.z=Math.PI/2; g.add(shell); const core=makePacketBlock(.30,.10,.10,0xe8fdff); g.add(core); const ring=new THREE.Mesh(new THREE.TorusGeometry(.17,.010,8,50),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.34})); ring.rotation.y=Math.PI/2; g.add(ring); return g; }
+function makePolicyGateDeep(color=0x69eaff){ const g=new THREE.Group(); const l=makeRod(.92,color,.18); l.position.x=-.22; g.add(l); const r=makeRod(.92,color,.18); r.position.x=.22; g.add(r); const top=new THREE.Mesh(new THREE.BoxGeometry(.50,.05,.12),basicMat(color,.20)); top.position.y=.46; g.add(top); const iris=new THREE.Mesh(new THREE.TorusGeometry(.20,.020,8,64),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.44})); iris.rotation.x=Math.PI/2; iris.userData.policyIris=true; g.add(iris); for(let i=0;i<4;i++){ const b=new THREE.Mesh(new THREE.BoxGeometry(.16,.025,.06),basicMat(0xe8fdff,.24)); b.rotation.z=i*Math.PI/2; b.userData.policyBlade={index:i}; g.add(b); } return g; }
+function makeCryptoDie(color=0xb9f9ff){const g=new THREE.Group();const carrier=rmesh(1.04,.12,.86,.065,matCeramic(color,.96));carrier.position.y=-.08;g.add(carrier);const moat=new THREE.Mesh(new THREE.TorusGeometry(.29,.020,10,64),matSatin(.90));moat.rotation.x=Math.PI/2;moat.position.y=.015;g.add(moat);const pkg=rmesh(.54,.17,.54,.055,matBlack(color,.97));pkg.position.y=.07;g.add(pkg);const lid=rmesh(.37,.10,.37,.035,matCeramic(color,.97));lid.position.y=.19;g.add(lid);const die=rmesh(.20,.035,.20,.015,matSignal(color,.95));die.position.y=.265;g.add(die);for(let i=0;i<12;i++){const a=i/12*Math.PI*2;const tr=rmesh(.22,.012,.012,.004,matSatin(.72));tr.position.set(Math.cos(a)*.31,.16,Math.sin(a)*.31);tr.rotation.y=-a;tr.userData.rootTrace={index:i,axis:i%2?'x':'z'};g.add(tr);}const core=makeDiamondCore(.095,0xe8fdff);core.position.y=.33;g.add(core);return g;}
+function makeInstrumentScreen(w,h,color=0x69eaff,kind=0){
+ const g=screenPanel(w,h,color);
+ const lower=new THREE.Mesh(new THREE.BoxGeometry(w*.98,h*.10,.085),new THREE.MeshPhysicalMaterial({color:0x050a0e,metalness:.72,roughness:.30}));lower.position.set(0,-h*.47,-.015);g.add(lower);
+ for(let i=0;i<5;i++){const y=-h*.28+i*h*.14,pts=[];for(let k=0;k<12;k++)pts.push(new THREE.Vector3(-w*.34+k*w*.062,y+Math.sin(k*.85+i+kind)*h*.035,.045));g.add(line(pts,i%2?0xb9f9ff:color,.28));}
+ for(let i=0;i<4;i++){const led=makeMicroNode(.012,i===0?0xffffff:color,.72);led.position.set(w*.35,-h*.42+i*h*.08,.06);g.add(led);}
+ const knob=new THREE.Mesh(new THREE.CylinderGeometry(.034,.034,.025,16),new THREE.MeshPhysicalMaterial({color:0x96aab4,metalness:.92,roughness:.18}));knob.rotation.x=Math.PI/2;knob.position.set(-w*.38,-h*.42,.06);g.add(knob);
+ return g;
+}
+function makeSpineProcessorModule(color=0x69eaff,accent=0xffffff){const g=new THREE.Group();g.add(rmesh(.92,.30,.56,.055,matBlack(color,.94)));const face=rmesh(.82,.21,.028,.025,matPoly(.95));face.position.z=.294;g.add(face);const bus=rmesh(.50,.025,.025,.007,matSignal(accent,.72));bus.position.set(-.05,.055,.316);g.add(bus);const ports=portBank(4,.115,1);ports.scale.set(.72,.72,.72);ports.position.set(.10,-.055,.323);g.add(ports);return g;}
+function makeTapBridgeDeep(color=0xe8fdff){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.BoxGeometry(.72,.20,.34),new THREE.MeshPhysicalMaterial({color:0x08131c,emissive:0x69eaff,emissiveIntensity:.08,metalness:.42,roughness:.24,transparent:true,opacity:.62,clearcoat:.8})); g.add(body);
+  const frame=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(.76,.24,.38)),new THREE.LineBasicMaterial({color:0xb9f9ff,transparent:true,opacity:.42})); g.add(frame);
+  for(let side of [-1,1]){
+    for(let i=0;i<3;i++){
+      const port=new THREE.Mesh(new THREE.BoxGeometry(.05,.04,.04),new THREE.MeshBasicMaterial({color:i===1?0xffffff:0x69eaff,transparent:true,opacity:.68}));
+      port.position.set(side*.36,-.03,-.08+i*.08); port.userData.tapPort={index:(side<0?0:3)+i}; g.add(port);
+    }
+  }
+  const bridge=new THREE.Mesh(new THREE.BoxGeometry(.42,.030,.08),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.58})); bridge.position.z=.16; g.add(bridge);
+  const core=new THREE.Mesh(new THREE.CylinderGeometry(.07,.07,.20,10),basicMat(0xe8fdff,.44)); core.rotation.z=Math.PI/2; core.userData.tapCore=true; g.add(core);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(.14,.010,8,40),new THREE.MeshBasicMaterial({color:0x5872ff,transparent:true,opacity:.26})); ring.rotation.y=Math.PI/2; ring.userData.tapRing={speed:.010}; g.add(ring);
+  g.userData.tapBridge=true;
+  return g;
+}
+function makeCaptureApplianceDeep(){const g=new THREE.Group();g.add(rmesh(1.72,.46,1.04,.085,matBlack(0x69eaff,.97)));const face=rmesh(1.56,.35,.038,.035,matPoly(.98));face.position.z=.538;g.add(face);const ports=portBank(12,.09,2);ports.scale.set(.78,.78,.78);ports.position.set(-.34,-.04,.566);g.add(ports);const up=portBank(4,.12,1);up.scale.set(.88,.88,.88);up.position.set(.48,-.04,.566);g.add(up);const tx=labelTexture('ARENYXA','NX-CAP / ANALYSIS FABRIC');const label=new THREE.Mesh(new THREE.PlaneGeometry(.62,.15),new THREE.MeshBasicMaterial({map:tx,toneMapped:false,transparent:true,opacity:.92}));label.position.set(.42,.115,.568);g.add(label);for(let i=0;i<6;i++){const led=makeMicroNode(.012,i===0?0xffffff:0x69eaff,.88);led.position.set(-.54+i*.055,.11,.572);led.userData.capturePort={index:i};g.add(led);}const vent=ventField(10,3,.07,.011);vent.position.set(0,.235,0);vent.rotation.x=-Math.PI/2;g.add(vent);const pcb=rmesh(1.30,.04,.70,.025,matPcb(.54));pcb.position.set(0,.02,0);g.add(pcb);[-.42,-.14,.14,.42].forEach((x,i)=>{const chip=rmesh(.22,.075,.31,.025,i===3?matSatin(.54):matCeramic(i%2?0x5872ff:0x69eaff,.60));chip.position.set(x,.055,-.03);g.add(chip);});const heart=makeDiamondCore(.13,0xe8fdff);heart.position.set(.08,.14,.02);heart.userData.captureCoreHeart=true;g.add(heart);return g;}
+function buildDataSpineWorld(){
+  const g=new THREE.Group();
+  g.userData.worldType='dataSpine';
+  const backbone=new THREE.Mesh(new THREE.BoxGeometry(1.02,4.18,.78),new THREE.MeshPhysicalMaterial({color:0x07131c,emissive:0x69eaff,emissiveIntensity:.10,metalness:.40,roughness:.20,transparent:true,opacity:.62,clearcoat:.92}));
+  backbone.position.y=.02; g.add(backbone);
+  const backboneFrame=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1.08,4.28,.84)),new THREE.LineBasicMaterial({color:0xb9f9ff,transparent:true,opacity:.34})); g.add(backboneFrame);
+  const coreBus=new THREE.Mesh(new THREE.BoxGeometry(.18,3.76,.18),new THREE.MeshBasicMaterial({color:0xe8fdff,transparent:true,opacity:.44})); g.add(coreBus);
+  for(let i=0;i<9;i++){
+    const y=(i-4)*.42;
+    const module=makeSpineProcessorModule(i%2?0x69eaff:0x5872ff,i%3===0?0xe8fdff:0xffffff);
+    module.position.y=y; module.userData.spineLayer={index:i}; g.add(module);
+    const branchL=makeSpineProcessorModule(0x5872ff,0xb9f9ff); branchL.scale.setScalar(.62); branchL.position.set(-1.38,y,(i%2?-.30:.30)); branchL.rotation.y=.18; branchL.userData.spineWing={side:-1,index:i,baseX:-1.38}; g.add(branchL);
+    const branchR=makeSpineProcessorModule(0x69eaff,0xe8fdff); branchR.scale.setScalar(.62); branchR.position.set(1.38,y,(i%2?.30:-.30)); branchR.rotation.y=-.18; branchR.userData.spineWing={side:1,index:i,baseX:1.38}; g.add(branchR);
+    g.add(tube([new THREE.Vector3(-.38,y,0),new THREE.Vector3(-.78,y,0),new THREE.Vector3(-1.06,y,branchL.position.z)],.012,0x69eaff,.30));
+    g.add(tube([new THREE.Vector3(.38,y,0),new THREE.Vector3(.78,y,0),new THREE.Vector3(1.06,y,branchR.position.z)],.012,0x5872ff,.30));
+  }
+  for(let i=0;i<4;i++){
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(.76+i*.18,.018,10,120),new THREE.MeshBasicMaterial({color:i%2?0x5872ff:0x69eaff,transparent:true,opacity:.28}));
+    ring.rotation.x=Math.PI/2 + i*.08; ring.position.y=(i-1.5)*.86; ring.userData.spineRing={index:i,baseY:ring.position.y}; g.add(ring);
+  }
+  for(let i=0;i<8;i++){
+    const pulse=makePacketBlock(.18,.08,.08,i%2?0x69eaff:0xe8fdff); pulse.position.set(i%2?-.12:.12,-1.56+i*.44,i%3===0?.16:-.16); pulse.userData.spinePulse={index:i}; g.add(pulse);
+  }
+  const rackL=makeServerRackDeep(1.54,4,0x5872ff); rackL.position.set(-2.48,-.24,-.58); g.add(rackL);
+  const rackR=makeServerRackDeep(1.54,4,0x69eaff); rackR.position.set(2.48,.28,.58); g.add(rackR);
+  const intakeL=makeNetworkSwitchDeep(0x69eaff); intakeL.position.set(-2.28,-1.74,.34); intakeL.scale.setScalar(.92); g.add(intakeL);
+  const intakeR=makeNetworkSwitchDeep(0x5872ff); intakeR.position.set(2.28,-1.74,-.34); intakeR.scale.setScalar(.92); g.add(intakeR);
+  g.add(tube([new THREE.Vector3(-2.02,-1.62,.22),new THREE.Vector3(-1.40,-1.30,.08),new THREE.Vector3(-.44,-1.08,0)],.012,0x69eaff,.26));
+  g.add(tube([new THREE.Vector3(2.02,-1.62,-.22),new THREE.Vector3(1.40,-1.30,-.08),new THREE.Vector3(.44,-1.08,0)],.012,0x5872ff,.26));
+  const endpoint=makeEndpointNode(0xb9f9ff); endpoint.position.set(0,-2.10,.70); endpoint.scale.setScalar(.76); g.add(endpoint);
+  const halo=particleCloud(720,2.46,0xb9f9ff); halo.scale.set(1,.84,1); halo.material.opacity=.16; g.add(halo);
+  return g;
+}
+function buildSensorFieldWorld(){
+  const g=new THREE.Group();
+  g.userData.worldType='sensorField';
+  const hub=makeFrameBox(1.18,2.12,.82,0xb9f9ff,.18); g.add(hub);
+  const hubCore=new THREE.Mesh(new THREE.CylinderGeometry(.20,.20,1.72,14),basicMat(0x9aefff,.24)); g.add(hubCore);
+  const healthPlane=screenPanel(1.18,.74,0x69eaff); healthPlane.position.set(0,.12,.62); healthPlane.userData.sensorConsole=true; g.add(healthPlane);
+  for(let i=0;i<4;i++){
+    const bar=new THREE.Mesh(new THREE.BoxGeometry(.66,.035,.06),new THREE.MeshBasicMaterial({color:i%2?0xffffff:0xb9f9ff,transparent:true,opacity:.42}));
+    bar.position.set(0,.22 - i*.16,.68); g.add(bar);
+  }
+  const topRing=new THREE.Mesh(new THREE.TorusGeometry(.62,.032,10,120),new THREE.MeshBasicMaterial({color:0x69eaff,transparent:true,opacity:.42}));
+  topRing.position.y=.98; topRing.rotation.x=Math.PI/2; topRing.userData.scanArc={speed:.34,axis:'y'}; g.add(topRing);
+  const lowerRing=new THREE.Mesh(new THREE.TorusGeometry(1.56,.016,8,140),new THREE.MeshBasicMaterial({color:0x5872ff,transparent:true,opacity:.18}));
+  lowerRing.rotation.set(Math.PI/2.1,.22,0); lowerRing.userData.scanArc={speed:.18,axis:'x'}; g.add(lowerRing);
+  const probeData=[
+    {kind:'server',x:-1.82,y:.66,z:.42,color:0x5872ff,scale:.78},
+    {kind:'endpoint',x:1.88,y:.76,z:-.38,color:0x69eaff,scale:.78},
+    {kind:'worker',x:-1.38,y:-.82,z:-.54,color:0x9a68ff,scale:1.00},
+    {kind:'cloud',x:1.28,y:-.74,z:.54,color:0xb9f9ff,scale:.98},
+    {kind:'endpoint',x:0,y:1.36,z:-1.06,color:0x5872ff,scale:.62}
+  ];
+  probeData.forEach((pd,i)=>{
+    let node;
+    if(pd.kind==='server') node=makeServerRackDeep(1.10,3,pd.color);
+    else if(pd.kind==='endpoint') node=makeEndpointNode(pd.color);
+    else if(pd.kind==='worker') node=makeHexWorker(pd.color);
+    else node=makeCloudNode(pd.color);
+    node.scale.setScalar(pd.scale);
+    node.position.set(pd.x,pd.y,pd.z);
+    node.rotation.y=Math.atan2(pd.x,pd.z);
+    node.userData.sensorPod={index:i,baseY:pd.y,baseX:pd.x,baseZ:pd.z};
+    g.add(node);
+    g.add(tube([new THREE.Vector3(0,.08,0),new THREE.Vector3(pd.x*.34,pd.y*.42,pd.z*.34),new THREE.Vector3(pd.x,pd.y,pd.z)],.012,i%2?0x5872ff:0x69eaff,.26));
+  });
+  const healthNodes=[[-2.26,.18,.22],[-2.04,-.46,-.28],[-.22,1.58,.18],[2.22,.18,-.22],[2.02,-.52,.28]];
+  healthNodes.forEach((v,i)=>{
+    const n=makeMicroNode(.06,i%2?0x69eaff:0xb9f9ff,.86); n.position.set(v[0],v[1],v[2]); n.userData.healthDot={index:i,baseY:v[1]}; g.add(n);
+  });
+  const field=particleCloud(860,2.62,0x9fefff); field.scale.y=.58; field.material.opacity=.15; g.add(field);
+  return g;
+}
+function makeNetworkSwitchDeep(color=0x69eaff){const g=new THREE.Group();g.add(rmesh(1.08,.28,.64,.055,matBlack(color,.96)));const face=rmesh(.98,.19,.030,.020,matPoly(.97));face.position.z=.333;g.add(face);const ports=portBank(12,.078,2);ports.scale.set(.72,.72,.72);ports.position.set(-.10,-.006,.352);g.add(ports);for(let i=0;i<6;i++){const led=makeMicroNode(.010,i===0?0xffffff:color,.86);led.position.set(.28+i*.042,.065,.354);led.userData.switchPort={index:i};g.add(led);}const vent=ventField(6,2,.058,.010);vent.position.set(0,0,-.326);vent.rotation.y=Math.PI;g.add(vent);g.userData.networkSwitch=true;return g;}
+function makeRouterNodeDeep(color=0x5872ff){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(.27,.27,.18,12),new THREE.MeshPhysicalMaterial({color:0x07121b,emissive:color,emissiveIntensity:.10,metalness:.34,roughness:.28,transparent:true,opacity:.52}));
+  body.rotation.z=Math.PI/2; g.add(body);
+  for(let i=0;i<3;i++){
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(.20+i*.045,.012,8,60),new THREE.MeshBasicMaterial({color:i%2?0xb9f9ff:color,transparent:true,opacity:.34}));
+    ring.rotation.y=Math.PI/2; ring.userData.routerRing={speed:.010+i*.004}; g.add(ring);
+  }
+  const core=makeMicroNode(.055,0xe8fdff,.92); core.userData.routerCore=true; g.add(core);
+  return g;
+}
+function makeTapProbeDeep(color=0xe8fdff){
+  const g=new THREE.Group();
+  const core=new THREE.Mesh(new THREE.OctahedronGeometry(.18,1),basicMat(color,.54)); core.userData.tapCore=true; g.add(core);
+  const ringA=new THREE.Mesh(new THREE.TorusGeometry(.28,.014,8,72),new THREE.MeshBasicMaterial({color:0x69eaff,transparent:true,opacity:.38})); ringA.rotation.x=Math.PI/2; ringA.userData.tapRing={speed:.014}; g.add(ringA);
+  const ringB=new THREE.Mesh(new THREE.TorusGeometry(.21,.010,8,60),new THREE.MeshBasicMaterial({color:0x5872ff,transparent:true,opacity:.30})); ringB.rotation.y=Math.PI/2; ringB.userData.tapRing={speed:-.011}; g.add(ringB);
+  for(let i=0;i<3;i++){
+    const port=makeMicroNode(.026,i===1?0xffffff:0xb9f9ff,.76); port.position.set((i-1)*.16,-.16,.04); g.add(port);
+  }
+  return g;
+}
+function makeCaptureCoreDeep(){
+  const g=new THREE.Group();
+  const frame=makeFrameBox(1.48,1.16,1.10,0xb9f9ff,.14); g.add(frame);
+  const inner=makeFrameBox(.86,.64,.58,0x69eaff,.20); g.add(inner);
+  const core=makeDiamondCore(.22,0xe8fdff); core.userData.captureCoreHeart=true; g.add(core);
+  for(let i=0;i<4;i++){
+    const blade=new THREE.Mesh(new THREE.BoxGeometry(.72,.035,.08),new THREE.MeshBasicMaterial({color:i%2?0x69eaff:0x5872ff,transparent:true,opacity:.42}));
+    blade.position.set(0,-.24+i*.16,.34); blade.userData.captureBlade={index:i,baseY:blade.position.y}; g.add(blade);
+  }
+  for(let i=0;i<3;i++){
+    const scan=new THREE.Mesh(new THREE.TorusGeometry(.42+i*.13,.011,8,100),new THREE.MeshBasicMaterial({color:i%2?0x5872ff:0x69eaff,transparent:true,opacity:.22}));
+    scan.rotation.set(Math.PI/2+i*.13,i*.38,0); scan.userData.captureScanRing={speed:.007+i*.003}; g.add(scan);
+  }
+  return g;
+}
+
+function makeExplodableServerBlade(color=0x69eaff){const g=new THREE.Group();const shell=rmesh(1.65,.48,1.04,.07,matBlack(color,.96));shell.userData.captureServerShell={baseY:0};g.add(shell);const front=rmesh(1.50,.35,.035,.032,matPoly(.97));front.position.z=.538;front.userData.captureServerShell={baseY:0};g.add(front);const ports=portBank(10,.09,2);ports.scale.set(.72,.72,.72);ports.position.set(-.28,-.02,.565);g.add(ports);const pcb=rmesh(1.36,.04,.74,.025,matPcb(.94));pcb.position.set(0,-.10,0);g.add(pcb);const nic=rmesh(.30,.12,.46,.025,matSatin(.92));nic.position.set(-.52,.02,.08);g.add(nic);const cpu=rmesh(.40,.10,.38,.035,matCeramic(color,.96));cpu.position.set(.05,.03,-.04);g.add(cpu);const back=rmesh(.12,.18,.72,.018,matSatin(.88));back.position.set(.57,.02,0);g.add(back);const bus=rmesh(1.16,.018,.05,.006,matSignal(color,.72));bus.position.set(0,.11,.25);g.add(bus);return g;}
+
+function makeServerClusterDeep(){const g=new THREE.Group();const main=makeExplodableServerBlade(0x69eaff);main.position.set(0,.12,0);g.add(main);const rack=makeServerRackDeep(1.28,4,0x5872ff);rack.scale.setScalar(.64);rack.position.set(.78,-.20,-.28);g.add(rack);const bus=rmesh(1.90,.09,.20,.035,matBlack(0xb9f9ff,.88));bus.position.set(0,-.48,.02);g.add(bus);g.userData.serverCluster=true;return g;}
+function buildCaptureMatrixWorld(){
+  const g=new THREE.Group();
+  g.userData.worldType='captureTunnel';
+
+  const client=makeEndpointNode(0x69eaff); client.position.set(-3.42,.56,.12); client.scale.setScalar(.90); g.add(client);
+  const ingressSwitch=makeNetworkSwitchDeep(0x69eaff); ingressSwitch.position.set(-2.18,.56,.08); ingressSwitch.scale.setScalar(1.06); g.add(ingressSwitch);
+  const tap=makeTapBridgeDeep(); tap.position.set(-1.08,.56,.06); tap.scale.setScalar(1.12); g.add(tap);
+  const captureInline=makeCaptureApplianceDeep(); captureInline.position.set(.12,.56,.02); captureInline.scale.setScalar(.90); captureInline.rotation.y=.02; g.add(captureInline);
+  const serverCluster=makeServerClusterDeep(); serverCluster.position.set(2.18,.56,.00); serverCluster.scale.setScalar(1.04); serverCluster.userData.capturePeripheral={index:4,baseY:serverCluster.position.y}; g.add(serverCluster);
+  for(let i=0;i<3;i++){const lane=new THREE.Mesh(new THREE.BoxGeometry(1.64,.032,.045),new THREE.MeshBasicMaterial({color:i%2?0x69eaff:0xb9f9ff,transparent:true,opacity:.28}));lane.position.set(2.18,.48+i*.11,.40);lane.userData.serverFlowLane={index:i};g.add(lane);}
+  const egressSwitch=makeNetworkSwitchDeep(0x5872ff); egressSwitch.position.set(3.72,.56,-.02); egressSwitch.scale.setScalar(1.02); g.add(egressSwitch);
+  const cloudOut=makeCloudNode(0xb9f9ff); cloudOut.position.set(5.02,.82,-.10); cloudOut.scale.setScalar(.98); g.add(cloudOut);
+
+  const analysisBay=makeCaptureApplianceDeep(); analysisBay.position.set(.22,-.76,.56); analysisBay.scale.setScalar(.72); analysisBay.userData.capturePeripheral={index:5,baseY:analysisBay.position.y}; g.add(analysisBay);
+
+  const mainForward=[
+    new THREE.Vector3(-3.00,.68,.08),new THREE.Vector3(-2.46,.68,.08),new THREE.Vector3(-1.72,.68,.08),
+    new THREE.Vector3(-1.18,.68,.08),new THREE.Vector3(-.30,.68,.06),new THREE.Vector3(.82,.68,.04),
+    new THREE.Vector3(1.54,.68,.04),new THREE.Vector3(2.18,.68,.04),new THREE.Vector3(2.86,.68,.02),
+    new THREE.Vector3(3.54,.68,.00),new THREE.Vector3(4.48,.76,-.02)
+  ];
+  const mainReturn=[
+    new THREE.Vector3(4.48,.42,.10),new THREE.Vector3(3.54,.42,.08),new THREE.Vector3(2.86,.42,.08),
+    new THREE.Vector3(2.18,.42,.08),new THREE.Vector3(1.54,.42,.06),new THREE.Vector3(.82,.42,.06),
+    new THREE.Vector3(-.30,.42,.08),new THREE.Vector3(-1.18,.42,.10),new THREE.Vector3(-1.72,.42,.10),
+    new THREE.Vector3(-2.46,.42,.10),new THREE.Vector3(-3.00,.42,.10)
+  ];
+  g.add(tube(mainForward,.026,0x69eaff,.44));
+  g.add(tube(mainReturn,.024,0x5872ff,.40));
+  g.add(tube([new THREE.Vector3(-1.08,.32,.08),new THREE.Vector3(-.82,.06,.18),new THREE.Vector3(-.40,-.28,.36),new THREE.Vector3(.02,-.62,.54)],.016,0xb9f9ff,.36));
+  g.add(tube([new THREE.Vector3(.12,.30,.06),new THREE.Vector3(.18,0,.18),new THREE.Vector3(.22,-.28,.38),new THREE.Vector3(.24,-.62,.54)],.014,0x69eaff,.28));
+
+  const leftCloud=makeCloudNode(0xb9f9ff); leftCloud.position.set(-2.94,1.56,-.94); leftCloud.scale.setScalar(.84); leftCloud.userData.capturePeripheral={index:0,baseY:leftCloud.position.y}; g.add(leftCloud);
+  const monitorSwitch=makeNetworkSwitchDeep(0x5872ff); monitorSwitch.position.set(-.84,1.44,.98); monitorSwitch.scale.setScalar(.90); monitorSwitch.userData.capturePeripheral={index:1,baseY:monitorSwitch.position.y}; g.add(monitorSwitch);
+  const worker=makeHexWorker(0x69eaff); worker.position.set(1.42,1.42,-.92); worker.scale.setScalar(.96); worker.userData.capturePeripheral={index:2,baseY:worker.position.y}; g.add(worker);
+  const endpoint2=makeEndpointNode(0xb9f9ff); endpoint2.position.set(3.24,1.48,.96); endpoint2.scale.setScalar(.64); endpoint2.userData.capturePeripheral={index:3,baseY:endpoint2.position.y}; g.add(endpoint2);
+  const topology=[
+    [new THREE.Vector3(-2.94,1.42,-.88),new THREE.Vector3(-2.56,1.06,-.52),new THREE.Vector3(-2.18,.74,.10)],
+    [new THREE.Vector3(-.84,1.34,.92),new THREE.Vector3(-1.02,1.00,.56),new THREE.Vector3(-1.08,.74,.08)],
+    [new THREE.Vector3(1.42,1.28,-.86),new THREE.Vector3(1.56,1.00,-.44),new THREE.Vector3(2.18,.78,.04)],
+    [new THREE.Vector3(3.24,1.34,.90),new THREE.Vector3(3.52,1.04,.44),new THREE.Vector3(3.72,.74,.00)]
+  ];
+  topology.forEach((pts,i)=>g.add(tube(pts,.010,i%2?0x5872ff:0x69eaff,.22)));
+
+  const graphNodes=[[-2.42,1.00,.48],[-1.24,1.18,-.62],[.18,1.12,.76],[1.52,1.06,-.78],[2.82,1.10,.56]];
+  graphNodes.forEach((v,i)=>{
+    const n=makeMicroNode(.058,i%2?0x5872ff:0x69eaff,.82); n.position.set(v[0],v[1],v[2]); n.userData.captureGraphNode={index:i,baseY:v[1]}; g.add(n);
+  });
+
+  for(let i=0;i<28;i++){
+    const p=makePacketBlock(.17,.075,.085,i%3===0?0xffffff:(i%2?0x5872ff:0x69eaff));
+    p.userData.capturePacket={kind:i%2?'forward':'return',phase:i/28,speed:.20+(i%5)*.018,lane:i%3}; g.add(p);
+  }
+  for(let i=0;i<12;i++){
+    const p=makePacketBlock(.14,.066,.072,i%2?0xe8fdff:0xb9f9ff);
+    p.userData.capturePacket={kind:'mirror',phase:i/12,speed:.22+(i%3)*.018,lane:i%2}; g.add(p);
+  }
+  for(let i=0;i<12;i++){
+    const p=makeMicroNode(.042,i%2?0x69eaff:0x5872ff,.90);
+    p.userData.capturePacket={kind:'peripheral',phase:i/12,speed:.14+(i%4)*.015,lane:i%4}; g.add(p);
+  }
+  for(let i=0;i<5;i++){
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(.72+i*.15,.012,8,110),new THREE.MeshBasicMaterial({color:i%2?0x5872ff:0x69eaff,transparent:true,opacity:.16}));
+    ring.position.set(.22,-.76,.56); ring.rotation.set(Math.PI/2+i*.08,i*.34,0); ring.userData.captureCollectorRing={index:i,speed:.004+i*.002}; g.add(ring);
+  }
+  return g;
+}
+function buildEvidenceVaultWorld(){
+  const g=new THREE.Group();
+  g.userData.worldType='evidenceVault';
+  const baseRing=new THREE.Mesh(new THREE.TorusGeometry(1.58,.028,10,160),new THREE.MeshBasicMaterial({color:0x9fefff,transparent:true,opacity:.22}));
+  baseRing.rotation.x=Math.PI/2; baseRing.position.y=-1.24; baseRing.userData.sealRing={index:0}; g.add(baseRing);
+  const upperRing=new THREE.Mesh(new THREE.TorusGeometry(1.08,.018,10,120),new THREE.MeshBasicMaterial({color:0x5872ff,transparent:true,opacity:.18}));
+  upperRing.rotation.set(Math.PI/2.1,.18,0); upperRing.userData.sealRing={index:1}; g.add(upperRing);
+  const vaultFrame=makeFrameBox(1.62,2.10,1.28,0x69eaff,.12); g.add(vaultFrame);
+  const innerCabin=makeFrameBox(.92,1.28,.68,0xb9f9ff,.18); g.add(innerCabin);
+  const vaultBase=new THREE.Mesh(new THREE.CylinderGeometry(.92,1.08,.18,8),new THREE.MeshPhysicalMaterial({color:0x071019,metalness:.76,roughness:.29,clearcoat:.45}));vaultBase.position.y=-1.08;g.add(vaultBase);
+  for(let i=0;i<4;i++){const rail=new THREE.Mesh(new THREE.BoxGeometry(.72,.035,.07),new THREE.MeshBasicMaterial({color:i%2?0xb9f9ff:0x69eaff,transparent:true,opacity:.24}));rail.position.set(0,-.52+i*.34,.67);g.add(rail);}
+  const crystal=makeDiamondCore(.34,0xe8fdff); crystal.position.y=.08; crystal.userData.vaultCrystal=true; g.add(crystal);
+  const seal=makeShieldToken(0xe8fdff); seal.position.set(0,-.02,.46); seal.scale.setScalar(.48); seal.userData.vaultSeal=true; g.add(seal);
+  for(let i=0;i<4;i++){
+    const pillar=makeRod(1.86,i%2?0x69eaff:0xb9f9ff,.14);
+    pillar.position.set(i<2?-.58:.58,0,i%2?-.38:.38);
+    g.add(pillar);
+  }
+  for(let i=0;i<6;i++){
+    const ang=-Math.PI*.64 + i*(Math.PI*1.28/5);
+    const evidence=makeEvidenceCapsule(i%2?0x69eaff:0x5872ff);
+    evidence.position.set(Math.cos(ang)*2.10,.18+Math.sin(i*.8)*.18,Math.sin(ang)*1.00);
+    evidence.rotation.y=-ang*.58;
+    evidence.rotation.x=(i-2.5)*.04;
+    evidence.userData.evidenceCard={index:i,angle:ang,radius:2.10,baseY:evidence.position.y};
+    g.add(evidence);
+    const hashNode=makeHashBar(i%2?0xb9f9ff:0xe8fdff);
+    hashNode.position.copy(evidence.position).multiplyScalar(.72);
+    hashNode.position.y*=.76;
+    hashNode.userData.hashNode={index:i,angle:ang,baseY:hashNode.position.y};
+    g.add(hashNode);
+    g.add(tube([new THREE.Vector3(0,0,0),new THREE.Vector3(Math.cos(ang)*1.05,evidence.position.y*.45,Math.sin(ang)*.52),evidence.position.clone()],.010,i%2?0x5872ff:0x69eaff,.22));
+  }
+  for(let i=0;i<5;i++){
+    const chain=makePacketBlock(.26,.12,.12,i%2?0x69eaff:0xb9f9ff);
+    chain.position.set(1.12+i*.34,-1.02+i*.16,0);
+    chain.userData.chainBlock={index:i,baseY:chain.position.y,baseX:chain.position.x};
+    g.add(chain);
+    if(i<4){
+      const link=new THREE.Mesh(new THREE.BoxGeometry(.16,.03,.03),new THREE.MeshBasicMaterial({color:0xb9f9ff,transparent:true,opacity:.52}));
+      link.position.set(1.28+i*.34,-.94+i*.16,0);
+      link.rotation.z=.42;
+      g.add(link);
+    }
+  }
+  const aura=particleCloud(950,2.74,0xe6fbff); aura.scale.y=.58; aura.material.opacity=.14; g.add(aura);
+  return g;
+}
+function buildProtocolMachineWorld(){
+  const g=new THREE.Group();
+  g.userData.worldType='protocolMachine';
+  const input=makePacketBlock(.58,.22,.22,0x69eaff); input.position.set(-2.45,0,0); g.add(input);
+  const output=makePacketBlock(.58,.22,.22,0x5872ff); output.position.set(2.45,0,0); g.add(output);
+  const depths=[1.52,1.28,1.04,.82,.62,.42];
+  for(let i=0;i<6;i++){
+    const layer=makeProtocolLayerDeep(i,2.18-i*.14,depths[i],i%2?0x69eaff:0x5872ff);
+    layer.position.y=(i-2.5)*.34; layer.userData.protocolLayer.baseY=layer.position.y;
+    g.add(layer);
+  }
+  for(let side of [-1,1]){
+    for(let i=0;i<3;i++){
+      const arch=new THREE.Mesh(new THREE.TorusGeometry(.74+i*.18,.012,8,120,Math.PI*.76),new THREE.MeshBasicMaterial({color:side<0?0x69eaff:0x5872ff,transparent:true,opacity:.22}));
+      arch.rotation.set(Math.PI/2, side<0?Math.PI/2:-Math.PI/2, 0);
+      arch.position.set(side*(.24+i*.10), (i-1)*.38, 0);
+      arch.userData.protocolArch={side,index:i};
+      g.add(arch);
+    }
+  }
+  g.add(tube([new THREE.Vector3(-2.10,0,0),new THREE.Vector3(-1.34,.16,0),new THREE.Vector3(-.86,.05,0)],.018,0x69eaff,.28));
+  g.add(tube([new THREE.Vector3(.86,-.05,0),new THREE.Vector3(1.34,-.16,0),new THREE.Vector3(2.10,0,0)],.018,0x5872ff,.28));
+  for(let i=0;i<12;i++){
+    const slab=makePacketBlock(.28,.10,.16,i%3===0?0x9a68ff:(i%2?0xb9f9ff:0x69eaff));
+    slab.userData.protocolSlab={index:i,baseX:(i%2?-.94:.94),baseY:(i-5.5)*.15};
+    g.add(slab);
+  }
+  const gantryL=makeGatewayTower(0x69eaff); gantryL.position.set(-1.18,0,.78); gantryL.scale.setScalar(.58); gantryL.userData.protocolScanner={side:-1}; g.add(gantryL);
+  const gantryR=makeGatewayTower(0x5872ff); gantryR.position.set(1.18,0,-.78); gantryR.scale.setScalar(.58); gantryR.userData.protocolScanner={side:1}; g.add(gantryR);
+  const centerCore=makeDiamondCore(.22,0xe8fdff); centerCore.position.y=.02; centerCore.userData.protocolCore=true; g.add(centerCore);
+  const datum=new THREE.Mesh(new THREE.BoxGeometry(2.62,.045,.08),new THREE.MeshPhysicalMaterial({color:0x0a151d,emissive:0x69eaff,emissiveIntensity:.025,metalness:.68,roughness:.28,transparent:true,opacity:.82}));datum.position.set(0,-1.06,.54);g.add(datum);
+  for(let i=0;i<6;i++){const tick=new THREE.Mesh(new THREE.BoxGeometry(.12,.026,.045),new THREE.MeshBasicMaterial({color:i%2?0xb9f9ff:0x5872ff,transparent:true,opacity:.38}));tick.position.set(-.80+i*.32,-1.03,.60);g.add(tick);}
+  return g;
+}
+function buildMitmGatewayWorld(){
+  const g=new THREE.Group();
+  g.userData.worldType='mitmGateway';
+  const client=makeEndpointNode(0x69eaff); client.position.set(-3.25,0,0); client.scale.setScalar(.82); g.add(client);
+  const server=makeServerRackDeep(1.66,5,0x5872ff); server.position.set(3.10,.04,0); g.add(server);
+  const gateL=makeGatewayTower(0x69eaff); gateL.position.set(-1.72,0,0); g.add(gateL);
+  const gateR=makeGatewayTower(0x5872ff); gateR.position.set(1.72,0,0); g.add(gateR);
+  const core=makeFrameBox(1.36,1.96,1.08,0xb9f9ff,.18); g.add(core);
+  const coreInner=makeFrameBox(.70,1.12,.44,0xffffff,.18); g.add(coreInner);
+  const analysisCore=makeDiamondCore(.22,0xe8fdff); analysisCore.position.set(0,0,0); g.add(analysisCore);
+  for(let y of [-.34,0,.34]){
+    g.add(tube([new THREE.Vector3(-2.72,y,0),new THREE.Vector3(-2.18,y+.10,0),new THREE.Vector3(-1.98,y,0)],.014,0x69eaff,.30));
+    g.add(tube([new THREE.Vector3(-1.42,y,0),new THREE.Vector3(-.72,y*.42,0),new THREE.Vector3(-.40,y*.22,0)],.014,0xb9f9ff,.30));
+    g.add(tube([new THREE.Vector3(.40,y*.22,0),new THREE.Vector3(.72,y*.42,0),new THREE.Vector3(1.42,y,0)],.014,0xb9f9ff,.30));
+    g.add(tube([new THREE.Vector3(1.98,y,0),new THREE.Vector3(2.22,y-.10,0),new THREE.Vector3(2.62,y,0)],.014,0x5872ff,.30));
+  }
+  for(let i=0;i<12;i++){
+    const pulse=makeMicroNode(.05,i<6?0xe8fdff:0xb9f9ff,.95);
+    pulse.userData.gatewayPulse={track:i%3,phase:i/12,segment:Math.floor(i/3)};
+    g.add(pulse);
+  }
+  for(let i=0;i<3;i++){
+    const shell=new THREE.Mesh(new THREE.TorusGeometry(1.02+i*.24,.012,8,140),new THREE.MeshBasicMaterial({color:i%2?0x5872ff:0x69eaff,transparent:true,opacity:.18}));
+    shell.rotation.set(Math.PI/2 + i*.14,i*.42,0); shell.userData.mitmShell={speed:.14+i*.06}; g.add(shell);
+  }
+  return g;
+}
+function buildZeroTrustWorld(){
+  const g=new THREE.Group();
+  g.userData.worldType='zeroTrustCore';
+  const coreShell=makeShieldToken(0x69eaff); coreShell.scale.setScalar(1.10); g.add(coreShell);
+  const innerCore=makeDiamondCore(.26,0xe8fdff); innerCore.userData.trustHeart=true; g.add(innerCore);
+  for(let i=0;i<8;i++){
+    const ang=i/8*Math.PI*2;
+    const plate=makeShieldToken(i%2?0x5872ff:0x69eaff);
+    plate.scale.setScalar(.62);
+    plate.position.set(Math.cos(ang)*1.74,Math.sin(i*.7)*.12,Math.sin(ang)*1.06);
+    plate.rotation.y=-ang+.35;
+    plate.userData.barrierPlate={angle:ang,radius:1.74,baseY:plate.position.y};
+    g.add(plate);
+  }
+  for(let i=0;i<4;i++){
+    const gate=makePolicyGateDeep(i%2?0x69eaff:0x5872ff);
+    gate.position.set(i<2?-1.10:1.10,0,i%2?-.62:.62);
+    gate.userData.policyGate={index:i,baseY:gate.position.y};
+    g.add(gate);
+  }
+  for(let i=0;i<3;i++){
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(1.12+i*.30,.014,8,120),new THREE.MeshBasicMaterial({color:i%2?0x5872ff:0x69eaff,transparent:true,opacity:.18}));
+    ring.rotation.set(Math.PI/2.2+i*.12,i*.54,i*.18); ring.userData.zeroRing={speed:.16+i*.05}; g.add(ring);
+  }
+  const tokenDefs=[
+    {obj:makeEndpointNode(0xb9f9ff), x:-2.28, y:0, z:0, scale:.40},
+    {obj:makeHexWorker(0x69eaff), x:2.28, y:0, z:0, scale:.55},
+    {obj:makeShieldToken(0x5872ff), x:0, y:0, z:-1.96, scale:.62},
+    {obj:makeDiamondCore(.24,0xe8fdff), x:0, y:0, z:1.96, scale:1.0}
+  ];
+  tokenDefs.forEach((d,i)=>{
+    d.obj.scale.setScalar(d.scale);
+    d.obj.position.set(d.x,d.y,d.z);
+    d.obj.userData.trustToken={index:i,baseScale:d.scale};
+    g.add(d.obj);
+    g.add(tube([new THREE.Vector3(0,0,0),new THREE.Vector3(d.x*.46,0,d.z*.46),new THREE.Vector3(d.x*.82,0,d.z*.82)],.009,0x9fefff,.14));
+  });
+  return g;
+}
+function buildRootCoreWorld(){
+  const g=new THREE.Group();
+  g.userData.worldType='rootCore';
+  const substrate=makeChipBase(2.92,.24,1.92,0x69eaff); substrate.position.y=-.90; g.add(substrate);
+  for(let i=0;i<5;i++){
+    const trace=new THREE.Mesh(new THREE.BoxGeometry(2.10,.028,.04),new THREE.MeshBasicMaterial({color:i%2?0xb9f9ff:0x5872ff,transparent:true,opacity:.42}));
+    trace.position.set(0,-.58 + i*.18,.62 - (i%2)*1.24);
+    trace.userData.rootTrace={index:i,axis:'x'};
+    g.add(trace);
+  }
+  const packageShell=makeFrameBox(2.18,1.68,1.24,0x69eaff,.10); g.add(packageShell);
+  const packageInner=makeFrameBox(1.42,1.02,.82,0xb9f9ff,.16); g.add(packageInner);
+  const packageBase=new THREE.Mesh(new THREE.BoxGeometry(2.34,.16,1.42),new THREE.MeshPhysicalMaterial({color:0x050b10,metalness:.78,roughness:.31,clearcoat:.42}));packageBase.position.y=-.78;g.add(packageBase);
+  for(let i=0;i<8;i++){const a=-.82+i*.235;for(let side of [-1,1]){const via=makeMicroNode(.018,i%2?0x69eaff:0xb9f9ff,.54);via.position.set(a,-.68,side*.58);g.add(via);}}
+  const cryptCore=makeDiamondCore(.34,0xe8fdff); cryptCore.userData.rootKernel=true; g.add(cryptCore);
+  const cryptoDie=makeCryptoDie(0xb9f9ff); cryptoDie.position.y=-.22; cryptoDie.userData.cryptoDie=true; g.add(cryptoDie);
+  for(let i=0;i<4;i++){
+    const post=makeRod(1.92,0xcffbff,.16); post.position.set(i<2?-.92:.92,0,i%2?-.42:.42); g.add(post);
+  }
+  for(let i=0;i<4;i++){
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(.70+i*.20,.018,10,140),new THREE.MeshBasicMaterial({color:i%2?0x5872ff:0x69eaff,transparent:true,opacity:.20}));
+    ring.rotation.set(Math.PI/2+i*.12,i*.34,i*.22); ring.userData.rootRing={speed:.12+i*.04}; g.add(ring);
+  }
+  const keyArm=makeRod(1.02,0xe6fbff,.32); keyArm.rotation.z=Math.PI/2; keyArm.position.set(.88,-.18,.10); g.add(keyArm);
+  const keyHead=new THREE.Mesh(new THREE.TorusGeometry(.24,.055,10,80),basicMat(0xe6fbff,.80)); keyHead.position.set(1.34,-.18,.10); keyHead.userData.rootKey=true; g.add(keyHead);
+  const tooth1=new THREE.Mesh(new THREE.BoxGeometry(.22,.10,.10),basicMat(0xe6fbff,.82)); tooth1.position.set(1.70,-.30,.10); g.add(tooth1);
+  const tooth2=new THREE.Mesh(new THREE.BoxGeometry(.15,.08,.08),basicMat(0xe6fbff,.82)); tooth2.position.set(1.54,-.06,.10); g.add(tooth2);
+  for(let i=0;i<4;i++){
+    const node=makeHashBar(i%2?0x69eaff:0xb9f9ff);
+    node.scale.setScalar(.62);
+    node.position.set(-1.02 + i*.68,.68,(i%2?.48:-.48));
+    node.userData.rootSignature={index:i,baseY:node.position.y};
+    g.add(node);
+  }
+  return g;
+}
+function makeRuntimeModule(kind,index,color=0x69eaff){
+  const g=new THREE.Group();
+  if(kind==='capture'){
+    const frame=makeFrameBox(.72,.76,.56,color,.24); g.add(frame);
+    for(let i=0;i<3;i++){const rail=new THREE.Mesh(new THREE.BoxGeometry(.48,.035,.05),new THREE.MeshBasicMaterial({color:i%2?0xffffff:color,transparent:true,opacity:.50}));rail.position.set(0,(i-1)*.16,.30);g.add(rail);} 
+    const aperture=new THREE.Mesh(new THREE.TorusGeometry(.18,.018,8,64),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.48}));aperture.rotation.x=Math.PI/2;aperture.userData.runtimeSpinner={speed:.012};g.add(aperture);
+  }else if(kind==='protocol'){
+    for(let i=0;i<4;i++){const plate=makeLayerPlate(.68-i*.06,.08,.50-i*.07,i%2?color:0x5872ff,0xffffff);plate.position.y=(i-1.5)*.16;plate.userData.runtimeLayer={index:i,baseY:plate.position.y};g.add(plate);} 
+  }else if(kind==='evidence'){
+    const capsule=makeEvidenceCapsule(color); capsule.scale.setScalar(.92); g.add(capsule);
+    const seal=makeShieldToken(0xe8fdff);seal.scale.setScalar(.34);seal.position.z=.24;g.add(seal);
+  }else if(kind==='trust'){
+    const shield=makeShieldToken(color);shield.scale.setScalar(.82);g.add(shield);
+    const heart=makeDiamondCore(.12,0xe8fdff);heart.position.z=.10;g.add(heart);
+  }else if(kind==='root'){
+    const die=makeCryptoDie(color);die.scale.setScalar(.72);g.add(die);
+  }else{
+    const core=makeHexWorker(color);core.scale.setScalar(1.15);g.add(core);
+  }
+  g.userData.runtimeModule={kind,index,baseY:0};
+  return g;
+}
+function makeRuntimePanel(w=.92,h=.42,color=0x69eaff){
+  const g=makeFrameBox(w,h,.08,color,.18);
+  for(let i=0;i<4;i++){
+    const bar=new THREE.Mesh(new THREE.BoxGeometry(w*(.58-i*.06),.018,.018),new THREE.MeshBasicMaterial({color:i%2?0xffffff:color,transparent:true,opacity:.42}));
+    bar.position.set(-w*.05,-h*.24+i*h*.15,.06);g.add(bar);
+  }
+  return g;
+}
+function makeRuntimeBus(radius=1.34,color=0x69eaff){
+  const g=new THREE.Group();
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(radius,.018,10,180),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.28}));ring.rotation.x=Math.PI/2;ring.userData.runtimeBus=true;g.add(ring);
+  for(let i=0;i<8;i++){const a=i/8*Math.PI*2;const n=makeMicroNode(.035,i%2?0xe8fdff:color,.9);n.position.set(Math.cos(a)*radius,0,Math.sin(a)*radius);n.userData.runtimeBusNode={index:i,angle:a,radius};g.add(n);} 
+  return g;
+}
+function buildInstallationMeshWorld(){
+  const g=new THREE.Group();
+  g.userData.worldType='installationMesh';
+
+  // Arenyxa runtime core: layered, active and clearly system-like rather than a single device.
+  const lowerDeck=makeFrameBox(2.10,.16,1.54,0x69eaff,.18); lowerDeck.position.y=-1.02; g.add(lowerDeck);
+  const upperDeck=makeFrameBox(1.62,.14,1.10,0xb9f9ff,.16); upperDeck.position.y=.96; g.add(upperDeck);
+  const coreShell=makeFrameBox(1.22,2.28,.98,0x69eaff,.20); g.add(coreShell);
+  const coreDie=makeCryptoDie(0xb9f9ff); coreDie.scale.setScalar(.78); coreDie.position.y=-.08; coreDie.userData.runtimeCore=true; g.add(coreDie);
+  const heart=makeDiamondCore(.20,0xe8fdff); heart.position.y=.44; heart.userData.runtimeHeart=true; g.add(heart);
+
+  for(let i=0;i<3;i++){
+    const ring=makeRuntimeBus(.82+i*.32,i%2?0x5872ff:0x69eaff);ring.position.y=-.42+i*.42;ring.rotation.z=(i-1)*.10;g.add(ring);
+  }
+
+  const moduleDefs=[
+    ['capture',-2.10,.78,.28,0x69eaff],
+    ['protocol',2.08,.80,-.24,0x5872ff],
+    ['evidence',-2.18,-.72,-.18,0xb9f9ff],
+    ['trust',2.16,-.74,.24,0x69eaff],
+    ['root',0,1.62,-.34,0xe8fdff],
+    ['worker',0,-1.70,.34,0x5872ff]
+  ];
+  moduleDefs.forEach((m,i)=>{
+    const mod=makeRuntimeModule(m[0],i,m[4]);mod.position.set(m[1],m[2],m[3]);mod.userData.runtimeModule.baseY=m[2];g.add(mod);
+    g.add(tube([new THREE.Vector3(0,m[2]*.18,0),new THREE.Vector3(m[1]*.44,m[2]*.46,m[3]*.30),new THREE.Vector3(m[1]*.82,m[2]*.82,m[3]*.82)],.010,m[4],.24));
+  });
+
+  // Runtime activity: scheduler queue + telemetry + state panels.
+  for(let i=0;i<10;i++){
+    const task=makePacketBlock(.18,.07,.08,i%3===0?0xffffff:(i%2?0x69eaff:0x5872ff));
+    task.userData.runtimeTask={index:i,phase:i/10}; g.add(task);
+  }
+  const panelL=makeRuntimePanel(.90,.44,0x69eaff);panelL.position.set(-1.48,1.55,.18);panelL.rotation.y=.26;g.add(panelL);
+  const panelR=makeRuntimePanel(.90,.44,0x5872ff);panelR.position.set(1.48,1.52,-.12);panelR.rotation.y=-.26;g.add(panelR);
+  const panelC=makeRuntimePanel(1.10,.38,0xb9f9ff);panelC.position.set(0,-1.46,.48);g.add(panelC);
+
+  // External world remains visible but subordinate to the system core.
+  const ext=[
+    {obj:makeServerRackDeep(1.10,4,0x69eaff),x:-3.00,y:.18,z:.62,s:.62},
+    {obj:makeEndpointNode(0xb9f9ff),x:3.00,y:.18,z:-.62,s:.58},
+    {obj:makeCloudNode(0x9fefff),x:-2.84,y:-1.18,z:-.62,s:.72},
+    {obj:makeHexWorker(0x5872ff),x:2.88,y:-1.16,z:.62,s:.82}
+  ];
+  ext.forEach((n,i)=>{n.obj.scale.setScalar(n.s);n.obj.position.set(n.x,n.y,n.z);n.obj.userData.installPod={index:i,baseY:n.y,baseX:n.x};g.add(n.obj);g.add(tube([new THREE.Vector3(n.x*.74,n.y*.72,n.z*.74),new THREE.Vector3(n.x*.40,n.y*.38,n.z*.40),new THREE.Vector3(0,0,0)],.009,i%2?0x5872ff:0x69eaff,.18));});
+
+  const halo=particleCloud(720,2.9,0xb9f9ff);halo.scale.y=.62;halo.material.opacity=.10;g.add(halo);
+  return g;
+}
+function buildTrafficBurstWorld(){
+  const g=new THREE.Group();
+  g.userData.worldType='trafficBurst';
+  const core=new THREE.Mesh(new THREE.IcosahedronGeometry(.44,3),basicMat(0xe8fdff,.48)); g.add(core);
+  for(let i=0;i<20;i++){
+    const ang=i/20*Math.PI*2;
+    const r1=.46, r2=2.0 + (i%4)*.18;
+    const pts=[new THREE.Vector3(Math.cos(ang)*r1,(i%5-2)*.08,Math.sin(ang)*r1),new THREE.Vector3(Math.cos(ang)*1.10,(i%5-2)*.12,Math.sin(ang)*1.10),new THREE.Vector3(Math.cos(ang)*r2,(i%5-2)*.18,Math.sin(ang)*r2)];
+    const ray=tube(pts,.010,i%2?0x5872ff:0x69eaff,.22); g.add(ray);
+    const shard=makePacketBlock(.30,.12,.12,i%2?0x69eaff:0x9a68ff);
+    shard.position.copy(pts[2]); shard.rotation.y=-ang; shard.userData.burstShard={index:i,basePos:shard.position.clone(),angle:ang}; g.add(shard);
+  }
+  const haze=particleCloud(1500,3.1,0xdffcff); haze.scale.y=.78; haze.material.opacity=.22; g.add(haze);
+  return g;
+}
+
+function makeFlagshipInstrumentConsole(){const g=new THREE.Group();const body=rmesh(4.05,1.82,1.72,.16,matBlack(0x69eaff,.98));g.add(body);const face=rmesh(3.72,1.54,.09,.11,matPoly(.98));face.position.set(0,.02,.89);g.add(face);const sf=rmesh(2.32,1.08,.10,.085,matSatin(.94));sf.position.set(-.62,.22,.97);g.add(sf);const tex=instrumentDisplayTexture();const display=new THREE.Mesh(new THREE.PlaneGeometry(2.11,.88),new THREE.MeshBasicMaterial({map:tex,toneMapped:false,transparent:true,opacity:.96}));display.position.set(-.62,.22,1.028);g.add(display);const ltex=labelTexture('ARENYXA','AXM / NETWORK MEASUREMENT INSTRUMENT');const label=new THREE.Mesh(new THREE.PlaneGeometry(1.12,.25),new THREE.MeshBasicMaterial({map:ltex,toneMapped:false,transparent:true,opacity:.94}));label.position.set(1.18,.65,.99);g.add(label);for(let i=0;i<3;i++){const knob=new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,.12,32),matSatin(.97));knob.rotation.x=Math.PI/2;knob.position.set(.88+i*.40,.20,.99);g.add(knob);}for(let i=0;i<5;i++){const key=rmesh(.29,.15,.055,.035,i===0?matSignal(0x69eaff,.94):matCeramic(0x69eaff,.96));key.position.set(1.24,-.08-i*.20,1.00);g.add(key);}const ports=portBank(4,.18,1);ports.scale.set(1.10,1.10,1.10);ports.position.set(.88,-.66,.99);g.add(ports);for(let i=0;i<6;i++){const led=makeMicroNode(.016,i===0?0xffffff:0x69eaff,.90);led.position.set(-1.25+i*.12,-.68,1.01);led.userData.serverLed={index:i};g.add(led);}const vent=ventField(14,3,.09,.015);vent.position.set(0,.92,0);vent.rotation.x=-Math.PI/2;g.add(vent);const cable1=tube([new THREE.Vector3(.62,-.67,1.02),new THREE.Vector3(1.55,-.82,1.32),new THREE.Vector3(2.55,-.52,.70),new THREE.Vector3(3.10,-.20,.18)],.025,0x69eaff,.52);g.add(cable1);const cable2=tube([new THREE.Vector3(1.05,-.67,1.02),new THREE.Vector3(1.72,-.92,1.12),new THREE.Vector3(2.62,-.76,.42),new THREE.Vector3(3.25,-.46,-.06)],.021,0x5872ff,.44);g.add(cable2);return g;}
+
+function buildDeveloperWorkbenchWorld(){const g=new THREE.Group();g.userData.worldType='developerWorkbench';const instrument=makeFlagshipInstrumentConsole();instrument.position.set(-.34,.10,.02);instrument.scale.setScalar(1.02);g.add(instrument);const bench=rmesh(4.72,.18,2.20,.08,matBlack(0xb9f9ff,.90));bench.position.set(-.26,-1.20,-.02);g.add(bench);const analyzer=makeDiamondCore(.22,0xb9f9ff);analyzer.position.set(-2.62,-.50,.14);analyzer.userData.devAnalyzer=true;g.add(analyzer);for(let i=0;i<3;i++){const loop=new THREE.Mesh(new THREE.TorusGeometry(.40+i*.14,.010,10,100),new THREE.MeshBasicMaterial({color:i%2?0x5872ff:0x69eaff,transparent:true,opacity:.16}));loop.rotation.set(Math.PI/2.2+i*.16,i*.42,0);loop.position.copy(analyzer.position);loop.userData.devLoop={speed:.12+i*.04};g.add(loop);}const worker=makeHexWorker(0x5872ff);worker.position.set(-2.62,.40,-.30);worker.userData.devModule={index:1,baseY:worker.position.y};g.add(worker);const packet=makePacketBlock(.34,.14,.16,0xb9f9ff);packet.position.set(2.82,.34,-.22);packet.userData.devModule={index:2,baseY:packet.position.y};g.add(packet);const root=makeShieldToken(0xe8fdff);root.position.set(2.88,-.50,-.18);root.scale.setScalar(.72);root.userData.devModule={index:3,baseY:root.position.y};g.add(root);return g;}
+function homeWorlds(){
+  addWorld(buildDigitalEarth(),0);
+  addWorld(buildDataSpineWorld(),1);
+  addWorld(buildSensorFieldWorld(),2);
+}
+function platformWorlds(){
+  addWorld(buildCaptureMatrixWorld(),0);
+  addWorld(buildEvidenceVaultWorld(),1);
+  addWorld(buildProtocolMachineWorld(),2);
+}
+function securityWorlds(){
+  addWorld(buildMitmGatewayWorld(),0);
+  addWorld(buildZeroTrustWorld(),1);
+  addWorld(buildRootCoreWorld(),2);
+}
+function labWorlds(){
+  addWorld(buildInstallationMeshWorld(),0);
+  addWorld(buildTrafficBurstWorld(),1);
+  addWorld(buildDeveloperWorkbenchWorld(),2);
+}
+homeWorlds();
+platformWorlds();
+securityWorlds();
+labWorlds();
+let mx=0,my=0,smx=0,smy=0,prevScroll=scrollY,scrollVel=0;
+addEventListener('pointermove',e=>{if(earthDragActive)return;mx=(e.clientX/innerWidth-.5)*2;my=(e.clientY/innerHeight-.5)*2;},{passive:true});
+function resize(){renderer.setSize(innerWidth,innerHeight,false);composer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();}
+addEventListener('resize',resize,{passive:true});resize();
+
+const clock=new THREE.Clock();
+function render(){
+  const t=clock.getElapsedTime();
+  smx+=(mx-smx)*.035;smy+=(my-smy)*.035;
+  let scenePos=0;
+  if(sections.length>1){
+    const y=scrollY;
+    if(y>=sections[sections.length-1].offsetTop){
+      scenePos=sections.length-1;
+    }else{
+      for(let i=0;i<sections.length-1;i++){
+        const start=sections[i].offsetTop;
+        const end=sections[i+1].offsetTop;
+        if(y>=start && y<end){
+          const local=Math.min(1,Math.max(0,(y-start)/Math.max(1,end-start)));
+          const eased=local*local*(3-2*local);
+          scenePos=i+eased;
+          break;
+        }
+      }
+    }
+  }
+  const currentVel=scrollY-prevScroll;scrollVel+=(currentVel-scrollVel)*.12;prevScroll=scrollY;
+  document.body.classList.toggle('is-fast-scrolling', Math.abs(scrollVel) > 16);
+  after.uniforms['damp'].value=Math.max(.86,Math.min(.945,.938-Math.abs(scrollVel)*.0014));
+
+  if(introRunning){
+    camera.position.x+=(introCamera.x-camera.position.x)*.09;
+    camera.position.y+=(introCamera.y-camera.position.y)*.09;
+    camera.position.z+=(introCamera.z-camera.position.z)*.09;
+    camera.lookAt(0,0,0);
+  }else{
+  // Cinematic camera: each scene gets a slightly different shot profile.
+  const sceneIndex=Math.floor(scenePos);
+  const localProgress=scenePos-sceneIndex;
+  const shotEase=localProgress*localProgress*(3-2*localProgress);
+
+  const shotProfiles=[
+    [ .00, .02, 0.00],  // Core: centered hero
+    [-.55, .18, .08],  // Spine: left drift
+    [ .48,-.14,-.08],  // Sensor: right drift
+    [-.20, .08, .04],  // Capture: tunnel push
+    [ .62, .02,-.10],  // Evidence: lateral reveal
+    [-.46,-.08, .06],  // Protocol: counter move
+    [ .18, .16,-.04],  // MITM: controlled center
+    [-.30,-.18, .08],  // Zero Trust: low angle
+    [ .50, .12,-.06],  // Root: orbital reveal
+    [-.58, .02, .06],  // Installation: side pass
+    [ .18,-.22,-.10],  // Explosion: low/high energy
+    [ .00, .06, .00],  // Developer: settle
+  ];
+
+  const aProfile=shotProfiles[Math.min(sceneIndex,shotProfiles.length-1)] || [0,0,0];
+  const bProfile=shotProfiles[Math.min(sceneIndex+1,shotProfiles.length-1)] || aProfile;
+  const profile=[
+    aProfile[0]+(bProfile[0]-aProfile[0])*shotEase,
+    aProfile[1]+(bProfile[1]-aProfile[1])*shotEase,
+    aProfile[2]+(bProfile[2]-aProfile[2])*shotEase
+  ];
+
+  const isPortraitPhone=innerWidth<=720 && innerHeight>innerWidth;
+  const portraitShotOffsets=[
+    [0,0,0],[0,0,0],[-.22,.34,-.08],[.12,.46,-.16],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[-.12,.18,-.08],[0,0,0],[0,0,0]
+  ];
+  const portraitZoom=[0,0,-.45,-1.15,0,0,0,0,0,-.55,0,0];
+  const aOffset=portraitShotOffsets[Math.min(sceneIndex,portraitShotOffsets.length-1)]||[0,0,0];
+  const bOffset=portraitShotOffsets[Math.min(sceneIndex+1,portraitShotOffsets.length-1)]||aOffset;
+  const portraitOffset=[aOffset[0]+(bOffset[0]-aOffset[0])*shotEase,aOffset[1]+(bOffset[1]-aOffset[1])*shotEase,aOffset[2]+(bOffset[2]-aOffset[2])*shotEase];
+  const aZoom=portraitZoom[Math.min(sceneIndex,portraitZoom.length-1)]||0;
+  const bZoom=portraitZoom[Math.min(sceneIndex+1,portraitZoom.length-1)]||aZoom;
+  const portraitZoomValue=aZoom+(bZoom-aZoom)*shotEase;
+
+  const targetZ=8-scenePos*14 + (isPortraitPhone ? portraitZoomValue : 0);
+  const targetX=profile[0] + (isPortraitPhone ? portraitOffset[0] : 0) + smx*.14;
+  const targetY=profile[1] + (isPortraitPhone ? portraitOffset[1] : 0) - smy*.09;
+
+  const focusActive=!!(
+    earthSelectedNode &&
+    earthWorld &&
+    earthFocusNodeWorld &&
+    earthFocusLookWorld &&
+    earthFocusCenterWorld &&
+    scenePos<.92 &&
+    sections[0]?.classList.contains('scene-active')
+  );
+  earthFocusAmount += ((focusActive ? 1 : 0) - earthFocusAmount) * (focusActive ? .072 : .055);
+
+  let cameraTargetX=targetX;
+  let cameraTargetY=targetY;
+  let cameraTargetZ=targetZ;
+  const lookAhead=7.2 + Math.abs(scrollVel)*.008;
+  let lookAtX=profile[2] + (isPortraitPhone ? portraitOffset[2] : 0);
+  let lookAtY=-.10 + (isPortraitPhone ? .16 : 0);
+  let lookAtZ=targetZ-lookAhead;
+
+  if(earthFocusAmount>.001 && earthSelectedNode && earthWorld){
+    earthSelectedNode.getWorldPosition(earthFocusNodeWorld);
+    earthWorld.getWorldPosition(earthFocusCenterWorld);
+    earthFocusLookWorld.copy(earthFocusCenterWorld).lerp(earthFocusNodeWorld,.82);
+
+    cameraTargetX += earthFocusCenterWorld.x * .18 * earthFocusAmount;
+    cameraTargetY += (earthFocusLookWorld.y - earthFocusCenterWorld.y) * .10 * earthFocusAmount;
+    cameraTargetZ += -1.58 * earthFocusAmount;
+
+    lookAtX += (earthFocusLookWorld.x - lookAtX) * earthFocusAmount;
+    lookAtY += (earthFocusLookWorld.y - lookAtY) * earthFocusAmount;
+    lookAtZ += (earthFocusLookWorld.z - lookAtZ) * earthFocusAmount;
+  }
+
+  camera.position.x+=(cameraTargetX-camera.position.x)*.038;
+  camera.position.y+=(cameraTargetY-camera.position.y)*.038;
+  camera.position.z+=(cameraTargetZ-camera.position.z)*.046;
+  camera.lookAt(lookAtX,lookAtY,lookAtZ);
+  }
+
+  worlds.forEach((w,i)=>{
+    const d=Math.abs(scenePos-i);
+    // Active worlds move; distant worlds mostly rest.
+    const activeWeight=Math.max(0,1-Math.min(1,d));
+    const idleWeight=.18 + activeWeight*.82;
+    w.rotation.y += reducedMotion ? 0 : (.00012 + .00046*idleWeight);
+    w.rotation.x=Math.sin(t*.16+i)*.026*idleWeight;
+
+    if(w.userData.worldType==='networkEarth'){
+      updateEarthWorld(t,scenePos);
+
+      if(introRunning){
+        w.position.x=introEarth.x;
+        w.position.y=introEarth.y;
+        w.scale.setScalar(introEarth.scale);
+        w.rotation.set(0,0,0);
+        return;
+      }
+
+      const earthMorph=smoothstep01((scenePos-.08)/.86);
+      const activeWeightEarth=Math.max(0,1-Math.min(1,d));
+      const baseX=(w.userData.baseX??3.05)*(1-earthMorph);
+      const baseY=(w.userData.baseY??.08)*(1-earthMorph);
+      w.position.x=baseX+Math.sin(t*.12)*.018*activeWeightEarth;
+      w.position.y=baseY+Math.cos(t*.10)*.012*activeWeightEarth;
+      w.scale.setScalar((w.userData.baseScale||1.02)*(1-earthMorph*.14));
+      w.rotation.set(0,0,0);
+      return;
+    }
+
+    const activeWeight2=Math.max(0,1-Math.min(1,d));
+
+    if(w.userData.worldType==='dataSpine'){
+      w.children.forEach(o=>{
+        if(o.userData.spineRing){
+          const meta=o.userData.spineRing;
+          o.rotation.z += (.006 + meta.index*.0016) * activeWeight2;
+          o.position.y = meta.baseY + Math.sin(t*1.25 + meta.index)*.05;
+        }
+        if(o.userData.spineWing){
+          const meta=o.userData.spineWing;
+          o.position.x = meta.baseX + Math.sin(t*1.35 + meta.index*.7)*.05*meta.side;
+        }
+        if(o.userData.spinePulse){
+          const pulse=1 + Math.sin(t*2.8 + o.userData.spinePulse.index)*.16;
+          o.scale.setScalar(pulse);
+          o.rotation.z = Math.sin(t*1.2 + o.userData.spinePulse.index)*.12;
+        }
+        if(o.userData.spineLayer){
+          const pulse=1 + Math.sin(t*1.9 + o.userData.spineLayer.index)*.025;
+          o.scale.x += (pulse-o.scale.x)*.08;
+        }
+        if(o.userData.serverLed){
+          o.material.opacity = .42 + Math.sin(t*3.2 + o.userData.serverLed.index)*.36;
+        }
+        if(o.userData.endpointPulse){
+          const s=1 + Math.sin(t*2.5)*.18;
+          o.scale.setScalar(s);
+        }
+      });
+    }
+
+    if(w.userData.worldType==='sensorField'){
+      w.children.forEach(o=>{
+        if(o.userData.sensorPod){
+          const meta=o.userData.sensorPod;
+          o.position.y = meta.baseY + Math.sin(t*1.6 + meta.index)*.08;
+          o.position.x = meta.baseX + Math.sin(t*.7 + meta.index)*.03;
+          o.rotation.z = Math.sin(t*1.1 + meta.index)*.04;
+        }
+        if(o.userData.scanArc){
+          const meta=o.userData.scanArc;
+          if(meta.axis==='x') o.rotation.x += meta.speed*.004*activeWeight2;
+          else if(meta.axis==='z') o.rotation.z += meta.speed*.004*activeWeight2;
+          else o.rotation.y += meta.speed*.005*activeWeight2;
+        }
+        if(o.userData.sensorConsole){
+          o.position.y = .12 + Math.sin(t*1.5)*.03;
+        }
+        if(o.userData.healthDot){
+          const meta=o.userData.healthDot;
+          o.position.y = meta.baseY + Math.sin(t*1.8 + meta.index)*.05;
+          o.scale.setScalar(1 + Math.sin(t*2.6 + meta.index)*.18);
+        }
+        if(o.userData.serverLed){
+          o.material.opacity = .44 + Math.sin(t*2.8 + o.userData.serverLed.index)*.34;
+        }
+        if(o.userData.rackFan){ o.rotation.z += .018*activeWeight2; }
+        if(o.userData.endpointPulse || o.userData.workerCore){
+          const s=1 + Math.sin(t*2.3 + (o.userData.workerCore?1.3:0))* .16;
+          o.scale.setScalar(s);
+        }
+      });
+    }
+
+    if(w.userData.worldType==='captureTunnel'){
+      const liveBoost=.85 + Math.min(1.15,Math.abs(scrollVel)*.014);
+      const captureLocal=Math.max(0,Math.min(1,scenePos-(w.userData.worldIndex||3)));
+      const reveal=smoothstep01(Math.max(0,(captureLocal-.18)/.56));
+      w.traverse(o=>{
+        if(o.userData.captureServerShell){const base=o.userData.captureServerShell.baseY||0;o.position.y=base+reveal*.34;o.rotation.z=reveal*.045;}
+        if(o.userData.capturePacket){
+          const meta=o.userData.capturePacket;
+          const prog=(t*meta.speed*liveBoost + meta.phase)%1;
+          if(meta.kind==='forward'){
+            o.position.set(-3.00 + prog*7.48,.68 + (meta.lane-1)*.038,.06+Math.sin(prog*Math.PI*6+meta.lane)*.045);
+            o.rotation.y=prog*Math.PI*2;
+          }else if(meta.kind==='return'){
+            o.position.set(4.48 - prog*7.48,.42 + (meta.lane-1)*.038,.10+Math.sin(prog*Math.PI*6+meta.lane)*.045);
+            o.rotation.y=-prog*Math.PI*2;
+          }else if(meta.kind==='mirror'){
+            const side=meta.lane?1:-1;
+            const curve=Math.sin(prog*Math.PI);
+            o.position.set(-.18 + side*.12*curve,.30-prog*.92,.10+prog*.44);
+            o.rotation.x=prog*Math.PI*1.5;
+            o.rotation.z=side*prog*.8;
+            o.scale.setScalar(.98 + Math.sin(prog*Math.PI)*.28);
+          }else if(meta.kind==='peripheral'){
+            const starts=[[-2.94,1.42,-.88],[-.84,1.34,.92],[1.42,1.28,-.86],[3.24,1.34,.90]];
+            const ends=[[-2.18,.74,.10],[-1.08,.74,.08],[2.18,.78,.04],[3.72,.74,.00]];
+            const lane=meta.lane%4, a=starts[lane], b=ends[lane];
+            const curve=Math.sin(prog*Math.PI)*.16;
+            o.position.set(a[0]+(b[0]-a[0])*prog,a[1]+(b[1]-a[1])*prog+curve,a[2]+(b[2]-a[2])*prog);
+            o.scale.setScalar(.92+Math.sin((prog+t)*8)*.14);
+          }
+        }
+        if(o.userData.switchPort){ o.material.opacity=.40 + (.30+.28*Math.sin(t*4.2+o.userData.switchPort.index))*activeWeight2; }
+        if(o.userData.tapRing){ o.rotation.z += o.userData.tapRing.speed*activeWeight2; }
+        if(o.userData.tapCore){ const s=1+Math.sin(t*2.8)*.10; o.scale.setScalar(s); o.rotation.y+=.010*activeWeight2; }
+        if(o.userData.tapPort){ o.scale.setScalar(1 + Math.sin(t*3.4 + o.userData.tapPort.index)*.10); }
+        if(o.userData.capturePort){ o.scale.setScalar(1 + Math.sin(t*3.0 + o.userData.capturePort.index)*.08); }
+        if(o.userData.serverFlowLane){ o.material.opacity=.18 + (.12+.12*Math.sin(t*3.2+o.userData.serverFlowLane.index))*activeWeight2; }
+        if(o.userData.captureCoreHeart){ const s=1+Math.sin(t*3.0)*.12; o.scale.setScalar(s); o.rotation.y+=.011*activeWeight2; }
+        if(o.userData.captureBlade){ const m=o.userData.captureBlade; o.position.y=m.baseY+Math.sin(t*2.0+m.index)*.028; }
+        if(o.userData.captureScanRing){ o.rotation.y += o.userData.captureScanRing.speed*activeWeight2; o.rotation.z += o.userData.captureScanRing.speed*.5*activeWeight2; }
+        if(o.userData.captureCollectorRing){ o.rotation.y += o.userData.captureCollectorRing.speed*activeWeight2; o.rotation.z += o.userData.captureCollectorRing.speed*.7*activeWeight2; }
+        if(o.userData.capturePeripheral){ const m=o.userData.capturePeripheral; o.position.y=m.baseY+Math.sin(t*1.15+m.index)*.045; }
+        if(o.userData.captureGraphNode){ const m=o.userData.captureGraphNode; o.position.y=m.baseY+Math.sin(t*1.8+m.index)*.035; o.scale.setScalar(1+Math.sin(t*2.4+m.index)*.18); }
+        if(o.userData.captureConsole){ const baseY=(typeof o.userData.captureConsole==='object' && o.userData.captureConsole.baseY!==undefined)?o.userData.captureConsole.baseY:.18; o.position.y = baseY + Math.sin(t*1.2)*.03; }
+        if(o.userData.serverLed){ o.material.opacity=.44+Math.sin(t*3.1+o.userData.serverLed.index)*.34; }
+        if(o.userData.rackFan){ o.rotation.z += .018*activeWeight2; }
+        if(o.userData.endpointPulse){ o.scale.setScalar(1+Math.sin(t*2.6)*.15); }
+      });
+    }
+
+    if(w.userData.worldType==='evidenceVault'){
+      w.children.forEach(o=>{
+        if(o.userData.evidenceCard){
+          const meta=o.userData.evidenceCard;
+          const ang=meta.angle + Math.sin(t*.55 + meta.index)*.06;
+          o.position.x = Math.cos(ang)*meta.radius;
+          o.position.z = Math.sin(ang)*1.00;
+          o.position.y = meta.baseY + Math.sin(t*1.1 + meta.index)*.08;
+          o.rotation.y = -ang*.58;
+        }
+        if(o.userData.hashNode){
+          const meta=o.userData.hashNode;
+          const ang=meta.angle + Math.sin(t*.55 + meta.index)*.06;
+          o.position.x = Math.cos(ang)*1.52;
+          o.position.z = Math.sin(ang)*.72;
+          o.position.y = meta.baseY + Math.sin(t*1.4 + meta.index)*.05;
+          o.rotation.y += .008*activeWeight2;
+        }
+        if(o.userData.chainBlock){
+          const meta=o.userData.chainBlock;
+          o.position.y = meta.baseY + Math.sin(t*1.6 + meta.index)*.03;
+          o.position.x = meta.baseX + Math.sin(t*.9 + meta.index)*.02;
+          o.scale.setScalar(1 + Math.sin(t*2.0 + meta.index)*.06);
+        }
+        if(o.userData.sealRing){
+          o.rotation.z += (.003 + o.userData.sealRing.index*.0015)*activeWeight2;
+        }
+        if(o.userData.vaultCrystal){
+          const s=1 + Math.sin(t*2.2)*.08;
+          o.scale.setScalar(s);
+          o.rotation.y += .01*activeWeight2;
+        }
+        if(o.userData.vaultSeal){
+          o.rotation.y += .006*activeWeight2;
+        }
+      });
+    }
+
+    if(w.userData.worldType==='protocolMachine'){
+      w.children.forEach(o=>{
+        if(o.userData.protocolLayer){
+          const meta=o.userData.protocolLayer;
+          o.position.y = meta.baseY + Math.sin(t*1.4 + meta.index*.8)*.045;
+          o.position.x = Math.sin(t*.9 + meta.index)*.05;
+          o.rotation.y = Math.sin(t*.6 + meta.index)*.08;
+          o.scale.z = 1 + Math.sin(t*1.2 + meta.index)*.03;
+        }
+        if(o.userData.protocolSlab){
+          const meta=o.userData.protocolSlab;
+          const phase=(t*.52 + meta.index*.11)%1;
+          const pass=phase<.5 ? phase/.5 : (1-phase)/.5;
+          o.position.x = meta.baseX*(1-pass);
+          o.position.y = meta.baseY;
+          o.position.z = Math.sin(meta.index*.7 + t)*.18;
+          o.rotation.y = (meta.baseX<0 ? 1 : -1) * (1-pass)*.45;
+        }
+        if(o.userData.protocolArch){
+          o.rotation.z += (.0025 + o.userData.protocolArch.index*.0008) * (o.userData.protocolArch.side<0?-1:1) * activeWeight2;
+        }
+        if(o.userData.protocolScanner){
+          o.position.y = Math.sin(t*1.1 + (o.userData.protocolScanner.side<0?0:1))* .08;
+        }
+        if(o.userData.protocolCore){
+          const s=1 + Math.sin(t*2.0)*.09;
+          o.scale.setScalar(s);
+          o.rotation.y += .011*activeWeight2;
+        }
+        if(o.userData.gatewayRing){
+          o.rotation.z += .01*activeWeight2;
+        }
+      });
+    }
+
+    if(w.userData.worldType==='mitmGateway'){
+      w.children.forEach(o=>{
+        if(o.userData.gatewayPulse){
+          const meta=o.userData.gatewayPulse;
+          const yy=[-.34,0,.34][meta.track];
+          const prog=(t*.34 + meta.phase)%1;
+          const ranges=[[-2.72,-1.98],[-1.42,-.40],[.40,1.42],[1.98,2.62]];
+          const seg=ranges[Math.min(meta.segment, ranges.length-1)];
+          o.position.set(seg[0] + (seg[1]-seg[0])*prog, yy*(1-prog*.18), 0);
+        }
+        if(o.userData.mitmShell){
+          o.rotation.y += o.userData.mitmShell.speed*.004*activeWeight2;
+          o.rotation.x += o.userData.mitmShell.speed*.002*activeWeight2;
+        }
+        if(o.userData.gatewayRing){
+          o.rotation.z += .012*activeWeight2;
+        }
+        if(o.userData.serverLed){
+          o.material.opacity = .46 + Math.sin(t*3.0 + o.userData.serverLed.index)*.32;
+        }
+        if(o.userData.endpointPulse){
+          o.scale.setScalar(1 + Math.sin(t*2.6)*.15);
+        }
+      });
+    }
+
+    if(w.userData.worldType==='zeroTrustCore'){
+      w.children.forEach(o=>{
+        if(o.userData.barrierPlate){
+          const meta=o.userData.barrierPlate;
+          const ang=meta.angle + t*.18;
+          o.position.x=Math.cos(ang)*meta.radius;
+          o.position.z=Math.sin(ang)*1.06;
+          o.position.y=meta.baseY + Math.sin(t*1.4 + meta.angle)*.08;
+          o.rotation.y=-ang+.35;
+        }
+        if(o.userData.zeroRing){
+          o.rotation.y += o.userData.zeroRing.speed*.004*activeWeight2;
+          o.rotation.z += o.userData.zeroRing.speed*.0025*activeWeight2;
+        }
+        if(o.userData.policyGate){
+          o.position.y = o.userData.policyGate.baseY + Math.sin(t*1.5 + o.userData.policyGate.index)*.05;
+          o.scale.y = 1 + Math.sin(t*2.2 + o.userData.policyGate.index)*.08;
+        }
+        if(o.userData.trustToken){
+          const s=1 + Math.sin(t*1.8 + o.userData.trustToken.index)*.06;
+          const base=o.userData.trustToken.baseScale || 1;
+          o.scale.setScalar(base * s);
+        }
+        if(o.userData.trustHeart){
+          const s=1 + Math.sin(t*2.4)*.12;
+          o.scale.setScalar(s);
+          o.rotation.y += .01*activeWeight2;
+        }
+        if(o.userData.endpointPulse || o.userData.workerCore){
+          const s=1 + Math.sin(t*2.4 + (o.userData.workerCore?1.2:0))* .14;
+          o.scale.setScalar(s);
+        }
+      });
+    }
+
+    if(w.userData.worldType==='rootCore'){
+      w.children.forEach(o=>{
+        if(o.userData.rootRing){
+          o.rotation.y += o.userData.rootRing.speed*.004*activeWeight2;
+          o.rotation.x += o.userData.rootRing.speed*.0025*activeWeight2;
+        }
+        if(o.userData.rootKernel){
+          const s=1 + Math.sin(t*2.1)*.08;
+          o.scale.setScalar(s);
+          o.rotation.y += .010*activeWeight2;
+          o.rotation.x += .004*activeWeight2;
+        }
+        if(o.userData.rootTrace){
+          o.material.opacity = .22 + Math.sin(t*2.4 + o.userData.rootTrace.index)*.18;
+          if(o.userData.rootTrace.axis==='x') o.scale.x = 1 + Math.sin(t*1.2 + o.userData.rootTrace.index)*.06;
+        }
+        if(o.userData.rootSignature){
+          const meta=o.userData.rootSignature;
+          o.position.y = meta.baseY + Math.sin(t*1.8 + meta.index)*.05;
+          o.rotation.y += .007*activeWeight2;
+        }
+        if(o.userData.rootKey){
+          o.rotation.z += .009*activeWeight2;
+        }
+      });
+    }
+
+    if(w.userData.worldType==='installationMesh'){
+      w.traverse(o=>{
+        if(o.userData.installPod){
+          const meta=o.userData.installPod;
+          o.position.y = meta.baseY + Math.sin(t*1.3 + meta.index)*.055;
+          o.position.x = meta.baseX + Math.sin(t*.8 + meta.index)*.035;
+        }
+        if(o.userData.serverLed){
+          o.material.opacity=.46 + Math.sin(t*3.0 + o.userData.serverLed.index)*.32;
+        }
+        if(o.userData.rackFan){ o.rotation.z += .018*activeWeight2; }
+        if(o.userData.endpointPulse || o.userData.workerCore){
+          const s=1 + Math.sin(t*2.4 + (o.userData.workerCore?1.1:0))*.10;
+          o.scale.setScalar(s);
+        }
+        if(o.userData.runtimeBus){ o.rotation.z += .0035*activeWeight2; }
+        if(o.userData.runtimeBusNode){
+          const m=o.userData.runtimeBusNode;
+          const a=m.angle+t*(.30+.02*(m.index%3));
+          o.position.x=Math.cos(a)*m.radius;
+          o.position.z=Math.sin(a)*m.radius;
+          o.scale.setScalar(.88+Math.sin(t*2.2+m.index)*.18);
+        }
+        if(o.userData.runtimeModule){
+          const m=o.userData.runtimeModule;
+          o.position.y=m.baseY+Math.sin(t*1.15+m.index)*.045;
+          o.rotation.y=Math.sin(t*.55+m.index)*.035;
+        }
+        if(o.userData.runtimeLayer){
+          const m=o.userData.runtimeLayer;
+          o.position.y=m.baseY+Math.sin(t*1.5+m.index)*.022;
+        }
+        if(o.userData.runtimeSpinner){ o.rotation.z += o.userData.runtimeSpinner.speed*activeWeight2; }
+        if(o.userData.runtimeCore){
+          o.rotation.y=Math.sin(t*.52)*.07;
+          o.position.y=-.08+Math.sin(t*1.5)*.025;
+        }
+        if(o.userData.runtimeHeart){
+          const s=.96+Math.sin(t*2.6)*.11;
+          o.scale.setScalar(s);
+          o.rotation.y+=.009*activeWeight2;
+        }
+      });
+      w.children.forEach(o=>{
+        if(o.userData.runtimeTask){
+          const m=o.userData.runtimeTask;
+          const phase=(t*.20+m.phase)%1;
+          const a=phase*Math.PI*2;
+          const r=1.10+.24*Math.sin(phase*Math.PI);
+          o.position.set(Math.cos(a)*r,-.12+Math.sin(a*2)*.42,Math.sin(a)*.62);
+          o.rotation.y=-a;
+          o.scale.setScalar(.82+Math.sin(t*3+m.index)*.12);
+        }
+      });
+    }
+
+    if(w.userData.worldType==='trafficBurst'){
+      w.children.forEach(o=>{
+        if(o.userData.burstShard){
+          const meta=o.userData.burstShard;
+          const pulse=1 + Math.sin(t*2.6 + meta.index)*.10;
+          o.position.copy(meta.basePos).multiplyScalar(pulse);
+          o.rotation.y = -meta.angle + t*.22;
+        }
+      });
+    }
+
+    if(w.userData.worldType==='developerWorkbench'){
+      w.children.forEach(o=>{
+        if(o.userData.devScreen){
+          const meta=o.userData.devScreen;
+          o.position.y = meta.baseY + Math.sin(t*1.2 + meta.index)*.07;
+        }
+        if(o.userData.devAnalyzer){
+          const s=1 + Math.sin(t*2.2)*.10;
+          o.scale.setScalar(s);
+          o.rotation.x += .006*activeWeight2;
+          o.rotation.y += .010*activeWeight2;
+          o.rotation.z += .004*activeWeight2;
+        }
+        if(o.userData.devModule){
+          const meta=o.userData.devModule;
+          o.position.y = meta.baseY + Math.sin(t*1.8 + meta.index)*.04;
+        }
+        if(o.userData.devLoop){
+          o.rotation.y += o.userData.devLoop.speed*.004*activeWeight2;
+          o.rotation.x += o.userData.devLoop.speed*.002*activeWeight2;
+        }
+        if(o.userData.devProbe){
+          o.rotation.y += (.006 + o.userData.devProbe.index*.0012)*activeWeight2;
+          o.position.y = -.18 + Math.sin(t*1.2 + o.userData.devProbe.index)*.05;
+        }
+        if(o.userData.devKeyboard){
+          o.position.z = .56 + Math.sin(t*1.4)*.02;
+        }
+        if(o.userData.endpointPulse || o.userData.workerCore){
+          const s=1 + Math.sin(t*2.4 + (o.userData.workerCore?1.3:0))* .14;
+          o.scale.setScalar(s);
+        }
+      });
+    }
+
+    const portraitWorld = innerWidth<=720 && innerHeight>innerWidth;
+    const baseFloatX=Math.sin(t*.13+i)*.035*activeWeight2;
+    const baseFloatY=Math.cos(t*.11+i)*.018*activeWeight2;
+    let extraY=0, extraScale=1;
+    if(portraitWorld && w.userData.worldType==='dataSpine'){ extraY=.26; extraScale=1.12; }
+    if(portraitWorld && w.userData.worldType==='sensorField'){ extraY=.34; extraScale=1.18; }
+    if(portraitWorld && w.userData.worldType==='captureTunnel'){ extraY=.46; extraScale=1.28; }
+    if(portraitWorld && w.userData.worldType==='installationMesh'){ extraY=.22; extraScale=1.10; }
+    w.position.x=baseFloatX;
+    w.position.y=baseFloatY + extraY;
+    w.scale.setScalar((.985 + activeWeight2*.045) * extraScale);
+    w.traverse(o=>{
+      if(o.userData.scan)o.position.x=Math.sin(t*.95)*2.3;
+      if(o.material && 'opacity' in o.material && !o.userData.baseOpacity){o.userData.baseOpacity=o.material.opacity;}
+      if(o.material && o.userData.baseOpacity!==undefined){const visibility=Math.max(.05,1-d*.65);o.material.opacity=o.userData.baseOpacity*visibility;}
+    });
+  });
+  scene.children[0] && (scene.children[0].rotation.y=t*.002);
+  bloom.strength += ((.70 + Math.min(.22,Math.abs(scrollVel)*.006)) - bloom.strength) * .04;
+  composer.render();
+  requestAnimationFrame(render);
+}
+render();
+
+if(document.readyState==='complete') runIntro();
+else window.addEventListener('load',runIntro,{once:true});
+
+</script>
+</body>
+</html>

@@ -8,6 +8,12 @@ The public runtime compatibility version remains `8.1`, the established plugin-f
 
 Final local engineering acceptance is evidence-driven. Native Windows/Npcap/ETW/WFP/DPAPI/TPM-CNG/SCM, live PostgreSQL multi-node and TShark differential certification remain environment-dependent and must be reported as `NOT EXECUTED` when those prerequisites are unavailable.
 
+## Websites
+
+- Flagship experience: [https://arenyxa.pages.dev/](https://arenyxa.pages.dev/)
+- Official introduction: [https://arenyxa.github.io/](https://arenyxa.github.io/)
+- Deployable website sources: [`websites/`](websites/)
+
 ## V8.0 platform hardening carried forward
 
 
