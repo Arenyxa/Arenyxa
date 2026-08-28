@@ -307,6 +307,7 @@ def run_gate(
         for index in range(jobs)
     ]
     latencies_ms: list[float] = []
+    phase_latencies_ms: dict[str, list[float]] = {"lease_next": [], "start_job": [], "complete": []}
     errors: list[dict[str, Any]] = []
     completed = 0
     state_lock = threading.Lock()
@@ -333,8 +334,9 @@ def run_gate(
             try:
                 lease = queue.lease_next(worker_id, lease_seconds=60)
                 lease_finished = queue._clock.snapshot()
+                lease_finished_perf = time.perf_counter()
                 timing.update({
-                    "lease_next_finished_perf": time.perf_counter(),
+                    "lease_next_finished_perf": lease_finished_perf,
                     "lease_next_finished_wall": lease_finished.wall_epoch,
                     "lease_next_finished_stable": lease_finished.stable_epoch,
                 })
@@ -358,15 +360,20 @@ def run_gate(
                     time.sleep(0.002)
                     continue
                 empty_rounds = 0
+                phase_latencies_ms["lease_next"].append((lease_finished_perf - operation_start) * 1000.0)
                 phase = "start_job"
                 start_snapshot = queue._clock.snapshot()
                 timing.update({
                     "start_job_started_wall": start_snapshot.wall_epoch,
                     "start_job_started_stable": start_snapshot.stable_epoch,
                 })
+                start_started_perf = time.perf_counter()
                 queue.start_job(lease.job_id, worker_id, lease.lease_token)
+                phase_latencies_ms["start_job"].append((time.perf_counter() - start_started_perf) * 1000.0)
                 phase = "complete"
+                complete_started_perf = time.perf_counter()
                 queue.complete(lease.job_id, worker_id, lease.lease_token, {"status": "ok"})
+                phase_latencies_ms["complete"].append((time.perf_counter() - complete_started_perf) * 1000.0)
             except _GATE_OPERATION_ERRORS as exc:
                 with state_lock:
                     errors.append(
@@ -388,6 +395,16 @@ def run_gate(
         states = [coordinator.job(job_id) for job_id in job_ids]
         non_completed = sum(1 for row in states if row is None or row.get("state") != "completed")
         p99 = _percentile(latencies_ms, 0.99)
+        phase_summary = {
+            name: {
+                "mean": round(statistics.fmean(values), 3) if values else 0.0,
+                "p50": round(_percentile(values, 0.50), 3),
+                "p95": round(_percentile(values, 0.95), 3),
+                "p99": round(_percentile(values, 0.99), 3),
+                "max": round(max(values), 3) if values else 0.0,
+            }
+            for name, values in phase_latencies_ms.items()
+        }
         fencing = _postgres_fencing_probe(coordinator, clients, worker_ids, run_id)
         health = coordinator.health()
         invariants = dict(health.get("state_invariants") or {})
@@ -422,6 +439,7 @@ def run_gate(
                 "p99": round(p99, 3),
                 "max": round(max(latencies_ms), 3) if latencies_ms else 0.0,
                 "budget_p99": float(p99_budget_ms),
+                "phases": phase_summary,
             },
             "fencing_probe": fencing,
             "state_invariants": {key: int(invariants.get(key, 0)) for key in invariant_keys},

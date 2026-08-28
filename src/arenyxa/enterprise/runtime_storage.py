@@ -558,13 +558,8 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                     "row_factory": dict_row,
                     "connect_timeout": 10,
                 },
-                # The release gate drives eight threads through each client,
-                # but the database is faster with bounded backpressure than
-                # with one PostgreSQL backend per caller.  Four warm
-                # connections per pool keep the aggregate writer set bounded
-                # while preserving the gate's 128 caller concurrency.
-                min_size=4,
-                max_size=4,
+                min_size=1,
+                max_size=64,
                 timeout=15.0,
                 max_idle=300.0,
                 max_lifetime=1800.0,
