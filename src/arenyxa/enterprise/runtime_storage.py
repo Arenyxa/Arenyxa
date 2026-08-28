@@ -564,8 +564,11 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                     "row_factory": dict_row,
                     "connect_timeout": 10,
                 },
-                min_size=1,
-                max_size=64,
+                # Warm the bounded client pool before high-concurrency work;
+                # lazy connection expansion during the release gate inflates
+                # tail latency even when every database operation succeeds.
+                min_size=4,
+                max_size=8,
                 timeout=15.0,
                 max_idle=300.0,
                 max_lifetime=1800.0,
