@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-08-29T09:49:19+00:00",
+  "generated_at": "2026-08-29T10:22:56+00:00",
   "product": "Arenyxa",
   "runtime": "modern",
   "files": {
@@ -257,7 +257,7 @@
     "src/arenyxa/infrastructure/capture/proxy.py": "3de632744249809a8284533c547310fd62abcbd78e33ed6c7596be9d0bdd97d2",
     "src/arenyxa/infrastructure/capture/proxy_export.py": "e6c65ccff62fa29b77d081d7e9170db99d4337f4b32fead4c29be25ba721ac6a",
     "src/arenyxa/infrastructure/capture/proxy_models.py": "60be129c8bb4b05b27179f77b3c9459c43fe5d00bc54d1c57be1a6ddd641c99e",
-    "src/arenyxa/infrastructure/capture/proxy_persistence.py": "72df9cead4d38e329ae140fb9a41e2c14728ffb107fe40ede963ec1be71b283c",
+    "src/arenyxa/infrastructure/capture/proxy_persistence.py": "7557fc2c5e080fa17f988c1ef2361c764097d716ba8d6fc325ddeedb3cfc86ca",
     "src/arenyxa/infrastructure/capture/proxy_resilience.py": "8257a0cda776b77071651244b6bad4ee5e67e710e3850a8d45dc469e03e57691",
     "src/arenyxa/infrastructure/capture/proxy_rules.py": "cefaaeacb59954ea76ade2f60402d322e12faedba40a44f24409f5e71d46cb13",
     "src/arenyxa/infrastructure/capture/proxy_store.py": "a01e28d3e8f4230e155e84272221ee2731b57e6ac187e6f57d4ed4b2cabe39e9",
@@ -482,6 +482,6 @@
     "src/arenyxa/startup_diagnostics.py": "db8b53a2fb9c7de81f388f08740bc9cde1c82af6ab9d12f2248f35c8133199e3",
     "src/arenyxa/windows_service_entry.py": "b7dc0922448c3ccfad61d7f3bb485ba4f88b5c6b5a26db6e2eece0aa066d9526"
   },
-  "seed_sha256": "f5ee6c9131a77e554e50b6483cbef4b42871a296578c8afdfb62fd9af3dd6a96",
-  "seed_size": 2688941
+  "seed_sha256": "ddac1e6fe235b1f32ba70417c8f3dc223cd8baae7d52ddcfcc0ba6e5d5ca8961",
+  "seed_size": 2688932
 }

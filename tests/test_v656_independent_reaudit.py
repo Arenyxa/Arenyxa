@@ -332,14 +332,15 @@ def test_v656_runtime_and_packaging_versions_are_consistent() -> None:
     root = Path(__file__).resolve().parents[1]
     project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
     current = str(project["project"]["version"])
-    assert current == arenyxa.__package_version__ == "8.1.0"
+    assert current == arenyxa.__distribution_version__ == "8.1.1"
+    assert arenyxa.__package_version__ == "8.1.0"
     assert arenyxa.__version__ == "8.1"
     assert arenyxa.__compat_version__ == "6.8.0"
     version_info = (root / "packaging" / "version_info.txt").read_text(encoding="utf-8")
     installer = (root / "packaging" / "installer.iss").read_text(encoding="utf-8")
-    assert "filevers=(8,1,0,0)" in version_info
-    assert "ProductVersion', '8.1'" in version_info
-    assert '#define MyAppVersion "8.1"' in installer
+    assert "filevers=(8,1,1,0)" in version_info
+    assert "ProductVersion', '8.1.1'" in version_info
+    assert '#define MyAppVersion "8.1.1"' in installer
 
                                                                                              
                                                                       

@@ -35,7 +35,7 @@ def test_shell_owns_splash_authentication_and_main_pages(qapp) -> None:
     shell.close()
 
 
-def test_root_failure_stays_in_window_and_offers_normal_session(qapp) -> None:
+def test_root_failure_stays_in_window_and_remains_fail_closed(qapp) -> None:
     shell = ArenyxaShellWindow()
     shell.show_authentication(
         device_identity="device-fixture",
@@ -44,7 +44,8 @@ def test_root_failure_stays_in_window_and_offers_normal_session(qapp) -> None:
     )
     shell.authentication_page.set_failed("signature mismatch")
     assert shell.stack.currentWidget() is shell.authentication_page
-    assert shell.authentication_page.continue_button.isVisibleTo(shell.authentication_page)
+    assert not shell.authentication_page.continue_button.isVisibleTo(shell.authentication_page)
+    assert not shell.authentication_page.continue_button.isEnabled()
     assert "Root authentication failed" in shell.authentication_page.verification_state.text()
     shell.close()
 
@@ -53,4 +54,3 @@ def test_root_session_is_not_persisted_in_application_settings() -> None:
     names = {field.name for field in dataclasses.fields(AppSettings)}
     assert "root_session" not in names
     assert "active_root_session" not in names
-

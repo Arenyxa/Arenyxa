@@ -145,6 +145,7 @@ def test_coordinator_tls_context_can_hot_rotate_and_new_connections_verify(tmp_p
 def test_tpm_probe_never_claims_protection_without_real_seal_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     adapter = TPMKeyProtectionAdapter()
     monkeypatch.setattr(TPMKeyProtectionAdapter, "hardware_present", classmethod(lambda cls: True))
+    monkeypatch.setattr(TPMKeyProtectionAdapter, "_native_available", lambda self: False)
     status = adapter.capability_status()
     assert status["hardware_present"] is True
     assert status["sealing_provider_configured"] is False

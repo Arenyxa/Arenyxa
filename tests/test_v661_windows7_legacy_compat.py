@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_release_surface_is_v66_final() -> None:
     assert arenyxa.__version__ == "8.1"
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert 'version = "8.1.0"' in pyproject
+    assert 'version = "8.1.1"' in pyproject
     assert 'requires-python = ">=3.11,<3.14"' in pyproject
     assert "Python 3.8" in (ROOT / "scripts" / "bootstrap-win7.ps1").read_text(encoding="utf-8")
     assert (ROOT / "requirements-win7.txt").is_file()

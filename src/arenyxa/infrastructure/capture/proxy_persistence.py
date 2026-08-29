@@ -12,8 +12,7 @@ import logging
 import queue
 import threading
 import time
-from collections.abc import Callable
-from typing import Any, cast
+from typing import Any, Callable, Tuple, cast
 
 from arenyxa.infrastructure.capture.proxy_models import ProxyFlow
 
@@ -106,7 +105,7 @@ class ProxyPersistencePipeline:
             try:
                 if item is self._STOP:
                     break
-                session_id, flow = cast(tuple[str, ProxyFlow], item)
+                session_id, flow = cast(Tuple[str, ProxyFlow], item)
                 self._persist(str(session_id), flow)
             finally:
                 self._queue.task_done()

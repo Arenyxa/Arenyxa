@@ -161,11 +161,11 @@ def test_v660_release_surfaces_are_consistent() -> None:
     import arenyxa
     root = Path(__file__).resolve().parents[1]
     assert arenyxa.__version__ == "8.1"
-    assert 'version = "8.1.0"' in (root / "pyproject.toml").read_text(encoding="utf-8")
+    assert 'version = "8.1.1"' in (root / "pyproject.toml").read_text(encoding="utf-8")
     version_info = (root / "packaging/version_info.txt").read_text(encoding="utf-8")
-    assert "filevers=(8,1,0,0)" in version_info
-    assert "ProductVersion', '8.1'" in version_info
-    assert '#define MyAppVersion "8.1"' in (root / "packaging/installer.iss").read_text(encoding="utf-8")
+    assert "filevers=(8,1,1,0)" in version_info
+    assert "ProductVersion', '8.1.1'" in version_info
+    assert '#define MyAppVersion "8.1.1"' in (root / "packaging/installer.iss").read_text(encoding="utf-8")
 
 
 def test_repeated_bootstrap_shutdown_quiesces_owned_threads(tmp_path: Path) -> None:

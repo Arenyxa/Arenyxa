@@ -53,9 +53,9 @@ def _application(root: Path, settings: AppSettings | None = None):
 
 class V80ExperienceTests(unittest.TestCase):
     def test_engineering_build_identity(self) -> None:
-        self.assertEqual(__engineering_build__, "v8.1")
-        self.assertEqual(__display_version__, "8.1")
-        self.assertEqual(__distribution_version__, "8.1.0")
+        self.assertEqual(__engineering_build__, "v8.1.1")
+        self.assertEqual(__display_version__, "8.1.1")
+        self.assertEqual(__distribution_version__, "8.1.1")
 
     def test_five_modes_and_primary_navigation_limit(self) -> None:
         self.assertEqual(

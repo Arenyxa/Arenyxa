@@ -9,7 +9,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 import arenyxa.provenance as provenance_module
-from arenyxa import __version__
+from arenyxa import __display_version__ as __version__
 from arenyxa.provenance import ProvenanceState, verify_release_attestation
 
 
