@@ -1,10 +1,10 @@
-# Arenyxa V8.1
+# Arenyxa V8.1.1
 
-Release: **Arenyxa V8.1** (`8.1.0`). It preserves the v8.0 runtime, database, Security Kernel, Supervisor, Enterprise, Developer, Root, Server/Worker, Recovery, and existing feature surfaces while introducing a unified identity-driven Experience Context.
+Release: **Arenyxa V8.1.1** (`8.1.1`). It preserves the v8.0 runtime, database, Security Kernel, Supervisor, Enterprise, Developer, Root, Server/Worker, Recovery, and existing feature surfaces while introducing a unified identity-driven Experience Context.
 
-Arenyxa v8.1 is the stable source release of the Windows-first, Desktop-first, CLI-complete, Server-capable and Worker-capable Arenyxa network and security platform. It consolidates the Phase 1-7 platform upgrade while preserving the established Capture, Protocol Intelligence, Proxy/MITM, Security Kernel, TPM/Root, Zero Trust, Enterprise, Server/Worker, Recovery, Terminal, packaging and regression contracts.
+Arenyxa v8.1.1 is the stable source release of the Windows-first, Desktop-first, CLI-complete, Server-capable and Worker-capable Arenyxa network and security platform. It consolidates the Phase 1-7 platform upgrade while preserving the established Capture, Protocol Intelligence, Proxy/MITM, Security Kernel, TPM/Root, Zero Trust, Enterprise, Server/Worker, Recovery, Terminal, packaging and regression contracts.
 
-The public runtime compatibility version remains `8.1`, the established plugin-facing package compatibility identity remains `8.1.0`, the PEP 440 distribution version is `8.1.0`, and Windows file metadata remains `8.1.0.0`. Plugin/runtime compatibility intentionally remains `6.8.0`; the V8.1 stable release preserves established plugin and distributed compatibility semantics. Windows 7 remains a feature-frozen legacy lane.
+The public runtime compatibility version remains `8.1`, the established plugin-facing package compatibility identity remains `8.1.0`, the PEP 440 distribution version is `8.1.1`, and Windows file metadata is `8.1.1.0`. Plugin/runtime compatibility intentionally remains `6.8.0`; the V8.1.1 stable release preserves established plugin and distributed compatibility semantics. Windows 7 remains a feature-frozen legacy lane.
 
 Final local engineering acceptance is evidence-driven. Native Windows/Npcap/ETW/WFP/DPAPI/TPM-CNG/SCM, live PostgreSQL multi-node and TShark differential certification remain environment-dependent and must be reported as `NOT EXECUTED` when those prerequisites are unavailable.
 

@@ -14,7 +14,7 @@ import threading
 from pathlib import Path
 from typing import Any, Callable
 
-from arenyxa import __version__
+from arenyxa import __display_version__ as __version__
 from arenyxa.branding import (
     APP_NAME,
     PROJECT_EXTENSION,

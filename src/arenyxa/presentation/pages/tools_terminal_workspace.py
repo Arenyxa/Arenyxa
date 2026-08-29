@@ -35,7 +35,7 @@ from arenyxa.qt_compat.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from arenyxa import __display_version__, __version__
+from arenyxa import __display_version__, __display_version__ as __version__
 from arenyxa.application.advanced import (
     ApiMapper,
     CompatibilityAnalyzer,
@@ -851,4 +851,3 @@ class ConsoleCommandMixin:
             self.output.appendPlainText("已有开发者验证任务正在运行，请等待完成后再启动新的测试。")
             return False
         return True
-

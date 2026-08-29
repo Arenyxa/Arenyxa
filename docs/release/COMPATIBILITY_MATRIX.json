@@ -1,6 +1,6 @@
 {
   "schema": "arenyxa.compatibility-matrix/v1",
-  "product_release_version": "8.1.0",
+  "product_release_version": "8.1.1",
   "runtime_compatibility_identity": "6.8.0",
   "channels": [
     "stable",

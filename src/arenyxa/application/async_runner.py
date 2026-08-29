@@ -1,7 +1,7 @@
 from __future__ import annotations
 from arenyxa.recoverable import record_current_exception
 
-"""Modern asyncio request engine for Arenyxa v8.1.
+"""Modern asyncio request engine for Arenyxa v8.1.1.
 
 Run lifecycle/persistence remains compatible with :class:`RunOrchestrator`, while high-I/O
 HTTP work is multiplexed on an event loop instead of allocating one request worker thread

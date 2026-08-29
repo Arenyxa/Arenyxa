@@ -26,7 +26,7 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
 from cryptography.fernet import Fernet, InvalidToken
 from lxml import etree, html
-from arenyxa import __version__
+from arenyxa import __display_version__ as __version__
 from arenyxa.application.advanced import SmartExecutionPlanner
 from arenyxa.application.autopilot import AutopilotEngine, ExperienceStore
 from arenyxa.application.reliability import ResourceLeasePool
@@ -713,4 +713,3 @@ class BrowserRecorderService:
         if action.kind == "download": return [f"const downloadPromise = page.waitForEvent('download');", f"await page.locator({q(action.selector)}).click();", "const download = await downloadPromise;"]
         if action.kind == "assert_text": return [f"if (!(await page.locator({q(action.selector)}).innerText()).includes({q(action.value)})) throw new Error('assert_text failed');"]
         return [f"// unsupported: {action.kind}"]
-

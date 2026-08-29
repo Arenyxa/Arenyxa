@@ -33,7 +33,7 @@ from arenyxa.qt_compat.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from arenyxa import __display_version__, __version__
+from arenyxa import __display_version__, __display_version__ as __version__
 from arenyxa.compat import strict_zip
 from arenyxa.config import AppSettings
 from arenyxa.application.developer_safety import (
@@ -537,4 +537,3 @@ class AboutPage(WorkspacePage):
             return f"{binding_name()} {binding_version()}"
         except (ImportError, AttributeError):
             return "unknown"
-

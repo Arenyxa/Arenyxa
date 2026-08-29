@@ -57,7 +57,7 @@ def main() -> int:
     production_evidence_complete = bool(production and production.get("production_evidence_complete") is True)
     payload = {
         "schema": "arenyxa.final-enterprise-audit/v2",
-        "version": "8.1",
+        "version": "8.1.1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "local_release_candidate_ready": local_ready,
         "production_evidence_complete": production_evidence_complete,

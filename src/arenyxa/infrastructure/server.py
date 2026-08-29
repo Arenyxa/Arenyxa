@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from arenyxa import __display_version__, __version__
+from arenyxa import __display_version__, __display_version__ as __version__
 from arenyxa.application.async_runner import AsyncRunOrchestrator
 from arenyxa.application.control_plane import PlatformControlPlane
 from arenyxa.application.job_system import JobSystem

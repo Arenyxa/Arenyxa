@@ -20,7 +20,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--private-key", type=Path)
     parser.add_argument("--channel", choices=("official", "community"), default="community")
-    parser.add_argument("--version", default="8.1")
+    parser.add_argument("--version", default="8.1.1")
     parser.add_argument("--build-id", default="")
     parser.add_argument("--compiled-keys", type=Path, default=Path("src/arenyxa/release_keys.py"))
     args = parser.parse_args()

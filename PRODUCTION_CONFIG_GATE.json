@@ -6,7 +6,7 @@
     {
       "name": "release_version",
       "ok": true,
-      "detail": "version=8.0.0"
+      "detail": "version=8.1.1"
     },
     {
       "name": "docker_non_root",

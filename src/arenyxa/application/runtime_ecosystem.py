@@ -8,7 +8,7 @@ from arenyxa.compat import dataclass
 from pathlib import Path
 from typing import Any
 
-from arenyxa import __version__
+from arenyxa import __display_version__ as __version__
 from arenyxa.domain.errors import ArenyxaError
 from arenyxa.domain.models import FetchResponse, NetworkEvent, utc_now
 from arenyxa.infrastructure.atomic_io import atomic_write_bytes, atomic_write_json, read_text_limited

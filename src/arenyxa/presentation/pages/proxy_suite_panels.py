@@ -63,7 +63,7 @@ class ProxySuitePanelsMixin:
         target.addWidget(send)
         layout.addLayout(target)
         self.professional_request = QPlainTextEdit(
-            "GET / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: Arenyxa-Replay/8.1\r\nConnection: close\r\n\r\n"
+            "GET / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: Arenyxa-Replay/8.1.1\r\nConnection: close\r\n\r\n"
         )
         self.professional_request.setLineWrapMode(getattr(QPlainTextEdit, "NoWrap", 0))
         layout.addWidget(self.professional_request, 1)

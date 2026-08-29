@@ -11,7 +11,7 @@ import shlex
 from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from typing import Any, Iterable
-from arenyxa import __version__
+from arenyxa import __display_version__ as __version__
 from arenyxa.application.developer_safety import authorization_from_settings
 from arenyxa.application.scheduler import ScheduleRule
 from arenyxa.compat import UTC
@@ -56,7 +56,6 @@ class CommandProfessionalMixin(CommandPacketMixin, CommandAutomationMixin, Comma
         if artifact is None:
             raise CommandRuntimeError("PIVOT_SOURCE_NOT_FOUND", f"Captured HTTP {action} not found: {source_id}", exit_code=4)
         return artifact.snapshot()
-
 
 
 

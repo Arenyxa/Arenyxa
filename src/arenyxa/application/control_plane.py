@@ -14,7 +14,7 @@ from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
 
-from arenyxa import __package_version__, __version__
+from arenyxa import __distribution_version__ as __package_version__, __display_version__ as __version__
 from arenyxa.application.job_system import JobExecutionContext, JobSystem
 from arenyxa.application.resilience_drills import ResilienceDrillService
 from arenyxa.domain.models import utc_now

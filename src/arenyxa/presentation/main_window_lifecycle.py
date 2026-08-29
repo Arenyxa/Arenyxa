@@ -33,7 +33,7 @@ from arenyxa.qt_compat.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from arenyxa import __version__
+from arenyxa import __display_version__ as __version__
 from arenyxa.branding import preferred_window_icon_path
 from arenyxa.bootstrap import ApplicationContext
 from arenyxa.application.experience import apply_experience_profile

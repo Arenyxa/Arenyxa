@@ -35,7 +35,7 @@ from arenyxa.qt_compat.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from arenyxa import __version__
+from arenyxa import __display_version__ as __version__
 from arenyxa.application.advanced import (
     ApiMapper,
     CompatibilityAnalyzer,
@@ -355,4 +355,3 @@ class ConsoleExternalProcessMixin:
             self.stop_button.setEnabled(False)
         else:
             self.output.appendPlainText("当前没有正在运行的外部进程。")
-

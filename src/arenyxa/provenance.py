@@ -12,7 +12,7 @@ from arenyxa.compat import StrEnum
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from arenyxa import __version__
+from arenyxa import __display_version__ as __version__
 from arenyxa.branding import APP_NAME
 from arenyxa.release_keys import OFFICIAL_RELEASE_KEYS
 from arenyxa.infrastructure.atomic_io import read_bytes_limited, read_text_limited

@@ -199,7 +199,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         and _contains("src/arenyxa/application/resilience_drills.py", "run_phase6")
     )
     security_checked = _contains("scripts/phase0_gate.py", "security") or _contains("src/arenyxa/security/kernel.py", "SecurityKernel")
-    packaging_checked = _contains("packaging/installer.iss", "Arenyxa_V8.1_Setup_x64") and _contains("packaging/arenyxa.spec", "Arenyxa")
+    packaging_checked = _contains("packaging/installer.iss", "Arenyxa_V8.1.1_Setup_x64") and _contains("packaging/arenyxa.spec", "Arenyxa")
 
     windows_status = _external_status(evidence, "windows_native")
     postgres_status = _external_status(evidence, "postgresql_32_worker")
@@ -225,13 +225,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         "PERFORMANCE_BASELINE_CHECKED": performance_checked,
         "SECURITY_BASELINE_CHECKED": security_checked,
         "SURVIVABILITY_DRILLS_EXECUTED": survivability_checked,
-        "VERSION_UPDATED_TO_V8_1": _contains("src/arenyxa/__init__.py", '__version__ = "8.1"', '__engineering_build__ = "v8.1"', '__package_version__ = "8.1.0"')
-        and _contains("pyproject.toml", 'version = "8.1.0"'),
+        "VERSION_UPDATED_TO_V8_1": _contains("src/arenyxa/__init__.py", '__version__ = "8.1"', '__engineering_build__ = "v8.1.1"', '__display_version__ = "8.1.1"', '__distribution_version__ = "8.1.1"')
+        and _contains("pyproject.toml", 'version = "8.1.1"'),
     }
     local_passed = all(gates.values())
     report: dict[str, object] = {
         "schema": "arenyxa.v8-acceptance-gate/v2",
-        "version": "8.1",
+        "version": "8.1.1",
         "local_engineering_passed": local_passed,
         "production_certification_complete": bool(local_passed and external_complete),
         "status": "PASS" if local_passed and external_complete else ("PARTIAL" if local_passed else "FAIL"),

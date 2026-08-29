@@ -26,7 +26,7 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
 from cryptography.fernet import Fernet, InvalidToken
 from lxml import etree, html
-from arenyxa import __version__
+from arenyxa import __display_version__ as __version__
 from arenyxa.application.advanced import SmartExecutionPlanner
 from arenyxa.application.autopilot import AutopilotEngine, ExperienceStore
 from arenyxa.application.reliability import ResourceLeasePool
@@ -256,4 +256,3 @@ class WorkflowTemplateLibrary:
     @staticmethod
     def _template(name: str, stages: Sequence[str]) -> dict[str, Any]:
         return {"name": name, "stages": list(stages), "variables": {"project.base_url": "https://example.com"}, "description": "Arenyxa built-in starter template"}
-

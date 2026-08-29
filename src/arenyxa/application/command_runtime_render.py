@@ -8,7 +8,7 @@ from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
-from arenyxa import __version__
+from arenyxa import __display_version__ as __version__
 from arenyxa.application.developer_safety import authorization_from_settings
 from arenyxa.application.scheduler import ScheduleRule
 from arenyxa.compat import UTC
@@ -387,4 +387,3 @@ class CommandRenderMixin:
         if not args or args[0].startswith("--"):
             raise CommandRuntimeError("USAGE", f"Usage: {usage}")
         return args.pop(0)
-

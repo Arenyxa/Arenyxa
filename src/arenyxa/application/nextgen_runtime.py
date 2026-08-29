@@ -27,7 +27,7 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
 from cryptography.fernet import Fernet, InvalidToken
 from lxml import etree, html
-from arenyxa import __version__
+from arenyxa import __display_version__ as __version__
 from arenyxa.application.advanced import SmartExecutionPlanner
 from arenyxa.application.autopilot import AutopilotEngine, ExperienceStore
 from arenyxa.application.reliability import ResourceLeasePool
@@ -638,4 +638,3 @@ class DistributedWorkerService:
         for index, value in enumerate(values):
             result[wheel[index % len(wheel)]].append(value)
         return result
-

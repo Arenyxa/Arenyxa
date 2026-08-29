@@ -196,7 +196,7 @@ def _automated_checks(*, service_lifecycle: bool) -> tuple[list[str], dict[str, 
     if (deep.get("named_pipe") or {}).get("state") == "available":
         passed.append("named_pipe_capability")
     try:
-        event = runtime.write_event("Arenyxa v8.1 native qualification", level="INFORMATION")
+        event = runtime.write_event("Arenyxa v8.1.1 native qualification", level="INFORMATION")
         diagnostics["event_log"] = event
         if event.get("written") is True:
             passed.append("event_log_round_trip")
@@ -220,7 +220,7 @@ def _automated_checks(*, service_lifecycle: bool) -> tuple[list[str], dict[str, 
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Record real Windows-native Arenyxa v8.1 qualification evidence")
+    parser = argparse.ArgumentParser(description="Record real Windows-native Arenyxa v8.1.1 qualification evidence")
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--check", action="append", default=[], help="mark an operator-observed visual check as passed")
     parser.add_argument("--skip-automated", action="store_true", help="record operator evidence only")

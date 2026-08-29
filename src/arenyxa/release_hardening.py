@@ -10,7 +10,7 @@ from dataclasses import field
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-from arenyxa import __compat_version__, __package_version__
+from arenyxa import __compat_version__, __distribution_version__
 from arenyxa.compat import StrEnum, dataclass
 from arenyxa.domain.errors import ArenyxaError
 from arenyxa.domain.models import utc_now
@@ -653,7 +653,7 @@ def compatibility_matrix() -> dict[str, Any]:
     policies = default_migration_registry()._policies
     return {
         "schema": "arenyxa.compatibility-matrix/v1",
-        "product_release_version": __package_version__,
+        "product_release_version": __distribution_version__,
         "runtime_compatibility_identity": __compat_version__,
         "channels": [channel.value for channel in ReleaseChannel],
         "enterprise_protocol": {

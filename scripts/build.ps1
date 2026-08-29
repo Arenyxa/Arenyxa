@@ -39,11 +39,11 @@ try {
     $Attestation = Join-Path $ProjectRoot 'dist\Arenyxa\repair\release_attestation.json'
     
     # Improvement: read the version dynamically from __init__.py
-    $VersionRaw = Get-Content (Join-Path $ProjectRoot 'src\arenyxa\__init__.py') | Where-Object { $_ -match '__version__\s*=\s*"(.*)"' }
+    $VersionRaw = Get-Content (Join-Path $ProjectRoot 'src\arenyxa\__init__.py') | Where-Object { $_ -match '__distribution_version__\s*=\s*"(.*)"' }
     if ($VersionRaw -match '"(.*)"') {
         $ProjectVersion = $Matches[1]
     } else {
-        $ProjectVersion = '8.1'
+    $ProjectVersion = '8.1.1'
     }
 
     if ($ReleaseChannel -eq 'official' -and -not $SigningKey) {

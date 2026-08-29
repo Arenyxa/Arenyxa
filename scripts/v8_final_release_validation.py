@@ -166,8 +166,8 @@ def main(argv: list[str] | None = None) -> int:
     external_complete = all(item.get("status") == "PASS" for item in external)
     payload = {
         "schema": "arenyxa.v8-test-evidence/v2",
-        "version": "8.1",
-        "package_version": "8.1.0",
+        "version": "8.1.1",
+        "package_version": "8.1.1",
         "started_at": started,
         "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "full": True,

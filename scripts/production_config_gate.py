@@ -31,7 +31,7 @@ def main() -> int:
         with (ROOT / "pyproject.toml").open("rb") as stream:
             project = tomllib.load(stream)
         version = str(project.get("project", {}).get("version", ""))
-        _record(checks, "release_version", version == "8.1.0", f"version={version}")
+        _record(checks, "release_version", version == "8.1.1", f"version={version}")
 
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8") if (ROOT / "Dockerfile").is_file() else ""
     docker_nonroot = any(

@@ -12,7 +12,7 @@ from arenyxa.compat import UTC
 from typing import Any
 from urllib.parse import urlparse
 
-from arenyxa import __version__
+from arenyxa import __display_version__ as __version__
 
 _HTTP_TOKEN = re.compile(r"^[!#$%&\'*+.^_`|~0-9A-Za-z-]+$")
 

@@ -26,7 +26,7 @@ from arenyxa.qt_compat.QtWidgets import (
     QWidget,
 )
 
-from arenyxa import __version__
+from arenyxa import __display_version__ as __version__
 from arenyxa.application.nextgen import (
     BrowserAction, DistributedWorker, RequestAssertion,
     SelectorFingerprint, WorkflowDebugger,

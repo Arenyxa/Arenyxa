@@ -67,7 +67,7 @@ def _check_root_binding_contract() -> None:
 def main() -> int:
     _check_welcome_state_persistence()
     _check_root_binding_contract()
-    print("Arenyxa v8.1 Root Persistence Contract: PASS")
+    print("Arenyxa v8.1.1 Root Persistence Contract: PASS")
     return 0
 
 

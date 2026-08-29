@@ -335,7 +335,7 @@ class ProxyPage(ProxySuitePanelsMixin, WorkspacePage):
         target.addWidget(self.repeater_send)
         layout.addLayout(target)
         splitter = QSplitter(Qt.Orientation.Vertical)
-        self.repeater_request = QPlainTextEdit("GET / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: Arenyxa-Repeater/8.1\r\nConnection: close\r\n\r\n")
+        self.repeater_request = QPlainTextEdit("GET / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: Arenyxa-Repeater/8.1.1\r\nConnection: close\r\n\r\n")
         self.repeater_response = QPlainTextEdit()
         self.repeater_response.setReadOnly(True)
         self.repeater_request.setLineWrapMode(getattr(QPlainTextEdit, "NoWrap", 0))

@@ -13,7 +13,7 @@ from arenyxa.compat import dataclass
 from pathlib import Path
 from typing import Any
 
-from arenyxa import __version__
+from arenyxa import __display_version__ as __version__
 from arenyxa.branding import LEGACY_PROJECT_FORMATS, PROJECT_FORMAT
 from arenyxa.domain.errors import ArenyxaError
 from arenyxa.domain.models import utc_now

@@ -18,9 +18,9 @@ def main() -> int:
 
     try:
         import arenyxa
-        checks["package_import"] = {"ok": True, "version": arenyxa.__version__}
-        if arenyxa.__version__ != "8.1":
-            failures.append("runtime version is not 8.1")
+        checks["package_import"] = {"ok": True, "version": arenyxa.__display_version__}
+        if arenyxa.__display_version__ != "8.1.1":
+            failures.append("display version is not 8.1.1")
     except (ImportError, AttributeError) as exc:
         checks["package_import"] = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
         failures.append("package import failed")

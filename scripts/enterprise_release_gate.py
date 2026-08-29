@@ -1,4 +1,4 @@
-"""Aggregate release-critical Arenyxa v8.1 gates without placeholder success states."""
+"""Aggregate release-critical Arenyxa v8.1.1 gates without placeholder success states."""
 from __future__ import annotations
 
 import json
@@ -61,7 +61,7 @@ def main() -> int:
     release_ready = len(results) == len(GATES) and all(bool(item["ok"]) for item in results)
     payload = {
         "schema": "arenyxa.enterprise-release-gate/v2",
-        "version": "8.1",
+        "version": "8.1.1",
         "release_ready": release_ready,
         "checks_completed": len(results),
         "checks_expected": len(GATES),

@@ -71,7 +71,7 @@ class SitemapSpider:
             host = urlsplit(current).hostname or ""
             crawler.guard.check_target(host, resolve_dns=True)
             response = transport.fetch(
-                RequestSpec(current, retry=RetryPolicy(attempts=2), user_agent="Arenyxa-SitemapSpider/8.1"),
+                RequestSpec(current, retry=RetryPolicy(attempts=2), user_agent="Arenyxa-SitemapSpider/8.1.1"),
                 token=cancellation,
             )
             if response.status >= 400:
@@ -130,7 +130,7 @@ class _FeedSpider:
             raise ValueError("Feed URL must be valid HTTP/HTTPS")
         crawler.guard.check_target(urlsplit(value).hostname or "", resolve_dns=True)
         return CrawlerTransport(crawler.fetcher).fetch(
-            RequestSpec(value, retry=RetryPolicy(attempts=2), user_agent="Arenyxa-FeedSpider/8.1"),
+                RequestSpec(value, retry=RetryPolicy(attempts=2), user_agent="Arenyxa-FeedSpider/8.1.1"),
             token=token or CancellationToken(),
         )
 

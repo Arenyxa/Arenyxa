@@ -140,7 +140,7 @@ def export_proxy_har(
     payload = {
         "log": {
             "version": "1.2",
-            "creator": {"name": "Arenyxa Proxy", "version": "8.1"},
+            "creator": {"name": "Arenyxa Proxy", "version": "8.1.1"},
             "entries": entries,
         }
     }

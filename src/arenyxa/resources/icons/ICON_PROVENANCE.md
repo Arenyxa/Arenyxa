@@ -7,4 +7,4 @@
 - The wordmark is intentionally excluded from the icon so the mark remains readable in the Windows title bar, taskbar, Explorer, installer, About page, and startup surfaces.
 - The runtime PNG and Windows ICO are generated from the same canonical artwork so Desktop, taskbar, tray, About, PyInstaller, and Inno Setup use one identity.
 - The 1024 px PNG is RGBA; the outer canvas is transparent where the generated artwork is outside the rounded application badge.
-- Product release identity is Arenyxa v8.1. Plugin/runtime compatibility remains `6.8.0` and is not changed by this visual refresh.
+- Product release identity is Arenyxa v8.1.1. Plugin/runtime compatibility remains `6.8.0` and is not changed by this visual refresh.

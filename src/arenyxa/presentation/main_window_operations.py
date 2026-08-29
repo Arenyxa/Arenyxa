@@ -34,7 +34,7 @@ from arenyxa.qt_compat.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from arenyxa import __version__
+from arenyxa import __display_version__ as __version__
 from arenyxa.branding import preferred_window_icon_path
 from arenyxa.bootstrap import ApplicationContext
 from arenyxa.application.experience import apply_experience_profile
@@ -494,4 +494,3 @@ class MainWindowOperationsMixin:
         target = QUrl.fromLocalFile(str(self.context.paths.root.resolve()))
         if not QDesktopServices.openUrl(target):
             QMessageBox.warning(self, "无法打开文件夹", str(self.context.paths.root))
-
