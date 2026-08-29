@@ -428,7 +428,7 @@ class WindowsConPtySession:
             return
         try:
             on_exit(result)
-        except Exception:
+        except (OSError, RuntimeError, TypeError, ValueError):
             LOGGER.exception("ConPTY exit callback failed")
 
     def _cleanup_handles(self, generation: int | None = None) -> None:

@@ -513,13 +513,21 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
             ) from exc
         return psycopg, dict_row, ConnectionPool
 
+    def _pool_close_error_types(self) -> tuple[type[BaseException], ...]:
+        errors: list[type[BaseException]] = [OSError, RuntimeError, TypeError, ValueError]
+        try:
+            driver_error = self._driver()[0].Error
+        except (AttributeError, ImportError):
+            return tuple(errors)
+        if isinstance(driver_error, type) and issubclass(driver_error, BaseException):
+            errors.append(driver_error)
+        return tuple(errors)
     @staticmethod
     def _configure_pool_connection(connection: Any) -> None:
         """Configure PostgreSQL session limits once per physical pooled connection."""
         connection.execute("SET lock_timeout = '10s'")
         connection.execute("SET statement_timeout = '60s'")
         connection.execute("SET idle_in_transaction_session_timeout = '60s'")
-
     @staticmethod
     def _check_pool_connection(connection: Any) -> None:
         """Validate a checked-in/out PostgreSQL connection without relying on pool internals."""
@@ -527,7 +535,6 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
         fetchone = getattr(cursor, "fetchone", None)
         if callable(fetchone):
             fetchone()
-
     def _on_reconnect_failed(self, pool: Any) -> None:
         with self._pool_metrics_lock:
             self._pool_reconnect_failures += 1
@@ -560,7 +567,6 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
             "backend": "postgresql",
             **stats,
         }
-
     def _ensure_open_locked(self) -> None:
         if self._lifecycle_state != self._OPEN:
             raise _storage_fail(
@@ -568,7 +574,6 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                 "PostgreSQL runtime storage is closing or closed",
                 lifecycle_state=self._lifecycle_state,
             )
-
     def _connection_pool_locked(self) -> Any:
         self._ensure_open_locked()
         existing = self._pool
@@ -612,7 +617,7 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
             if not opened:
                 try:
                     pool.close()
-                except Exception:
+                except self._pool_close_error_types():
                     LOGGER.warning("PostgreSQL pool cleanup failed after open failure", exc_info=True)
         self._pool = pool
         return pool
@@ -677,7 +682,7 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
         try:
             if pool is not None:
                 pool.close()
-        except Exception as exc:
+        except self._pool_close_error_types() as exc:
             with self._pool_metrics_lock:
                 self._last_pool_error = f"{type(exc).__name__}: {exc}"[:512]
             with self._pool_condition:

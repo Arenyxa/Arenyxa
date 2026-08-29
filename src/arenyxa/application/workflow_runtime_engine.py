@@ -145,7 +145,7 @@ class WorkflowRuntimeEngineMixin:
             def checkpoint_is_durable() -> bool:
                 try:
                     durable = self.store.get_workflow_execution(execution_id)
-                except Exception:
+                except (ArenyxaError, OSError, RuntimeError, TypeError, ValueError, sqlite3.Error):
                     return False
                 stored = durable.get("checkpoint") if durable is not None else None
                 return isinstance(stored, Mapping) and hmac.compare_digest(
@@ -174,7 +174,7 @@ class WorkflowRuntimeEngineMixin:
                         continue
                     checkpoint_write_failed = True
                     raise
-                except Exception:
+                except (ArenyxaError, OSError, RuntimeError, TypeError, ValueError, sqlite3.Error):
                     if checkpoint_is_durable():
                         break
                     checkpoint_write_failed = True

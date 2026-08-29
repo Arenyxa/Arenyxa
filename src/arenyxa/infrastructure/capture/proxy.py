@@ -60,7 +60,6 @@ from arenyxa.infrastructure.capture.proxy_resilience import ProxyResilienceMixin
 
 
 LOGGER = logging.getLogger(__name__)
-
 class InterceptingProxy(ProxyResilienceMixin):
     """Run the bounded local interception proxy, persistence, DLP, and TLS inspection pipeline."""
     def __init__(self, root: Path, settings: ProxySettings | None = None) -> None:
@@ -100,7 +99,6 @@ class InterceptingProxy(ProxyResilienceMixin):
         self._match_replace_rules: list[ProxyMatchReplaceRule] = []
         self._load_autoresponder_rules()
         self._load_match_replace_rules()
-
     @staticmethod
     def _dlp_decision(
         scheme: str, host: str, port: int, target: str,
@@ -124,7 +122,6 @@ class InterceptingProxy(ProxyResilienceMixin):
             block_cloud_metadata=settings.block_cloud_metadata,
             block_private_or_loopback=bool(settings.allow_remote_clients and settings.block_private_targets_when_remote),
         ))
-
     def apply_settings(self, settings: ProxySettings) -> None:
         """Validate and atomically apply proxy runtime settings while stopped."""
         settings.validate()
@@ -140,7 +137,6 @@ class InterceptingProxy(ProxyResilienceMixin):
             with self._lock:
                 self.settings = settings
                 self.network_guard = replacement_guard
-
     def _load_autoresponder_rules(self) -> None:
         try:
             if not self._rules_path.is_file():
@@ -164,7 +160,6 @@ class InterceptingProxy(ProxyResilienceMixin):
             self._autoresponder_rules = loaded
         except (OSError, UnicodeError, json.JSONDecodeError, ValueError, TypeError):
             self._autoresponder_rules = []
-
     def _save_autoresponder_rules(self) -> None:
         payload = json.dumps([rule.snapshot() for rule in self._autoresponder_rules], ensure_ascii=False, indent=2).encode("utf-8")
         temp = self._rules_path.with_name(self._rules_path.name + f".{uuid.uuid4().hex}.tmp")
@@ -181,12 +176,10 @@ class InterceptingProxy(ProxyResilienceMixin):
                     temp.unlink()
                 except OSError:
                     record_current_exception(__name__, 'InterceptingProxy._save_autoresponder_rules:175')
-
     def autoresponder_rules(self) -> list[dict[str, Any]]:
         """Return the configured bounded auto-responder rules."""
         with self._lock:
             return [rule.snapshot() for rule in self._autoresponder_rules]
-
     def add_autoresponder_rule(
         self, host_pattern: str, path_pattern: str, *, method: str = "*", status: int = 200,
         reason: str = "Arenyxa AutoResponder", content_type: str = "application/json; charset=utf-8",
@@ -205,7 +198,6 @@ class InterceptingProxy(ProxyResilienceMixin):
             self._autoresponder_rules.append(rule)
             self._save_autoresponder_rules()
         return rule.snapshot()
-
     def remove_autoresponder_rule(self, rule_id: str) -> bool:
         """Remove one auto-responder rule by identifier."""
         with self._lock:
@@ -215,7 +207,6 @@ class InterceptingProxy(ProxyResilienceMixin):
             if changed:
                 self._save_autoresponder_rules()
             return changed
-
     def _autoresponder_response(self, method: str, host: str, target: str) -> tuple[ProxyAutoResponderRule, bytes] | None:
         with self._lock:
             rules = list(self._autoresponder_rules)
@@ -226,7 +217,6 @@ class InterceptingProxy(ProxyResilienceMixin):
                     raise ValueError("AutoResponder response exceeds the configured proxy message budget")
                 return rule, response
         return None
-
     def _load_match_replace_rules(self) -> None:
         try:
             if not self._rewrite_rules_path.is_file():
@@ -251,7 +241,6 @@ class InterceptingProxy(ProxyResilienceMixin):
             self._match_replace_rules = loaded
         except (OSError, UnicodeError, json.JSONDecodeError, ValueError, TypeError):
             self._match_replace_rules = []
-
     def _save_match_replace_rules(self) -> None:
         payload = json.dumps([rule.snapshot() for rule in self._match_replace_rules], ensure_ascii=False, indent=2).encode("utf-8")
         temp = self._rewrite_rules_path.with_name(self._rewrite_rules_path.name + f".{uuid.uuid4().hex}.tmp")
@@ -268,7 +257,6 @@ class InterceptingProxy(ProxyResilienceMixin):
                     temp.unlink()
                 except OSError:
                     record_current_exception(__name__, 'InterceptingProxy._save_match_replace_rules:262')
-
     def match_replace_rules(self) -> list[dict[str, Any]]:
         """Return the configured request and response match-replace rules."""
         with self._lock:
