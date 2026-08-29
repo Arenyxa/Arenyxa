@@ -12,10 +12,12 @@ import threading
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from enum import Enum
 from typing import Mapping
 
 from arenyxa.domain.models import FetchResponse
+from arenyxa.infrastructure.http_retry import parse_retry_after
 
 
 class BlockKind(str, Enum):
@@ -111,12 +113,8 @@ class AntiBotIntelligenceEngine:
         self.max_redirects = max(3, min(100, int(max_redirects)))
 
     @staticmethod
-    def _retry_after(headers: Mapping[str, str]) -> float | None:
-        raw = next((v for k, v in headers.items() if k.casefold() == "retry-after"), "").strip()
-        try:
-            return max(0.0, min(86400.0, float(raw))) if raw else None
-        except ValueError:
-            return None
+    def _retry_after(headers: Mapping[str, str], *, now: datetime | None = None) -> float | None:
+        return parse_retry_after(headers, now=now, maximum_seconds=86400.0)
 
     def assess(self, response: FetchResponse, *, expected_content: str = "") -> BlockAssessment:
         status = int(response.status or 0)
@@ -203,6 +201,7 @@ class HumanVerificationCoordinator:
         self.ttl_seconds = max(30.0, min(float(ttl_seconds), 86400.0))
         self.max_pending = max(1, min(int(max_pending), 100_000))
         self._tickets: dict[str, HumanVerificationTicket] = {}
+        self._pending_ids: set[str] = set()
         self._lock = threading.RLock()
 
     def issue(self, target_url: str, assessment: BlockAssessment) -> HumanVerificationTicket:
@@ -211,7 +210,7 @@ class HumanVerificationCoordinator:
         now = time.time()
         with self._lock:
             self._expire_locked(now)
-            if len(self._tickets) >= self.max_pending:
+            if len(self._pending_ids) >= self.max_pending:
                 raise RuntimeError("Human verification queue is full")
             ticket = HumanVerificationTicket(
                 ticket_id=f"human_{uuid.uuid4().hex}",
@@ -221,6 +220,7 @@ class HumanVerificationCoordinator:
                 expires_at=now + self.ttl_seconds,
             )
             self._tickets[ticket.ticket_id] = ticket
+            self._pending_ids.add(ticket.ticket_id)
             return ticket
 
     def resolve(self, ticket_id: str, *, operator_id: str, approved: bool) -> HumanVerificationTicket:
@@ -237,18 +237,23 @@ class HumanVerificationCoordinator:
                 raise ValueError("operator_id is required")
             ticket.operator_id = actor
             ticket.state = "approved" if bool(approved) else "rejected"
+            self._pending_ids.discard(ticket.ticket_id)
             return ticket
 
     def pending(self) -> list[HumanVerificationTicket]:
         now = time.time()
         with self._lock:
             self._expire_locked(now)
-            return [ticket for ticket in self._tickets.values() if ticket.state == "pending"]
+            return [ticket for ticket in self._tickets.values() if ticket.ticket_id in self._pending_ids]
 
     def _expire_locked(self, now: float) -> None:
-        for ticket in self._tickets.values():
-            if ticket.state == "pending" and ticket.expires_at <= now:
+        for ticket_id in tuple(self._pending_ids):
+            ticket = self._tickets[ticket_id]
+            if ticket.state != "pending":
+                self._pending_ids.discard(ticket_id)
+            elif ticket.expires_at <= now:
                 ticket.state = "expired"
+                self._pending_ids.discard(ticket_id)
 
 @dataclass(slots=True)
 class _HostPenalty:
@@ -315,4 +320,3 @@ class AntiBotHostGovernor:
                 }
                 for host, state in self._hosts.items()
             }
-

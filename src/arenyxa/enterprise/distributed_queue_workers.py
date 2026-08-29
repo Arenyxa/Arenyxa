@@ -273,8 +273,17 @@ class DistributedQueueWorkerMixin:
                 cursor = connection.execute(
                     """UPDATE distributed_jobs SET state=?,lease_worker_id='',lease_token_sha256='',lease_expires_at=0,
                        error_code=?,updated_at=? WHERE job_id=? AND state=? AND lease_worker_id=?
-                       AND lease_token_sha256=? AND lease_expires_at>?""",
-                    (target, code, utc_now(), str(row["job_id"]), previous, worker, str(row["lease_token_sha256"]), current),
+                       AND lease_token_sha256=? AND lease_expires_at>?
+                       AND EXISTS (
+                           SELECT 1 FROM distributed_workers w
+                           WHERE w.worker_id=? AND w.heartbeat_at=?
+                             AND w.heartbeat_at>0 AND w.heartbeat_at<=?
+                       )""",
+                    (
+                        target, code, utc_now(), str(row["job_id"]), previous, worker,
+                        str(row["lease_token_sha256"]), current, worker,
+                        float(row["heartbeat_at"]), cutoff,
+                    ),
                 )
                 if cursor.rowcount != 1:
                     continue
@@ -363,4 +372,3 @@ class DistributedQueueWorkerMixin:
             return heartbeat_recovered + self.recover_expired_leases()
         finally:
             self._expiry_scan_lock.release()
-

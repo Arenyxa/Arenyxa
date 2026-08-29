@@ -4,12 +4,13 @@ import threading
 import time
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 import pytest
 
 from arenyxa.domain.models import utc_now
+from arenyxa.infrastructure.capture.proxy import InterceptingProxy
 from arenyxa.infrastructure.capture.proxy_models import ProxyFlow, ProxySettings
 from arenyxa.infrastructure.capture.proxy_persistence import ProxyPersistencePipeline
 from arenyxa.infrastructure.capture.proxy_resilience import ProxyResilienceMixin
@@ -258,6 +259,7 @@ class _PersistenceHarness(ProxyResilienceMixin):
     def __post_init__(self) -> None:
         self._performance_telemetry = None
         self._lock = threading.RLock()
+        self._persistence_lifecycle_lock = threading.RLock()
         self.settings = ProxySettings(persistence_queue_capacity=16)
         self.persistence = self._new_persistence_pipeline(16)
 
@@ -293,8 +295,8 @@ def test_reconfigure_waits_for_old_pipeline_admissions_without_losing_evidence()
         harness._reconfigure_persistence(16, replacement_settings)
 
     reconfigure_thread, reconfigure_done, reconfigure_outcome = _start_call(reconfigure)
-    _wait_for_closing(old_pipeline)
     replaced_before_old_admission_finished = reconfigure_done.wait(0.1)
+    assert old_pipeline.status()["state"] == "open"
 
     release_admission.set()
     traffic_thread.join(2.0)
@@ -311,3 +313,110 @@ def test_reconfigure_waits_for_old_pipeline_admissions_without_losing_evidence()
     assert Counter(history.rows) == Counter({"old-pipeline", "new-pipeline"})
     assert Counter(archive.rows) == Counter({"old-pipeline", "new-pipeline"})
     _assert_cleanly_closed(harness.persistence)
+
+
+def test_apply_settings_rolls_back_after_timeout_and_can_retry_retirement(tmp_path) -> None:
+    original_settings = ProxySettings(
+        tls_interception=False,
+        persistence_queue_capacity=16,
+        persistence_flush_timeout_seconds=0.1,
+    )
+    proxy = InterceptingProxy(tmp_path / "proxy-rollback", original_settings)
+    old_pipeline = proxy.persistence
+    old_guard = proxy.network_guard
+    persist_entered = threading.Event()
+    release_persist = threading.Event()
+    original_persist = old_pipeline._persist
+
+    def blocked_persist(session_id: str, flow: ProxyFlow) -> None:
+        persist_entered.set()
+        assert release_persist.wait(3.0)
+        original_persist(session_id, flow)
+
+    old_pipeline._persist = blocked_persist  # type: ignore[method-assign]
+    old_pipeline.enqueue("session", _flow("blocked-settings"))
+    assert persist_entered.wait(2.0)
+    replacement = replace(
+        original_settings,
+        history_limit=original_settings.history_limit + 1,
+        persistence_queue_capacity=32,
+    )
+    try:
+        with pytest.raises(RuntimeError, match="did not quiesce"):
+            proxy.apply_settings(replacement)
+        assert proxy.settings is original_settings
+        assert proxy.network_guard is old_guard
+        assert proxy.persistence is old_pipeline
+        assert old_pipeline.status()["state"] == "closing"
+
+        release_persist.set()
+        proxy.apply_settings(replacement)
+        assert proxy.settings is replacement
+        assert proxy.persistence is not old_pipeline
+        _assert_cleanly_closed(old_pipeline)
+    finally:
+        release_persist.set()
+        proxy.close()
+
+
+def test_same_capacity_reconfigure_rebuilds_unhealthy_pipeline() -> None:
+    history = _RecordingSink()
+    archive = _RecordingSink()
+    harness = _PersistenceHarness(history, archive)
+    retired = harness.persistence
+    assert retired.close(2.0) is True
+
+    replacement_settings = replace(harness.settings, history_limit=harness.settings.history_limit + 1)
+    harness._reconfigure_persistence(
+        harness.settings.persistence_queue_capacity,
+        replacement_settings,
+    )
+
+    assert harness.persistence is not retired
+    assert harness.persistence.status()["state"] == "open"
+    assert harness.persistence.status()["writer_alive"] is True
+    assert harness.persistence.close(2.0) is True
+
+
+def test_writer_error_callback_during_reconfigure_does_not_invert_proxy_lock(tmp_path) -> None:
+    settings = ProxySettings(
+        tls_interception=False,
+        persistence_queue_capacity=16,
+        persistence_flush_timeout_seconds=2.0,
+    )
+    proxy = InterceptingProxy(tmp_path / "proxy-callback", settings)
+    old_pipeline = proxy.persistence
+    writer_entered = threading.Event()
+    release_writer = threading.Event()
+    callback_seen = threading.Event()
+    original_store = proxy.history_store.store
+
+    def failing_store(_session_id: str, _flow: ProxyFlow) -> None:
+        writer_entered.set()
+        assert release_writer.wait(3.0)
+        raise OSError("injected history failure")
+
+    proxy.history_store.store = failing_store  # type: ignore[method-assign]
+    proxy.add_listener(
+        lambda kind, value: callback_seen.set()
+        if kind == "error" and value.get("code") == "PROXY_HISTORY_WRITE_FAILED"
+        else None
+    )
+    old_pipeline.enqueue("session", _flow("callback-close"))
+    assert writer_entered.wait(2.0)
+    replacement = replace(settings, persistence_queue_capacity=32)
+    thread, done, outcome = _start_call(lambda: proxy.apply_settings(replacement))
+    _wait_for_closing(old_pipeline)
+    release_writer.set()
+    thread.join(3.0)
+    proxy.history_store.store = original_store  # type: ignore[method-assign]
+    try:
+        assert done.is_set()
+        assert outcome == {"result": None}
+        assert callback_seen.is_set()
+        assert proxy.settings is replacement
+        assert proxy.persistence is not old_pipeline
+        _assert_cleanly_closed(old_pipeline)
+    finally:
+        release_writer.set()
+        proxy.close()

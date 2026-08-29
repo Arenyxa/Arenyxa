@@ -103,6 +103,26 @@ def test_api_map_v2_groups_routes_profiles_parameters_and_infers_json_schema(sto
     assert endpoint.schema_fingerprint
 
 
+def test_api_schema_polymorphism_preserves_object_shape_required_and_optional_fields() -> None:
+    schema = ApiMapService()._merge_schema_samples(
+        [
+            {"payload": {"id": 1, "meta": {"name": "one"}}},
+            {"payload": "temporarily-unavailable"},
+            {"payload": {"id": 2, "meta": {"name": "two", "active": True}}},
+            {"status": "ok"},
+        ]
+    )
+    assert schema is not None
+    payload = schema["properties"]["payload"]
+    assert payload["type"] == ["object", "string"]
+    assert payload["optional"] is True
+    object_variant = next(item for item in payload["anyOf"] if item["type"] == "object")
+    assert object_variant["required"] == ["id", "meta"]
+    assert object_variant["properties"]["meta"]["properties"]["active"]["optional"] is True
+    assert object_variant["properties"]["meta"]["required"] == ["name"]
+    assert "payload" not in schema["required"]
+
+
 def test_replay_draft_restores_verified_body_but_never_auto_replays_credentials(store, tmp_path: Path) -> None:
     session = CaptureSession("replay", CaptureSource.BROWSER)
     store.save_capture(session)

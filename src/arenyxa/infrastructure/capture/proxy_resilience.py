@@ -7,6 +7,7 @@ protocol implementation so ``proxy.py`` remains below the architecture module-si
 """
 
 import logging
+import threading
 from typing import Any
 
 from arenyxa.domain.errors import ArenyxaError
@@ -22,6 +23,7 @@ class ProxyResilienceMixin:
     _performance_telemetry: Any
     settings: ProxySettings
     persistence: ProxyPersistencePipeline
+    _persistence_lifecycle_lock: threading.RLock
 
     def _new_persistence_pipeline(self, capacity: int) -> ProxyPersistencePipeline:
         return ProxyPersistencePipeline(
@@ -45,11 +47,14 @@ class ProxyResilienceMixin:
         )
 
     def _reconfigure_persistence(self, old_capacity: int, settings: ProxySettings) -> None:
-        if int(old_capacity) == int(settings.persistence_queue_capacity):
-            return
-        if not self.persistence.close(float(settings.persistence_flush_timeout_seconds)):
-            raise RuntimeError("Proxy persistence pipeline did not quiesce while applying settings")
-        self.persistence = self._new_persistence_pipeline(settings.persistence_queue_capacity)
+        with self._persistence_lifecycle_lock:
+            state = self.persistence.status()
+            healthy = state["state"] == "open" and bool(state["writer_alive"])
+            if int(old_capacity) == int(settings.persistence_queue_capacity) and healthy:
+                return
+            if not self.persistence.close(float(settings.persistence_flush_timeout_seconds)):
+                raise RuntimeError("Proxy persistence pipeline did not quiesce while applying settings")
+            self.persistence = self._new_persistence_pipeline(settings.persistence_queue_capacity)
 
     def apply_memory_pressure(self, level: str) -> dict[str, Any]:
         """Trim only volatile history; durable forensic history is never deleted."""
@@ -75,11 +80,13 @@ class ProxyResilienceMixin:
         }
 
     def persistence_status(self) -> dict[str, Any]:
-        return self.persistence.status()
+        with self._persistence_lifecycle_lock:
+            return self.persistence.status()
 
     def flush_persistence(self, timeout: float | None = None) -> bool:
         budget = self.settings.persistence_flush_timeout_seconds if timeout is None else float(timeout)
-        return self.persistence.flush(max(0.0, min(30.0, budget)))
+        with self._persistence_lifecycle_lock:
+            return self.persistence.flush(max(0.0, min(30.0, budget)))
 
     def _record_completed_proxy_metrics(self, flow: ProxyFlow) -> None:
         telemetry = self._performance_telemetry
@@ -91,20 +98,17 @@ class ProxyResilienceMixin:
         telemetry.gauge("proxy.response_bytes", float(flow.response_bytes))
 
     def _persist_completed_flow(self, session_id: str, flow: ProxyFlow) -> str:
-        try:
-            return self.persistence.enqueue(session_id, flow)
-        except (RuntimeError, OSError, ArenyxaError) as exc:
-            # Closing/failed pipeline: preserve the pre-Phase-6 durable evidence contract.
-            LOGGER.exception("Proxy persistence admission failed for %s", flow.id)
+        with self._persistence_lifecycle_lock:
+            pipeline = self.persistence
             try:
-                self.history_store.store(session_id, flow)
-            except (OSError, ArenyxaError) as history_exc:
-                self._persistence_error("history", flow, history_exc)
-            try:
-                self.archive.store(flow)
-            except OSError as archive_exc:
-                self._persistence_error("archive", flow, archive_exc)
-            return "synchronous_emergency"
+                return pipeline.enqueue(session_id, flow)
+            except (RuntimeError, OSError, ArenyxaError):
+                # Keep the rejected write inside the retiring generation's serialized
+                # sink boundary.  The lifecycle lock prevents replacement or sink close
+                # until the emergency write has finished.
+                LOGGER.exception("Proxy persistence admission failed for %s", flow.id)
+                pipeline.persist_synchronously(session_id, flow)
+                return "synchronous_emergency"
 
     def _record_persistence_backpressure(self, flow: ProxyFlow, mode: str) -> None:
         telemetry = self._performance_telemetry

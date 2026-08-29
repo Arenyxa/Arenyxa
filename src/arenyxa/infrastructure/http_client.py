@@ -15,13 +15,12 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable
 from dataclasses import field as dataclass_field
-from datetime import datetime
 from email.message import Message
-from email.utils import parsedate_to_datetime
 
-from arenyxa.compat import UTC, dataclass
+from arenyxa.compat import dataclass
 from arenyxa.domain.errors import ArenyxaError, domain_error
 from arenyxa.domain.models import FetchResponse, RequestSpec
+from arenyxa.infrastructure.http_retry import parse_retry_after
 from arenyxa.security.dlp import GLOBAL_DLP_ENGINE
 from arenyxa.security.network_guard import NetworkUseGuard
 
@@ -214,19 +213,7 @@ class HttpFetcher:
 
     @staticmethod
     def _parse_retry_after(headers: dict[str, str]) -> float | None:
-        raw = HttpFetcher._header_value(headers, "Retry-After").strip()
-        if not raw:
-            return None
-        try:
-            return max(0.0, float(raw))
-        except ValueError:
-            try:
-                moment = parsedate_to_datetime(raw)
-                if moment.tzinfo is None:
-                    moment = moment.replace(tzinfo=UTC)
-                return max(0.0, (moment - datetime.now(UTC)).total_seconds())
-            except (TypeError, ValueError, OverflowError):
-                return None
+        return parse_retry_after(headers)
 
     @staticmethod
     def _is_timeout_error(error: Exception | None) -> bool:

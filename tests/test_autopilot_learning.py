@@ -11,6 +11,7 @@ from arenyxa.application.autopilot import (
     FailureClassifier,
     SelectorRecoveryRanker,
 )
+from arenyxa.application.nextgen_http import SmartPathV2
 from arenyxa.domain.enums import CaptureSource
 from arenyxa.domain.models import FetchResponse, NetworkEvent
 
@@ -89,6 +90,34 @@ def test_autopilot_feeds_local_history_back_into_planner(tmp_path: Path) -> None
     assert plan.recommended_engine == "api"
     assert plan.features.has_session_state is True
     assert plan.features.has_api_events is True
+
+
+def test_legacy_persistent_unknown_engine_does_not_break_smart_planner(tmp_path: Path) -> None:
+    store = ExperienceStore(tmp_path / "experience.db")
+    engine = AutopilotEngine(SmartPathV2(), store)
+    features = engine.features(_response(), [_event()])
+    with store._connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO strategy_outcomes
+            (created_at,site_key,engine,success,latency_ms,peak_memory_mb,completeness,failure_code,features_json)
+            VALUES(?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                store._now(),
+                features.site_key,
+                "legacy-playwright",
+                1,
+                1.0,
+                1.0,
+                1.0,
+                None,
+                "{}",
+            ),
+        )
+    plan = engine.analyze(_response(), [_event()])
+    assert "legacy-playwright" in plan.historical_priors
+    assert plan.recommended_engine in {"http", "api", "browser", "distributed"}
 
 
 def test_failure_classifier_is_deterministic() -> None:

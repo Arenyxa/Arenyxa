@@ -60,3 +60,8 @@ FINAL_QUALITY_GATE.json
 
 # Local crash output
 crash.txt
+.aider*
+
+# Local release output and preserved source backups
+release/
+*.before_*

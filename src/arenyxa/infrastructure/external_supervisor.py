@@ -99,6 +99,12 @@ class ExternalSupervisorClient:
         with self._lock:
             if self._process is not None and self._process.poll() is None:
                 return
+            # A sender/ticker from a child that exited independently may still be
+            # unwinding.  Fence it before publishing the next generation.  Each
+            # generation owns both its stop token and its queue so an unconsumed
+            # control token can never terminate a later sender.
+            self._stop.set()
+            self._enqueue(_SENTINEL, self._queue)
             self.diagnostics_dir.mkdir(parents=True, exist_ok=True)
             child_stderr = self.diagnostics_dir / "external-supervisor.stderr.log"
             stderr_stream = child_stderr.open("a", encoding="utf-8", buffering=1)
@@ -142,17 +148,21 @@ class ExternalSupervisorClient:
             except (OSError, ValueError):
                 stderr_stream.close()
                 raise
+            outbound_queue: queue.Queue[object] = queue.Queue(maxsize=self.queue_capacity)
+            stop_event = threading.Event()
             self._process = process
-            self._stop.clear()
+            self._queue = outbound_queue
+            self._stop = stop_event
             self._started_monotonic = time.monotonic()
             self._sender_thread = threading.Thread(
                 target=self._sender_loop,
-                args=(process, stderr_stream),
+                args=(process, stderr_stream, outbound_queue, stop_event),
                 name="arenyxa-external-supervisor-ipc",
                 daemon=True,
             )
             self._ticker_thread = threading.Thread(
                 target=self._ticker_loop,
+                args=(outbound_queue, stop_event),
                 name="arenyxa-external-supervisor-process-heartbeat",
                 daemon=True,
             )
@@ -161,12 +171,14 @@ class ExternalSupervisorClient:
         self.heartbeat("process", {"pid": os.getpid(), "executable": sys.executable})
 
     def stop(self, timeout: float = 3.0) -> None:
-        self._stop.set()
-        self._enqueue(_SENTINEL)
         with self._lock:
+            stop_event = self._stop
+            outbound_queue = self._queue
             sender = self._sender_thread
             ticker = self._ticker_thread
             process = self._process
+            stop_event.set()
+            self._enqueue(_SENTINEL, outbound_queue)
             self._sender_thread = None
             self._ticker_thread = None
             self._process = None
@@ -193,7 +205,10 @@ class ExternalSupervisorClient:
             "sent_unix_ns": time.time_ns(),
             "state": dict(state or {}),
         }
-        self._enqueue(payload)
+        with self._lock:
+            outbound_queue = self._queue if self._process is not None else None
+        if outbound_queue is not None:
+            self._enqueue(payload, outbound_queue)
 
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
@@ -215,35 +230,57 @@ class ExternalSupervisorClient:
                 else 0.0,
             }
 
-    def _enqueue(self, item: object) -> None:
+    def _enqueue(self, item: object, outbound_queue: queue.Queue[object] | None = None) -> None:
+        target = self._queue if outbound_queue is None else outbound_queue
         try:
-            self._queue.put_nowait(item)
+            target.put_nowait(item)
             return
         except queue.Full:
             with self._lock:
                 self._dropped += 1
         try:
-            self._queue.get_nowait()
+            target.get_nowait()
         except queue.Empty:
             LOGGER.warning("External supervisor IPC queue reported full but no item was removable")
         try:
-            self._queue.put_nowait(item)
+            target.put_nowait(item)
         except queue.Full:
             with self._lock:
                 self._dropped += 1
 
-    def _ticker_loop(self) -> None:
-        while not self._stop.wait(0.5):
-            self.heartbeat("process", {"pid": os.getpid()})
+    def _ticker_loop(
+        self,
+        outbound_queue: queue.Queue[object],
+        stop_event: threading.Event,
+    ) -> None:
+        while not stop_event.wait(0.5):
+            self._enqueue(
+                {
+                    "schema": _SCHEMA,
+                    "component": "process",
+                    "sent_monotonic": time.monotonic(),
+                    "sent_unix_ns": time.time_ns(),
+                    "state": {"pid": os.getpid()},
+                },
+                outbound_queue,
+            )
 
-    def _sender_loop(self, process: subprocess.Popen[str], stderr_stream: TextIO) -> None:
+    def _sender_loop(
+        self,
+        process: subprocess.Popen[str],
+        stderr_stream: TextIO,
+        outbound_queue: queue.Queue[object],
+        stop_event: threading.Event,
+    ) -> None:
+        del stop_event  # The generation-local sentinel closes this queue consumer.
         try:
             stream = process.stdin
             if stream is None:
-                raise RuntimeError("External supervisor child has no IPC stdin")
-            while not self._stop.is_set():
+                LOGGER.error("External supervisor child has no IPC stdin")
+                return
+            while True:
                 try:
-                    item = self._queue.get(timeout=0.5)
+                    item = outbound_queue.get(timeout=0.5)
                 except queue.Empty:
                     continue
                 if item is _SENTINEL:

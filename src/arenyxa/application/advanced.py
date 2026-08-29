@@ -60,7 +60,12 @@ class SmartExecutionPlanner:
             scores["distributed"] += 3
             reasons.append("历史规模较大，建议分布式执行。")
         for engine, success in (history_success or {}).items():
-            scores[engine] += max(0, min(1, success)) * 2
+            if engine not in scores:
+                continue
+            try:
+                scores[engine] += max(0.0, min(1.0, float(success))) * 2.0
+            except (TypeError, ValueError):
+                continue
         engine, score = max(scores.items(), key=lambda item: item[1])
         total = sum(max(0, value) for value in scores.values()) or 1
         return ExecutionPlan(

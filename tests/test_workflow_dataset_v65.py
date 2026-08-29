@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sqlite3
+
 import pytest
 
 from arenyxa.application.data_lineage import DataLineageService
@@ -61,6 +63,38 @@ def test_v65_workflow_revision_pipeline_persists_output_and_lineage(store) -> No
     graph = lineage.graph("workflow_execution", result.execution_id, max_depth=2)
     assert any(edge["relation"] == "input_to" for edge in graph.edges)
     assert any(edge["relation"] == "produced" for edge in graph.edges)
+
+
+def test_transient_checkpoint_failure_retries_without_terminal_state_contradiction(
+    store, monkeypatch
+) -> None:
+    source = _source_revision(store)
+    runtime = WorkflowDatasetService(
+        store,
+        WorkflowEngine(),
+        DataLineageService(store),
+        checkpoint_every=1,
+    )
+    original = store.checkpoint_workflow_execution
+    calls = 0
+
+    def transient_once(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise sqlite3.OperationalError("transient checkpoint busy")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(store, "checkpoint_workflow_execution", transient_once)
+    result = runtime.execute_revision(_workflow(), source.id, "transient-checkpoint-output")
+    execution = store.get_workflow_execution(result.execution_id)
+
+    assert calls >= 2
+    assert result.state == "completed"
+    assert execution is not None
+    assert execution["state"] == "completed"
+    assert execution["processed_inputs"] == 3
+    assert execution["staged_outputs"] == 3
 
 
 class _AutoCancelToken(CancellationToken):

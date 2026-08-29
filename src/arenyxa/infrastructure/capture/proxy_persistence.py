@@ -53,6 +53,7 @@ class ProxyPersistencePipeline:
         self.error_callback = error_callback
         self._queue: queue.Queue[object] = queue.Queue(maxsize=self.capacity)
         self._lock = threading.RLock()
+        self._sink_lock = threading.RLock()
         self._lifecycle = threading.Condition(self._lock)
         self._close_lock = threading.Lock()
         self._state = self._OPEN
@@ -114,24 +115,36 @@ class ProxyPersistencePipeline:
             self._lifecycle.notify_all()
 
     def _persist(self, session_id: str, flow: ProxyFlow) -> None:
-        history_ok = True
-        archive_ok = True
-        try:
-            self.history_store.store(session_id, flow)
-        except Exception as exc:  # broad-exception-boundary: persistence worker must survive one failed flow
-            LOGGER.exception("Proxy persistence history sink failed")
-            history_ok = False
-            self._record_error("history", flow, exc)
-        try:
-            self.archive.store(flow)
-        except Exception as exc:  # broad-exception-boundary: legacy archive is isolated from durable history
-            LOGGER.exception("Proxy persistence archive sink failed")
-            archive_ok = False
-            self._record_error("archive", flow, exc)
-        with self._lock:
-            if history_ok and archive_ok:
-                self._persisted += 1
-            self._last_persisted_at = time.time()
+        # Queue backpressure and closing-pipeline emergency writes can run on producer
+        # threads.  Serialize every sink mutation so the single-writer ordering contract
+        # remains true even on those fallback paths.
+        with self._sink_lock:
+            history_ok = True
+            archive_ok = True
+            try:
+                self.history_store.store(session_id, flow)
+            except Exception as exc:  # broad-exception-boundary: persistence worker must survive one failed flow
+                LOGGER.exception("Proxy persistence history sink failed")
+                history_ok = False
+                self._record_error("history", flow, exc)
+            try:
+                self.archive.store(flow)
+            except Exception as exc:  # broad-exception-boundary: legacy archive is isolated from durable history
+                LOGGER.exception("Proxy persistence archive sink failed")
+                archive_ok = False
+                self._record_error("archive", flow, exc)
+            with self._lock:
+                if history_ok and archive_ok:
+                    self._persisted += 1
+                self._last_persisted_at = time.time()
+
+    def persist_synchronously(self, session_id: str, flow: ProxyFlow) -> None:
+        """Persist rejected admission through this generation's serialized sink boundary.
+
+        The owner must hold its generation/reconfiguration lock while calling this method;
+        that prevents a replacement generation or sink close from overlapping the write.
+        """
+        self._persist(str(session_id), copy.deepcopy(flow))
 
     def _record_error(self, sink: str, flow: ProxyFlow, exc: BaseException) -> None:
         with self._lock:
@@ -182,6 +195,18 @@ class ProxyPersistencePipeline:
                     if remaining <= 0:
                         return False
                     self._lifecycle.wait(remaining)
+
+                if not self._thread.is_alive():
+                    # A fatal BaseException can terminate the daemon even though normal
+                    # sink Exceptions are isolated.  Revive this generation only to drain
+                    # and retire it; a replacement generation is not published until this
+                    # writer reaches CLOSED.
+                    self._thread = threading.Thread(
+                        target=self._run,
+                        name="arenyxa-proxy-persistence-retirement",
+                        daemon=True,
+                    )
+                    self._thread.start()
 
             remaining = max(0.0, deadline - time.monotonic())
             if not self.flush(remaining):

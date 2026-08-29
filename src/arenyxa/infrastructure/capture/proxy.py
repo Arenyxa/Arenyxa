@@ -74,6 +74,7 @@ class InterceptingProxy(ProxyResilienceMixin):
             body_limit=self.settings.max_message_bytes,
         )
         self.archive = ProxyArchive(self.root / "archive")
+        self._persistence_lifecycle_lock = threading.RLock()
         self.persistence = self._new_persistence_pipeline(self.settings.persistence_queue_capacity)
         self.rule_engine = InterceptRuleEngine(self.root / "intercept-rules.json")
         self.network_guard = self._build_network_guard(self.settings)
@@ -127,13 +128,18 @@ class InterceptingProxy(ProxyResilienceMixin):
     def apply_settings(self, settings: ProxySettings) -> None:
         """Validate and atomically apply proxy runtime settings while stopped."""
         settings.validate()
-        with self._lock:
-            if self.running:
-                raise RuntimeError("Proxy settings cannot be replaced while the listener is running")
-            old_capacity = self.settings.persistence_queue_capacity
-            self.settings = settings
-            self.network_guard = self._build_network_guard(settings)
+        replacement_guard = self._build_network_guard(settings)
+        with self._persistence_lifecycle_lock:
+            with self._lock:
+                if self._closed:
+                    raise RuntimeError("Proxy engine is closed")
+                if self.running or self._active_clients:
+                    raise RuntimeError("Proxy settings cannot be replaced while the listener is active")
+                old_capacity = self.settings.persistence_queue_capacity
             self._reconfigure_persistence(old_capacity, settings)
+            with self._lock:
+                self.settings = settings
+                self.network_guard = replacement_guard
 
     def _load_autoresponder_rules(self) -> None:
         try:
@@ -437,28 +443,35 @@ class InterceptingProxy(ProxyResilienceMixin):
 
     def start(self) -> tuple[str, int]:
         """Start configured proxy listeners after validation and local policy checks."""
-        with self._lock:
-            if self._closed:
-                raise RuntimeError("Proxy engine is closed")
-            if self._server is not None:
-                return self.address
-            self.settings.validate()
-            server_type = _ProxyTCPServerV6 if ":" in self.settings.bind_host else _ProxyTCPServer
-            server = server_type((self.settings.bind_host, int(self.settings.bind_port)), _ProxyRequestHandler)
-            server.engine = self
-            thread = threading.Thread(target=server.serve_forever, name="arenyxa-proxy-listener", daemon=True)
-            self._server = server
-            self._thread = thread
-            self._started_at = utc_now()
-            self._session_id = "proxy_" + uuid.uuid4().hex
-            host, port = server.server_address[:2]
-            self.history_store.start_session(
-                self._session_id,
-                str(host),
-                int(port),
-                started_at=self._started_at,
-            )
-            thread.start()
+        with self._persistence_lifecycle_lock:
+            state = self.persistence.status()
+            if state["state"] != "open" or not state["writer_alive"]:
+                self._reconfigure_persistence(
+                    self.settings.persistence_queue_capacity,
+                    self.settings,
+                )
+            with self._lock:
+                if self._closed:
+                    raise RuntimeError("Proxy engine is closed")
+                if self._server is not None:
+                    return self.address
+                self.settings.validate()
+                server_type = _ProxyTCPServerV6 if ":" in self.settings.bind_host else _ProxyTCPServer
+                server = server_type((self.settings.bind_host, int(self.settings.bind_port)), _ProxyRequestHandler)
+                server.engine = self
+                thread = threading.Thread(target=server.serve_forever, name="arenyxa-proxy-listener", daemon=True)
+                self._server = server
+                self._thread = thread
+                self._started_at = utc_now()
+                self._session_id = "proxy_" + uuid.uuid4().hex
+                host, port = server.server_address[:2]
+                self.history_store.start_session(
+                    self._session_id,
+                    str(host),
+                    int(port),
+                    started_at=self._started_at,
+                )
+                thread.start()
         self._emit("started", self.status())
         return self.address
 
@@ -530,11 +543,16 @@ class InterceptingProxy(ProxyResilienceMixin):
                     len(self._active_clients),
                 )
                 return
+        with self._persistence_lifecycle_lock:
+            with self._lock:
+                if self._closed:
+                    return
             if not self.persistence.close(float(self.settings.persistence_flush_timeout_seconds)):
                 LOGGER.warning("Proxy persistence writer did not quiesce before close")
                 return
             self.history_store.close()
-            self._closed = True
+            with self._lock:
+                self._closed = True
 
     def _client_started(self, client: socket.socket) -> None:
         with self._client_condition:

@@ -2,6 +2,7 @@ from __future__ import annotations
 from arenyxa.recoverable import record_current_exception
 
 import ctypes
+import logging
 import os
 import shlex
 import shutil
@@ -17,6 +18,7 @@ from arenyxa.application.terminal import TerminalLaunch, TerminalMode, TerminalR
 
 OutputCallback = Callable[[str], None]
 ExitCallback = Callable[[TerminalResult], None]
+LOGGER = logging.getLogger(__name__)
 
 
 class ConPtyUnavailable(RuntimeError):
@@ -88,6 +90,8 @@ class WindowsConPtySession:
         self._output_read = wintypes.HANDLE()
         self._reader: threading.Thread | None = None
         self._waiter: threading.Thread | None = None
+        self._generation = 0
+        self._starting = False
         self._finished = threading.Event()
         self._finished.set()
         self._running = False
@@ -152,8 +156,13 @@ class WindowsConPtySession:
         if not self.supported():
             raise ConPtyUnavailable("This Windows runtime does not expose the ConPTY API")
         with self._lock:
-            if self._running:
-                raise RuntimeError("ConPTY session is already running")
+            if self._running or self._starting:
+                raise RuntimeError("ConPTY session is already starting or running")
+            if self._waiter is not None and self._waiter.is_alive():
+                raise RuntimeError("previous ConPTY session cleanup is still finishing")
+            self._generation += 1
+            generation = self._generation
+            self._starting = True
             self._cancelled = False
             self._output_chars = 0
             self._output_truncated = False
@@ -223,23 +232,53 @@ class WindowsConPtySession:
                 "CreateProcessW(ConPTY)",
             )
             with self._lock:
+                if self._generation != generation or self._cancelled:
+                    raise RuntimeError("ConPTY session start was cancelled")
                 self._hpc = hpc
                 self._process_handle = process_info.hProcess
                 self._thread_handle = process_info.hThread
                 self._input_write = input_write
                 self._output_read = output_read
                 self._running = True
+                self._starting = False
                 self._started_at = time.monotonic()
+                process_handle = self._process_handle
+                output_handle = self._output_read
+            hpc = ctypes.c_void_p()
             input_write = wintypes.HANDLE()
             output_read = wintypes.HANDLE()
             process_info.hProcess = wintypes.HANDLE()
             process_info.hThread = wintypes.HANDLE()
-            self._reader = threading.Thread(target=self._read_loop, args=(on_output,), name="arenyxa-conpty-read", daemon=True)
-            self._waiter = threading.Thread(target=self._wait_loop, args=(on_exit, attribute_buffer), name="arenyxa-conpty-wait", daemon=True)
+            self._reader = threading.Thread(
+                target=self._read_loop,
+                args=(generation, output_handle, on_output),
+                name=f"arenyxa-conpty-read-{generation}",
+                daemon=True,
+            )
+            self._waiter = threading.Thread(
+                target=self._wait_loop,
+                args=(generation, process_handle, on_exit, attribute_buffer),
+                name=f"arenyxa-conpty-wait-{generation}",
+                daemon=True,
+            )
             self._reader.start()
             self._waiter.start()
             attribute_buffer = None
         except (ConPtyUnavailable, OSError, RuntimeError, ValueError, ctypes.ArgumentError):
+            with self._lock:
+                committed_handle = self._process_handle if self._generation == generation else wintypes.HANDLE()
+                committed_running = bool(self._generation == generation and self._running)
+            if committed_running and committed_handle:
+                try:
+                    self._api.TerminateProcess(committed_handle, 130)
+                except (ConPtyUnavailable, OSError, ctypes.ArgumentError):
+                    record_current_exception(__name__, 'WindowsConPtySession.start:thread-start-rollback')
+            elif process_info.hProcess:
+                try:
+                    self._api.TerminateProcess(process_info.hProcess, 130)
+                except (ConPtyUnavailable, OSError, ctypes.ArgumentError):
+                    record_current_exception(__name__, 'WindowsConPtySession.start:process-create-rollback')
+            self._cleanup_handles(generation)
             if hpc.value:
                 self._api.ClosePseudoConsole(hpc)
             self._close_handle(input_read)
@@ -253,7 +292,13 @@ class WindowsConPtySession:
                     self._api.DeleteProcThreadAttributeList(ctypes.cast(attribute_buffer, ctypes.c_void_p))
                 except (ConPtyUnavailable, OSError, ctypes.ArgumentError):
                     record_current_exception(__name__, 'WindowsConPtySession.start:253')
-            self._finished.set()
+            with self._lock:
+                if self._generation == generation:
+                    self._starting = False
+                    self._running = False
+                    self._reader = None
+                    self._waiter = None
+                    self._finished.set()
             raise
 
     def send_input(self, text: str, *, append_newline: bool = True) -> bool:
@@ -287,24 +332,29 @@ class WindowsConPtySession:
             handle = self._process_handle
             running = self._running
             self._cancelled = True
-        if running and handle:
-            self._api.TerminateProcess(handle, 130)
+            if running and handle and not self._api.TerminateProcess(handle, 130):
+                LOGGER.warning("TerminateProcess failed for active ConPTY generation %d", self._generation)
 
     def wait(self, timeout: float | None = None) -> bool:
         return self._finished.wait(timeout)
 
     def close(self) -> None:
         self.stop()
-        self.wait(5.0)
-        self._cleanup_handles()
+        if not self.wait(5.0):
+            # The waiter still owns the live process/HPC handles. Closing them
+            # underneath WaitForSingleObject would orphan the process and leave
+            # the session permanently inconsistent; let the waiter finish its
+            # generation-specific cleanup when the process finally signals.
+            LOGGER.warning("ConPTY process did not exit within the close timeout; cleanup remains waiter-owned")
+            return
+        self._cleanup_handles(self._generation)
 
-    def _read_loop(self, on_output: OutputCallback) -> None:
+    def _read_loop(self, generation: int, handle: wintypes.HANDLE, on_output: OutputCallback) -> None:
         decoder = __import__("codecs").getincrementaldecoder("utf-8")("replace")
         buffer = ctypes.create_string_buffer(8192)
         while True:
             with self._lock:
-                handle = self._output_read
-                running = self._running
+                running = self._generation == generation and self._running
             if not handle or not running:
                 break
             read = wintypes.DWORD(0)
@@ -315,6 +365,8 @@ class WindowsConPtySession:
             if not text:
                 continue
             with self._lock:
+                if self._generation != generation or not self._running:
+                    break
                 remaining = self._max_output_chars - self._output_chars
                 if remaining <= 0:
                     self._output_truncated = True
@@ -328,42 +380,61 @@ class WindowsConPtySession:
             except (OSError, RuntimeError, TypeError, ValueError):
                 record_current_exception(__name__, 'WindowsConPtySession._read_loop:327')
         tail = decoder.decode(b"", final=True)
-        if tail:
+        with self._lock:
+            current = self._generation == generation
+        if tail and current:
             try:
                 on_output(tail)
             except (OSError, RuntimeError, TypeError, ValueError):
                 record_current_exception(__name__, 'WindowsConPtySession._read_loop:333')
 
-    def _wait_loop(self, on_exit: ExitCallback, attribute_buffer: ctypes.Array[ctypes.c_char]) -> None:
-        with self._lock:
-            handle = self._process_handle
+    def _wait_loop(
+        self,
+        generation: int,
+        handle: wintypes.HANDLE,
+        on_exit: ExitCallback,
+        attribute_buffer: ctypes.Array[ctypes.c_char],
+    ) -> None:
         if handle:
             self._api.WaitForSingleObject(handle, self.INFINITE)
         exit_code = wintypes.DWORD(0)
         if handle:
             self._api.GetExitCodeProcess(handle, ctypes.byref(exit_code))
-        with self._lock:
-            duration = max(0.0, time.monotonic() - self._started_at)
-            result = TerminalResult(
-                exit_code=int(exit_code.value),
-                duration_seconds=duration,
-                timed_out=False,
-                cancelled=bool(self._cancelled),
-                output_truncated=bool(self._output_truncated),
-            )
-            self._running = False
         try:
-            on_exit(result)
+            with self._lock:
+                is_current = self._generation == generation
+                result = TerminalResult(
+                    exit_code=int(exit_code.value),
+                    duration_seconds=max(0.0, time.monotonic() - self._started_at),
+                    timed_out=False,
+                    cancelled=bool(self._cancelled) if is_current else False,
+                    output_truncated=bool(self._output_truncated) if is_current else False,
+                )
+            self._cleanup_handles(generation)
         finally:
             try:
                 self._api.DeleteProcThreadAttributeList(ctypes.cast(attribute_buffer, ctypes.c_void_p))
             except (ConPtyUnavailable, OSError, ctypes.ArgumentError):
                 record_current_exception(__name__, 'WindowsConPtySession._wait_loop:359')
-            self._cleanup_handles()
-            self._finished.set()
-
-    def _cleanup_handles(self) -> None:
         with self._lock:
+            is_current = self._generation == generation
+            if is_current:
+                self._running = False
+                self._reader = None
+                self._waiter = None
+                self._finished.set()
+        if not is_current:
+            LOGGER.warning("Ignoring stale ConPTY waiter completion for generation %d", generation)
+            return
+        try:
+            on_exit(result)
+        except Exception:
+            LOGGER.exception("ConPTY exit callback failed")
+
+    def _cleanup_handles(self, generation: int | None = None) -> None:
+        with self._lock:
+            if generation is not None and generation != self._generation:
+                return
             hpc = self._hpc
             handles = [self._input_write, self._output_read, self._thread_handle, self._process_handle]
             self._hpc = ctypes.c_void_p()

@@ -5,9 +5,10 @@ import hashlib
 import json
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterator, Mapping
 
 from arenyxa.application.nextgen_browser import SelectorFingerprint, SelectorStudio
 from arenyxa.infrastructure.atomic_io import atomic_write_json
@@ -35,6 +36,7 @@ class AdaptiveSelectorStore:
         self.max_versions_per_key = max(4, min(int(max_versions_per_key), 2048))
         self._lock = threading.RLock()
         self._data: dict[str, list[dict[str, Any]]] = {}
+        self._pins: dict[tuple[str, str], int] = {}
         self._load()
 
     @staticmethod
@@ -71,14 +73,63 @@ class AdaptiveSelectorStore:
                     self._persist()
                     return SelectorVersion(**existing)
             bucket.append(asdict(item))
-            if len(bucket) > self.max_versions_per_key:
-                del bucket[:-self.max_versions_per_key]
+            self._prune_locked(bucket_key, bucket, protected_version_id=identity)
             self._persist()
         return item
 
     def versions(self, site: str, logical_name: str) -> list[SelectorVersion]:
         with self._lock:
             return [SelectorVersion(**dict(item)) for item in self._data.get(self.key(site, logical_name), ())]
+
+    @contextmanager
+    def versions_lease(self, site: str, logical_name: str) -> Iterator[list[SelectorVersion]]:
+        """Snapshot versions while pinning the selected latest version against pruning."""
+        bucket_key = self.key(site, logical_name)
+        pinned_version_id = ""
+        with self._lock:
+            versions = [SelectorVersion(**dict(item)) for item in self._data.get(bucket_key, ())]
+            if versions:
+                pinned_version_id = versions[-1].version_id
+                pin = (bucket_key, pinned_version_id)
+                self._pins[pin] = self._pins.get(pin, 0) + 1
+        try:
+            yield versions
+        finally:
+            if pinned_version_id:
+                with self._lock:
+                    pin = (bucket_key, pinned_version_id)
+                    remaining = self._pins.get(pin, 0) - 1
+                    if remaining > 0:
+                        self._pins[pin] = remaining
+                    else:
+                        self._pins.pop(pin, None)
+                    bucket = self._data.get(bucket_key, [])
+                    if self._prune_locked(bucket_key, bucket):
+                        self._persist()
+
+    def _prune_locked(
+        self,
+        bucket_key: str,
+        bucket: list[dict[str, Any]],
+        *,
+        protected_version_id: str = "",
+    ) -> bool:
+        changed = False
+        while len(bucket) > self.max_versions_per_key:
+            removable = next(
+                (
+                    index
+                    for index, item in enumerate(bucket)
+                    if str(item.get("version_id", "")) != protected_version_id
+                    if self._pins.get((bucket_key, str(item.get("version_id", ""))), 0) <= 0
+                ),
+                None,
+            )
+            if removable is None:
+                break
+            del bucket[removable]
+            changed = True
+        return changed
 
     def record_result(self, site: str, logical_name: str, version_id: str, *, success: bool) -> None:
         with self._lock:
@@ -107,24 +158,24 @@ class AdaptiveExtractionEngine:
         return self.store.remember(site, logical_name, selector, selector_type, fingerprint)
 
     def resolve(self, site: str, logical_name: str, markup: str, *, min_confidence: float = 0.92, auto_apply: bool = False) -> dict[str, Any]:
-        versions = self.store.versions(site, logical_name)
-        if not versions:
-            return {"status": "unknown", "selected": None, "candidates": [], "reason": "no selector history"}
-        latest = versions[-1]
-        direct = self.studio.analyze(markup, latest.selector, latest.selector_type)
-        if direct["matches"] == 1:
-            self.store.record_result(site, logical_name, latest.version_id, success=True)
-            return {"status": "stable", "selected": {"selector": latest.selector, "selector_type": latest.selector_type, "confidence": 1.0, "version_id": latest.version_id}, "candidates": []}
-        history = []
-        for item in versions:
-            total = item.success_count + item.failure_count
-            history.append({"selector": item.selector, "success": item.success_count >= item.failure_count if total else True})
-        decision = self.studio.heal_with_policy(markup, latest.fingerprint, history=history, auto_apply=auto_apply, min_confidence=min_confidence)
-        selected = decision.get("selected")
-        if selected:
-            healed = self.store.remember(site, logical_name, selected["selector"], selected["selector_type"], self.studio.analyze(markup, selected["selector"], selected["selector_type"])["fingerprint"], parent_version_id=latest.version_id, confidence=float(selected["confidence"]))
-            selected = dict(selected)
-            selected["version_id"] = healed.version_id
-            return {"status": "healed", "selected": selected, "candidates": decision["candidates"]}
-        self.store.record_result(site, logical_name, latest.version_id, success=False)
-        return {"status": "review-required", "selected": None, "candidates": decision["candidates"], "reason": decision["decision"]}
+        with self.store.versions_lease(site, logical_name) as versions:
+            if not versions:
+                return {"status": "unknown", "selected": None, "candidates": [], "reason": "no selector history"}
+            latest = versions[-1]
+            direct = self.studio.analyze(markup, latest.selector, latest.selector_type)
+            if direct["matches"] == 1:
+                self.store.record_result(site, logical_name, latest.version_id, success=True)
+                return {"status": "stable", "selected": {"selector": latest.selector, "selector_type": latest.selector_type, "confidence": 1.0, "version_id": latest.version_id}, "candidates": []}
+            history = []
+            for item in versions:
+                total = item.success_count + item.failure_count
+                history.append({"selector": item.selector, "success": item.success_count >= item.failure_count if total else True})
+            decision = self.studio.heal_with_policy(markup, latest.fingerprint, history=history, auto_apply=auto_apply, min_confidence=min_confidence)
+            selected = decision.get("selected")
+            if selected:
+                healed = self.store.remember(site, logical_name, selected["selector"], selected["selector_type"], self.studio.analyze(markup, selected["selector"], selected["selector_type"])["fingerprint"], parent_version_id=latest.version_id, confidence=float(selected["confidence"]))
+                selected = dict(selected)
+                selected["version_id"] = healed.version_id
+                return {"status": "healed", "selected": selected, "candidates": decision["candidates"]}
+            self.store.record_result(site, logical_name, latest.version_id, success=False)
+            return {"status": "review-required", "selected": None, "candidates": decision["candidates"], "reason": decision["decision"]}

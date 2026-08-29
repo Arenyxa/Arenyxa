@@ -465,6 +465,9 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
 
 
     _SCHEMA_ADVISORY_LOCK = 0x4152454E595841                                     
+    _OPEN = "open"
+    _CLOSING = "closing"
+    _CLOSED = "closed"
 
     def __init__(self, dsn: str) -> None:
         text = str(dsn).strip()
@@ -472,7 +475,10 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
             raise _storage_fail("DISTRIBUTED_STORAGE_DSN_INVALID", "PostgreSQL runtime DSN is invalid")
         self.dsn = text
         self._pool: Any | None = None
-        self._pool_lock = threading.Lock()
+        self._pool_condition = threading.Condition()
+        self._lifecycle_state = self._OPEN
+        self._active_connections = 0
+        self._close_owner = False
         self._pool_metrics_lock = threading.Lock()
         self._pool_acquisitions = 0
         self._pool_acquisition_failures = 0
@@ -529,69 +535,106 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
         LOGGER.error("PostgreSQL distributed runtime pool reconnect failed")
 
     def pool_metrics(self) -> dict[str, Any]:
+        with self._pool_condition:
+            pool = self._pool
+            lifecycle_state = self._lifecycle_state
+            active_connections = self._active_connections
         with self._pool_metrics_lock:
             local = {
                 "acquisitions": self._pool_acquisitions,
                 "acquisition_failures": self._pool_acquisition_failures,
                 "reconnect_failures": self._pool_reconnect_failures,
                 "last_error": self._last_pool_error,
+                "lifecycle_state": lifecycle_state,
+                "active_connections": active_connections,
             }
-        pool = self._pool
         if pool is None:
             return {**local, "open": False, "backend": "postgresql"}
         try:
             stats = dict(pool.get_stats())
         except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
             stats = {"stats_error": f"{type(exc).__name__}: {exc}"[:256]}
-        return {**local, "open": not bool(getattr(pool, "closed", False)), "backend": "postgresql", **stats}
+        return {
+            **local,
+            "open": lifecycle_state == self._OPEN and not bool(getattr(pool, "closed", False)),
+            "backend": "postgresql",
+            **stats,
+        }
 
-    def _connection_pool(self) -> Any:
+    def _ensure_open_locked(self) -> None:
+        if self._lifecycle_state != self._OPEN:
+            raise _storage_fail(
+                "DISTRIBUTED_STORAGE_CLOSED",
+                "PostgreSQL runtime storage is closing or closed",
+                lifecycle_state=self._lifecycle_state,
+            )
+
+    def _connection_pool_locked(self) -> Any:
+        self._ensure_open_locked()
         existing = self._pool
         if existing is not None:
             return existing
         _psycopg, dict_row, connection_pool = self._driver()
-        with self._pool_lock:
-            existing = self._pool
-            if existing is not None:
-                return existing
-            pool = connection_pool(
-                conninfo=self.dsn,
-                kwargs={
-                    "autocommit": True,
-                    "row_factory": dict_row,
-                    "connect_timeout": 10,
-                },
-                # Warm the bounded client pool before high-concurrency work;
-                # lazy connection expansion during the release gate inflates
-                # tail latency even when every database operation succeeds.
-                min_size=4,
-                max_size=8,
-                timeout=15.0,
-                max_idle=300.0,
-                max_lifetime=1800.0,
-                reconnect_timeout=30.0,
-                reconnect_failed=self._on_reconnect_failed,
-                configure=self._configure_pool_connection,
-                # Every gate operation already exercises the connection.  A
-                # checkout health query adds a network round trip to each
-                # lease/start/complete call and amplifies tail latency under
-                # the 128-client release gate.
-                check=None,
-                open=False,
-                name="arenyxa-distributed-runtime",
-            )
+        pool = connection_pool(
+            conninfo=self.dsn,
+            kwargs={
+                "autocommit": True,
+                "row_factory": dict_row,
+                "connect_timeout": 10,
+            },
+            # Warm the bounded client pool before high-concurrency work;
+            # lazy connection expansion during the release gate inflates
+            # tail latency even when every database operation succeeds.
+            min_size=4,
+            max_size=8,
+            timeout=15.0,
+            max_idle=300.0,
+            max_lifetime=1800.0,
+            reconnect_timeout=30.0,
+            reconnect_failed=self._on_reconnect_failed,
+            configure=self._configure_pool_connection,
+            # A server-side termination of an idle socket is not observable
+            # until I/O. Validate before handing the socket to a business
+            # transaction so the pool can discard and replace it first.
+            check=self._check_pool_connection,
+            open=False,
+            name="arenyxa-distributed-runtime",
+        )
+        opened = False
+        try:
             retry_database_operation(
                 lambda: pool.open(wait=True, timeout=15.0),
                 retryable=(OSError, TimeoutError, RuntimeError, _psycopg.Error),
                 policy=self.retry_policy,
             )
-            self._pool = pool
-            return pool
+            opened = True
+        finally:
+            if not opened:
+                try:
+                    pool.close()
+                except Exception:
+                    LOGGER.warning("PostgreSQL pool cleanup failed after open failure", exc_info=True)
+        self._pool = pool
+        return pool
+
+    def _connection_pool(self) -> Any:
+        with self._pool_condition:
+            return self._connection_pool_locked()
 
     @contextmanager
     def connection(self) -> Iterator[_ConnectionFacade]:
         psycopg, _dict_row, _connection_pool = self._driver()
-        pool = self._connection_pool()
+        with self._pool_condition:
+            self._ensure_open_locked()
+            self._active_connections += 1
+            admission_ready = False
+            try:
+                pool = self._connection_pool_locked()
+                admission_ready = True
+            finally:
+                if not admission_ready:
+                    self._active_connections -= 1
+                    self._pool_condition.notify_all()
         try:
             with pool.connection(timeout=15.0) as raw:
                 with self._pool_metrics_lock:
@@ -610,14 +653,46 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                 self._pool_acquisition_failures += 1
                 self._last_pool_error = f"{type(exc).__name__}: {exc}"[:512]
             raise
+        finally:
+            with self._pool_condition:
+                self._active_connections -= 1
+                self._pool_condition.notify_all()
 
     def close(self) -> None:
-        """Close the PostgreSQL connection pool during controlled shutdown and tests."""
-        with self._pool_lock:
+        """Drain admitted connections and make this storage instance terminally closed."""
+        with self._pool_condition:
+            while True:
+                if self._lifecycle_state == self._CLOSED:
+                    return
+                if self._lifecycle_state == self._OPEN:
+                    self._lifecycle_state = self._CLOSING
+                if not self._close_owner:
+                    self._close_owner = True
+                    break
+                self._pool_condition.wait()
+            while self._active_connections:
+                self._pool_condition.wait()
             pool = self._pool
-            self._pool = None
-        if pool is not None:
-            pool.close()
+
+        try:
+            if pool is not None:
+                pool.close()
+        except Exception as exc:
+            with self._pool_metrics_lock:
+                self._last_pool_error = f"{type(exc).__name__}: {exc}"[:512]
+            with self._pool_condition:
+                self._close_owner = False
+                # CLOSING remains non-admitting, but a later close() owns a
+                # well-defined retry instead of falsely reporting CLOSED.
+                self._pool_condition.notify_all()
+            raise
+
+        with self._pool_condition:
+            if self._pool is pool:
+                self._pool = None
+            self._lifecycle_state = self._CLOSED
+            self._close_owner = False
+            self._pool_condition.notify_all()
 
     def translate_sql(self, sql: str) -> str:
                                                                                                   
@@ -706,7 +781,11 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
             connection.commit()
 
     def begin_write(self, connection: _ConnectionFacade) -> None:
-        connection.execute("BEGIN")
+        # Recovery and fencing statements deliberately re-check mutable rows in
+        # their final UPDATE.  Pinning a server-configured REPEATABLE READ snapshot
+        # would make that re-check observe the earlier candidate snapshot instead
+        # of a heartbeat committed by another host in the meantime.
+        connection.execute("BEGIN ISOLATION LEVEL READ COMMITTED")
 
     def integrity_check(self) -> tuple[bool, str]:
         try:

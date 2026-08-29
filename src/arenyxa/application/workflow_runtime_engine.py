@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import logging
+import sqlite3
 import threading
 import time
 from dataclasses import asdict
@@ -99,6 +100,7 @@ class WorkflowRuntimeEngineMixin:
         checkpoint_started_at = time.monotonic()
         last_completed_identity = after_identity
         total_output_observed = already_outputs
+        checkpoint_write_failed = False
 
         def merge_node_metrics(result: WorkflowResult) -> None:
             for node_id, metrics in result.nodes.items():
@@ -115,6 +117,7 @@ class WorkflowRuntimeEngineMixin:
         def flush_checkpoint() -> None:
             nonlocal pending_processed, pending_errors, pending_outputs, pending_node_deltas
             nonlocal pending_output_bytes, checkpoint_started_at, checkpoint_generation, previous_checkpoint_hash
+            nonlocal checkpoint_write_failed
             if pending_processed <= 0:
                 return
             if pending_outputs:
@@ -138,15 +141,44 @@ class WorkflowRuntimeEngineMixin:
                 "output_schema": schema.as_dict(),
             }
             checkpoint_payload["checkpoint_sha256"] = checkpoint_digest(checkpoint_payload)
-            self.store.checkpoint_workflow_execution(
-                execution_id,
-                last_input_identity=last_completed_identity,
-                processed_delta=pending_processed,
-                output_delta=len(pending_outputs),
-                error_delta=pending_errors,
-                node_deltas=pending_node_deltas,
-                checkpoint=checkpoint_payload,
-            )
+
+            def checkpoint_is_durable() -> bool:
+                try:
+                    durable = self.store.get_workflow_execution(execution_id)
+                except Exception:
+                    return False
+                stored = durable.get("checkpoint") if durable is not None else None
+                return isinstance(stored, Mapping) and hmac.compare_digest(
+                    str(stored.get("checkpoint_sha256", "")),
+                    str(checkpoint_payload["checkpoint_sha256"]),
+                )
+
+            for attempt in range(2):
+                try:
+                    self.store.checkpoint_workflow_execution(
+                        execution_id,
+                        last_input_identity=last_completed_identity,
+                        processed_delta=pending_processed,
+                        output_delta=len(pending_outputs),
+                        error_delta=pending_errors,
+                        node_deltas=pending_node_deltas,
+                        checkpoint=checkpoint_payload,
+                    )
+                    break
+                except sqlite3.OperationalError:
+                    # Confirm an ambiguous commit before retrying additive deltas.  A retry is
+                    # safe only when the intended checkpoint is not already durable.
+                    if checkpoint_is_durable():
+                        break
+                    if attempt == 0:
+                        continue
+                    checkpoint_write_failed = True
+                    raise
+                except Exception:
+                    if checkpoint_is_durable():
+                        break
+                    checkpoint_write_failed = True
+                    raise
             previous_checkpoint_hash = str(checkpoint_payload["checkpoint_sha256"])
             pending_processed = 0
             pending_errors = 0
@@ -240,13 +272,14 @@ class WorkflowRuntimeEngineMixin:
             return self._result_from_row(final_row, resumed=resumed)
         except ArenyxaError as exc:
             if exc.code == "RUN_CANCELLED":
-                try:
-                    flush_checkpoint()
-                except Exception:
-                    LOGGER.exception(
-                        "Failed to flush workflow checkpoint during cancellation",
-                        extra={"execution_id": execution_id},
-                    )
+                if not checkpoint_write_failed:
+                    try:
+                        flush_checkpoint()
+                    except Exception:
+                        LOGGER.exception(
+                            "Failed to flush workflow checkpoint during cancellation",
+                            extra={"execution_id": execution_id},
+                        )
                 try:
                     self.store.set_revision_build_state(output_revision_id, "cancelled")
                 except Exception:
@@ -261,13 +294,14 @@ class WorkflowRuntimeEngineMixin:
                     error_message="Execution cancelled cooperatively",
                 )
             else:
-                try:
-                    flush_checkpoint()
-                except Exception:
-                    LOGGER.exception(
-                        "Failed to flush workflow checkpoint after domain failure",
-                        extra={"execution_id": execution_id, "error_code": exc.code},
-                    )
+                if not checkpoint_write_failed:
+                    try:
+                        flush_checkpoint()
+                    except Exception:
+                        LOGGER.exception(
+                            "Failed to flush workflow checkpoint after domain failure",
+                            extra={"execution_id": execution_id, "error_code": exc.code},
+                        )
                 try:
                     self.store.set_revision_build_state(output_revision_id, "failed")
                 except Exception:
@@ -283,13 +317,14 @@ class WorkflowRuntimeEngineMixin:
                 )
             raise
         except Exception as exc:
-            try:
-                flush_checkpoint()
-            except Exception:
-                LOGGER.exception(
-                    "Failed to flush workflow checkpoint after unexpected failure",
-                    extra={"execution_id": execution_id},
-                )
+            if not checkpoint_write_failed:
+                try:
+                    flush_checkpoint()
+                except Exception:
+                    LOGGER.exception(
+                        "Failed to flush workflow checkpoint after unexpected failure",
+                        extra={"execution_id": execution_id},
+                    )
             try:
                 self.store.set_revision_build_state(output_revision_id, "failed")
             except Exception:

@@ -53,6 +53,46 @@ def test_selector_store_persists_version_graph(tmp_path: Path) -> None:
     assert len(AdaptiveSelectorStore(path).versions("example.test", "title")) == 1
 
 
+def test_resolve_pins_selected_version_against_concurrent_pruning(tmp_path: Path) -> None:
+    entered = threading.Event()
+    release = threading.Event()
+
+    class BlockingStudio:
+        def analyze(self, _markup: str, selector: str, _selector_type: str):
+            if selector == ".selected":
+                entered.set()
+                assert release.wait(3.0)
+                return {"matches": 1, "fingerprint": {"tag": "div"}}
+            return {"matches": 1, "fingerprint": {"tag": "div"}}
+
+    store = AdaptiveSelectorStore(tmp_path / "selectors-race.json", max_versions_per_key=4)
+    for index in range(3):
+        store.remember("example.test", "item", f".old-{index}", "css", {"tag": "div", "i": index})
+    selected = store.remember("example.test", "item", ".selected", "css", {"tag": "div", "i": 3})
+    engine = AdaptiveExtractionEngine(store, studio=BlockingStudio())  # type: ignore[arg-type]
+    outcome: dict[str, object] = {}
+
+    def resolve() -> None:
+        try:
+            outcome["result"] = engine.resolve("example.test", "item", "<div></div>")
+        except Exception as exc:  # noqa: BLE001 - thread relays every regression failure
+            outcome["error"] = exc
+
+    worker = threading.Thread(target=resolve, daemon=True)
+    worker.start()
+    assert entered.wait(2.0)
+    for index in range(4, 8):
+        store.remember("example.test", "item", f".new-{index}", "css", {"tag": "div", "i": index})
+    release.set()
+    worker.join(3.0)
+
+    assert not worker.is_alive()
+    assert "error" not in outcome
+    assert outcome["result"]["status"] == "stable"  # type: ignore[index]
+    retained = {item.version_id: item for item in store.versions("example.test", "item")}
+    assert retained[selected.version_id].success_count == 1
+
+
 def test_browser_pool_validates_capacity_without_playwright_launch() -> None:
     with pytest.raises(ValueError):
         BrowserPool(max_contexts=0)

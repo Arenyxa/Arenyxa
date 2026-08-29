@@ -399,7 +399,11 @@ class ApiMapService:
                     break
                 key_budget[0] -= 1
                 properties[str(key)] = self._schema(value[key], depth=depth + 1, key_budget=key_budget)
-            schema: dict[str, Any] = {"type": "object", "properties": properties}
+            schema: dict[str, Any] = {
+                "type": "object",
+                "properties": properties,
+                "required": sorted(properties),
+            }
             if len(properties) < len(value):
                 schema["truncated"] = True
             return schema
@@ -415,9 +419,11 @@ class ApiMapService:
     @classmethod
     def _merge_schema(cls, left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
         if left == right:
-            return left
+            return dict(left)
         left_type = left.get("type")
         right_type = right.get("type")
+        if isinstance(left.get("anyOf"), list) or isinstance(right.get("anyOf"), list):
+            return cls._merge_schema_union(left, right)
         if left_type == right_type == "object":
             left_props = dict(left.get("properties") or {})
             right_props = dict(right.get("properties") or {})
@@ -428,19 +434,67 @@ class ApiMapService:
                 else:
                     source = left_props if key in left_props else right_props
                     merged_props[key] = {**source[key], "optional": True}
-            result: dict[str, Any] = {"type": "object", "properties": merged_props}
-            if left.get("truncated") or right.get("truncated"):
-                result["truncated"] = True
-            return result
+            left_required = set(left.get("required", left_props))
+            right_required = set(right.get("required", right_props))
+            result: dict[str, Any] = {
+                "type": "object",
+                "properties": merged_props,
+                "required": sorted(left_required & right_required),
+            }
+            return cls._preserve_schema_flags(result, left, right)
         if left_type == right_type == "array":
-            return {"type": "array", "items": cls._merge_schema(left.get("items", {}), right.get("items", {}))}
+            result = {
+                "type": "array",
+                "items": cls._merge_schema(left.get("items", {}), right.get("items", {})),
+            }
+            return cls._preserve_schema_flags(result, left, right)
+        if left_type == right_type and isinstance(left_type, str):
+            return cls._preserve_schema_flags({"type": left_type}, left, right)
+        return cls._merge_schema_union(left, right)
+
+    @staticmethod
+    def _preserve_schema_flags(
+        result: dict[str, Any], left: Mapping[str, Any], right: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        for flag in ("optional", "truncated"):
+            if left.get(flag) or right.get(flag):
+                result[flag] = True
+        return result
+
+    @classmethod
+    def _merge_schema_union(cls, left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
+        variants: list[dict[str, Any]] = []
+        for schema in (left, right):
+            nested = schema.get("anyOf")
+            if isinstance(nested, list):
+                variants.extend(dict(item) for item in nested if isinstance(item, Mapping))
+            else:
+                variants.append(dict(schema))
+
+        by_type: dict[str, dict[str, Any]] = {}
+        untyped: list[dict[str, Any]] = []
+        for variant in variants:
+            variant_type = variant.get("type")
+            if isinstance(variant_type, str):
+                existing = by_type.get(variant_type)
+                by_type[variant_type] = (
+                    variant if existing is None else cls._merge_schema(existing, variant)
+                )
+            else:
+                untyped.append(variant)
+        ordered = [by_type[key] for key in sorted(by_type)] + untyped
         types: set[str] = set()
-        for value in (left_type, right_type):
+        for variant in ordered:
+            value = variant.get("type")
             if isinstance(value, list):
                 types.update(str(item) for item in value)
             elif value:
                 types.add(str(value))
-        return {"type": sorted(types) if types else ["unknown"]}
+        result = {
+            "type": sorted(types) if types else ["unknown"],
+            "anyOf": ordered,
+        }
+        return cls._preserve_schema_flags(result, left, right)
 
     @staticmethod
     def _headers(raw: Any) -> dict[str, str]:
