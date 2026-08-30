@@ -1,0 +1,103 @@
+name: Arenyxa v8.1.1 Final Closure Prep
+
+on:
+  push:
+    branches: [v811-final-closure-prep]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: arenyxa-v811-final-closure-prep
+  cancel-in-progress: false
+
+jobs:
+  build-clean-release-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      BASE_SHA: e99c68c47a9b41aa0a42cf2764fd2246a7639479
+      PATCH_SHA256: B3E467783BA5CC880313203F6A9D03807AEEEF5AF78EF973AEA9FDFDF3F8F6A9
+      RELEASE_BRANCH: release/v8.1.1-final
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct and authenticate Codex handoff patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          PATCH_B64="$RUNNER_TEMP/arenyxa-v811-handoff.b64"
+          PATCH_GZ="$RUNNER_TEMP/arenyxa-v811-handoff.patch.gz"
+          PATCH_RAW="$RUNNER_TEMP/arenyxa-v811-handoff.patch"
+          cat .release/v811-handoff/part*.b64 | tr -d '\r\n' > "$PATCH_B64"
+          base64 --decode "$PATCH_B64" > "$PATCH_GZ"
+          gzip -dc "$PATCH_GZ" > "$PATCH_RAW"
+          ACTUAL="$(sha256sum "$PATCH_RAW" | awk '{print toupper($1)}')"
+          echo "Expected patch SHA-256: $PATCH_SHA256"
+          echo "Actual patch SHA-256:   $ACTUAL"
+          test "$ACTUAL" = "$PATCH_SHA256"
+          echo "PATCH_RAW=$PATCH_RAW" >> "$GITHUB_ENV"
+
+      - name: Apply handoff to authoritative clean Git baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "$BASE_SHA^{commit}"
+          git checkout --detach "$BASE_SHA"
+          test -z "$(git status --porcelain)"
+          git apply --check "$PATCH_RAW"
+          git apply --index "$PATCH_RAW"
+          echo "Applied Codex handoff patch to clean baseline $BASE_SHA"
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Verify v8.1.1 identity before trust-chain regeneration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/verify_v81_release_identity.py
+
+      - name: Regenerate source repair trust chain from final source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/build_source_repair_seed.py
+          python scripts/build_source_manifest.py
+          git add SOURCE_MANIFEST.sha256 src/arenyxa/resources/repair_manifest.json src/arenyxa/resources/repair_seed.zip
+
+      - name: Syntax and patch hygiene gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q src tests
+          git diff --check --cached
+          test -z "$(git ls-files | grep -E '(^|/)(\.aider|__pycache__|\.pytest_cache|\.mypy_cache|\.ruff_cache)(/|$)' || true)"
+
+      - name: Create clean release candidate commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git status --short
+          git commit -m "fix: finalize v8.1.1 lifecycle and long-horizon invariants"
+          FINAL_SHA="$(git rev-parse HEAD)"
+          echo "FINAL_SHA=$FINAL_SHA" >> "$GITHUB_ENV"
+          echo "Release candidate commit: $FINAL_SHA"
+
+      - name: Publish isolated release candidate branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin "$RELEASE_BRANCH" >/dev/null 2>&1; then
+            echo "Refusing to overwrite existing $RELEASE_BRANCH"
+            exit 2
+          fi
+          git push origin "HEAD:refs/heads/$RELEASE_BRANCH"
+          echo "Published $RELEASE_BRANCH at $FINAL_SHA"
