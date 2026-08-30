@@ -123,6 +123,21 @@ CREATE INDEX IF NOT EXISTS idx_distributed_jobs_state_priority
     ON distributed_jobs(state, priority DESC, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_distributed_jobs_worker
     ON distributed_jobs(lease_worker_id, state);
+CREATE TABLE IF NOT EXISTS distributed_job_idempotency(
+    idempotency_key TEXT PRIMARY KEY,
+    job_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    payload_sha256 TEXT NOT NULL,
+    resource_id TEXT NOT NULL,
+    permission TEXT NOT NULL,
+    side_effect_mode TEXT NOT NULL,
+    terminal_state TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    terminal_at TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_distributed_job_idempotency_mode_terminal
+    ON distributed_job_idempotency(side_effect_mode, terminal_at);
 """
 
 _POSTGRES_SCHEMA = (
@@ -279,6 +294,20 @@ class DistributedRuntimeStorageBackend(ABC):
     def integrity_check(self) -> tuple[bool, str]:
         """Run the concrete backend integrity/readiness check."""
         ...
+
+    def authoritative_lease_epoch(self, connection: _ConnectionFacade, clock: Any) -> float:
+        """Return the backend-authoritative epoch used for durable leases/heartbeats."""
+        del connection
+        return float(clock.stable_epoch())
+
+    def fast_lease_expiry_parameter(self, now: float, duration: float) -> float:
+        """Value bound to the fast lease SQL expiry slot."""
+        return float(now) + max(0.0, float(duration))
+
+    def fast_lease_expiry_from_row(self, row: Any, fallback: float) -> float:
+        """Resolve the authoritative expiry returned by a backend fast lease path."""
+        del row
+        return float(fallback)
 
     def close(self) -> None:
         """Release persistent backend resources; SQLite has none between calls."""
@@ -445,6 +474,51 @@ class SQLiteDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                 "INSERT OR REPLACE INTO distributed_meta(key,value) VALUES('protocol_min',?)",
                 (str(min_protocol),),
             )
+
+    def authoritative_lease_epoch(self, connection: _ConnectionFacade, clock: Any) -> float:
+        # SQLite is a single-host backend.  Persist one epoch/monotonic anchor so every
+        # process opening this queue interprets durable lease timestamps in the same
+        # system-wide monotonic domain instead of projecting its own wall-clock anchor.
+        key = "lease_clock_anchor_v1"
+        current_mono = float(clock.monotonic())
+        candidate_epoch = float(clock.stable_epoch())
+        candidate = f"{candidate_epoch:.17g}|{current_mono:.17g}"
+        row = connection.execute("SELECT value FROM distributed_meta WHERE key=?", (key,)).fetchone()
+        if row is None:
+            connection.execute(
+                "INSERT OR IGNORE INTO distributed_meta(key,value) VALUES(?,?)",
+                (key, candidate),
+            )
+            row = connection.execute("SELECT value FROM distributed_meta WHERE key=?", (key,)).fetchone()
+        if row is None:
+            raise _storage_fail("DISTRIBUTED_LEASE_CLOCK_UNAVAILABLE", "Durable SQLite lease clock anchor is unavailable")
+
+        def parse(value: Any) -> tuple[float, float]:
+            try:
+                epoch_text, mono_text = str(value).split("|", 1)
+                return float(epoch_text), float(mono_text)
+            except (TypeError, ValueError) as exc:
+                raise _storage_fail(
+                    "DISTRIBUTED_LEASE_CLOCK_CORRUPT",
+                    "Durable SQLite lease clock anchor is invalid",
+                ) from exc
+
+        epoch_anchor, mono_anchor = parse(row[0])
+        # A monotonic rollback can only occur across a host reboot for the supported
+        # single-host SQLite deployment. Re-anchor without moving logical time backward;
+        # old leases then age out after at most their remaining lease duration.
+        if current_mono + 1e-6 < mono_anchor:
+            replacement_epoch = max(epoch_anchor, candidate_epoch)
+            replacement = f"{replacement_epoch:.17g}|{current_mono:.17g}"
+            connection.execute(
+                "UPDATE distributed_meta SET value=? WHERE key=? AND value=?",
+                (replacement, key, str(row[0])),
+            )
+            row = connection.execute("SELECT value FROM distributed_meta WHERE key=?", (key,)).fetchone()
+            if row is None:
+                raise _storage_fail("DISTRIBUTED_LEASE_CLOCK_UNAVAILABLE", "Durable SQLite lease clock anchor disappeared")
+            epoch_anchor, mono_anchor = parse(row[0])
+        return epoch_anchor + max(0.0, current_mono - mono_anchor)
 
     def begin_write(self, connection: _ConnectionFacade) -> None:
         connection.execute("BEGIN IMMEDIATE")
@@ -785,6 +859,23 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
             )
             connection.commit()
 
+    def authoritative_lease_epoch(self, connection: _ConnectionFacade, clock: Any) -> float:
+        del clock
+        row = connection.execute(
+            "SELECT EXTRACT(EPOCH FROM clock_timestamp())::DOUBLE PRECISION AS lease_epoch"
+        ).fetchone()
+        if row is None:
+            raise _storage_fail("DISTRIBUTED_LEASE_CLOCK_UNAVAILABLE", "PostgreSQL authoritative lease clock is unavailable")
+        return float(row[0])
+
+    def fast_lease_expiry_parameter(self, now: float, duration: float) -> float:
+        del now
+        return max(0.0, float(duration))
+
+    def fast_lease_expiry_from_row(self, row: Any, fallback: float) -> float:
+        del fallback
+        return float(row["lease_expires_at"])
+
     def begin_write(self, connection: _ConnectionFacade) -> None:
         # Recovery and fencing statements deliberately re-check mutable rows in
         # their final UPDATE.  Pinning a server-configured REPEATABLE READ snapshot
@@ -815,7 +906,8 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
 
     def claim_worker_slot_for_lease_sql(self) -> str:
         return (
-            "UPDATE distributed_workers SET active_leases=active_leases+1,heartbeat_at=?,updated_at=? "
+            "UPDATE distributed_workers SET active_leases=active_leases+1,"
+            "heartbeat_at=GREATEST(heartbeat_at,?,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=? "
             "WHERE worker_id=? AND state='active' AND active_leases<max_slots "
             "RETURNING protocol_min,protocol_max"
         )
@@ -837,14 +929,14 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                 FOR UPDATE OF j SKIP LOCKED
             ), claimed_worker AS (
                 UPDATE distributed_workers AS w
-                SET active_leases=w.active_leases+1,heartbeat_at=?,updated_at=?
+                SET active_leases=w.active_leases+1,heartbeat_at=GREATEST(w.heartbeat_at,?,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?
                 FROM candidate AS c
                 WHERE w.worker_id=? AND w.state='active' AND w.active_leases<w.max_slots
                 RETURNING w.worker_id
             ), leased AS (
                 UPDATE distributed_jobs AS j
                 SET state='leased',attempt=j.attempt+1,lease_worker_id=?,lease_token_sha256=?,
-                    lease_expires_at=?,error_code='',updated_at=?
+                    lease_expires_at=EXTRACT(EPOCH FROM clock_timestamp())+?,error_code='',updated_at=?
                 FROM candidate AS c
                 CROSS JOIN claimed_worker AS w
                 WHERE j.job_id=c.job_id AND j.state='queued'
@@ -875,7 +967,7 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                 SELECT job_id,state
                 FROM distributed_jobs
                 WHERE job_id=? AND state='leased' AND lease_worker_id=?
-                  AND lease_token_sha256=? AND lease_expires_at>?
+                  AND lease_token_sha256=? AND lease_expires_at>GREATEST(?,EXTRACT(EPOCH FROM clock_timestamp()))
                 FOR UPDATE
             ), updated AS (
                 UPDATE distributed_jobs AS j
@@ -906,25 +998,46 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
     def complete_fast_sql(self) -> str:
         return """
             WITH candidate AS (
-                SELECT job_id,state,side_effect_state
+                SELECT job_id,state,side_effect_state,idempotency_key,kind,payload_sha256,
+                       resource_id,permission,side_effect_mode,created_at
                 FROM distributed_jobs
                 WHERE job_id=? AND state IN ('leased','running')
-                  AND lease_worker_id=? AND lease_token_sha256=? AND lease_expires_at>?
+                  AND lease_worker_id=? AND lease_token_sha256=? AND lease_expires_at>GREATEST(?,EXTRACT(EPOCH FROM clock_timestamp()))
                 FOR UPDATE
+            ), tombstone AS (
+                INSERT INTO distributed_job_idempotency(
+                    idempotency_key,job_id,kind,payload_sha256,resource_id,permission,
+                    side_effect_mode,terminal_state,created_at,terminal_at,updated_at
+                )
+                SELECT c.idempotency_key,c.job_id,c.kind,c.payload_sha256,c.resource_id,c.permission,
+                       c.side_effect_mode,'completed',c.created_at,?,?
+                FROM candidate AS c
+                ON CONFLICT (idempotency_key) DO UPDATE SET
+                    terminal_state=EXCLUDED.terminal_state,
+                    terminal_at=EXCLUDED.terminal_at,
+                    updated_at=EXCLUDED.updated_at
+                WHERE distributed_job_idempotency.job_id=EXCLUDED.job_id
+                  AND distributed_job_idempotency.kind=EXCLUDED.kind
+                  AND distributed_job_idempotency.payload_sha256=EXCLUDED.payload_sha256
+                  AND distributed_job_idempotency.resource_id=EXCLUDED.resource_id
+                  AND distributed_job_idempotency.permission=EXCLUDED.permission
+                  AND distributed_job_idempotency.side_effect_mode=EXCLUDED.side_effect_mode
+                RETURNING idempotency_key,terminal_at,updated_at
             ), updated AS (
                 UPDATE distributed_jobs AS j
                 SET state='completed',result_json=?,result_sha256=?,
                     side_effect_state=CASE WHEN c.side_effect_state='started' THEN 'completed'
                                            ELSE c.side_effect_state END,
-                    terminal_worker_id=?,terminal_lease_token_sha256=?,terminal_at=?,
+                    terminal_worker_id=?,terminal_lease_token_sha256=?,terminal_at=t.terminal_at,
                     lease_worker_id='',lease_token_sha256='',lease_expires_at=0,
-                    error_code='',updated_at=?
+                    error_code='',updated_at=t.updated_at
                 FROM candidate AS c
+                JOIN tombstone AS t ON t.idempotency_key=c.idempotency_key
                 WHERE j.job_id=c.job_id
-                RETURNING j.job_id
+                RETURNING j.job_id,j.terminal_at,j.updated_at
             ), worker_updated AS (
                 UPDATE distributed_workers AS w
-                SET active_leases=GREATEST(0,w.active_leases-1),heartbeat_at=?,updated_at=?
+                SET active_leases=GREATEST(0,w.active_leases-1),heartbeat_at=GREATEST(w.heartbeat_at,?,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?
                 WHERE w.worker_id=? AND EXISTS (SELECT 1 FROM updated)
                 RETURNING w.worker_id
             ), event AS (

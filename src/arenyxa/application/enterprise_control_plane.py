@@ -130,7 +130,12 @@ class EnterpriseControlPlane:
         self.identity.require("enterprise.remote_ops", "enterprise:distributed")
         self.identity.require_recent_step_up()
         count = int(self.server.queue.recover_expired_leases())
-        return {"recovered_leases": count, "checked_at": utc_now()}
+        retention = dict(self.server.queue.retain_terminal_jobs())
+        return {
+            "recovered_leases": count,
+            "retention_maintenance": retention,
+            "checked_at": utc_now(),
+        }
 
     def server_authority_start(self, *, ttl_seconds: int = 24 * 60 * 60) -> dict[str, Any]:
         token = str(self.server.activate_service(ttl_seconds=max(300, min(24 * 60 * 60, int(ttl_seconds)))))

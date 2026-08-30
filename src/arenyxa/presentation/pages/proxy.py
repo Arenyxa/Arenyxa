@@ -31,7 +31,7 @@ from arenyxa.infrastructure.capture.proxy import InterceptingProxy, ProxyFlow, P
 from arenyxa.infrastructure.capture.professional import MessageCodec, MessageComparer
 from arenyxa.application.proxy_deep_inspector import ProxyDeepInspector
 from arenyxa.application.proxy_profiler import ProxyProfiler
-from arenyxa.domain.errors import ArenyxaError
+from arenyxa.presentation.background import run_background
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.widgets import PageHeader, connect_current_row_changed, set_table_header_stretch_last
 from arenyxa.presentation.pages.proxy_suite_panels import ProxySuitePanelsMixin
@@ -642,22 +642,32 @@ class ProxyPage(ProxySuitePanelsMixin, WorkspacePage):
         self.refresh_runtime()
 
     def deactivated(self) -> None:
-        if self.engine.running:
-            self.timer.start()
-        else:
-            self.timer.stop()
+        # The proxy engine may continue running in the background, but a hidden
+        # page must not keep rebuilding Qt models/widgets at ~5 Hz.
+        self.timer.stop()
 
     def send_repeater(self) -> None:
-        try:
-            response = self.engine.repeat_raw(
-                self.repeater_scheme.currentText(),
-                self.repeater_host.text().strip(),
-                int(self.repeater_port.value()),
-                self.repeater_request.toPlainText(),
-            )
+        scheme = self.repeater_scheme.currentText()
+        host = self.repeater_host.text().strip()
+        port = int(self.repeater_port.value())
+        request = self.repeater_request.toPlainText()
+        self.repeater_send.setEnabled(False)
+        self.repeater_response.setPlainText("Sending request…")
+
+        def execute() -> bytes:
+            return self.engine.repeat_raw(scheme, host, port, request)
+
+        def completed(response: bytes) -> None:
+            self.repeater_send.setEnabled(True)
             self.repeater_response.setPlainText(response.decode("latin-1", "replace"))
-        except (OSError, ValueError, ArenyxaError) as exc:
-            self.repeater_response.setPlainText(f"Request failed: {exc}")
+            self.statusMessage.emit("Repeater request completed")
+
+        def failed(message: str) -> None:
+            self.repeater_send.setEnabled(True)
+            self.repeater_response.setPlainText(f"Request failed: {message}")
+            self.statusMessage.emit("Repeater request failed")
+
+        run_background(execute, completed, failed)
 
     def _sync_decoder_operations(self, mode: str) -> None:
         normalized = str(mode).strip().casefold()

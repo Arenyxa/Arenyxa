@@ -72,6 +72,17 @@ class LiveIntelligencePipeline:
             for alert in alerts:
                 self.stream.publish(f"capture.{session_id}.alert", alert.snapshot())
 
+    def retire_session(self, session_id: str) -> None:
+        key = str(session_id or "")
+        if not key:
+            return
+        with self._lock:
+            self._alerts.pop(key, None)
+            self._event_counts.pop(key, None)
+            self._protocol_counts.pop(key, None)
+            self._host_counts.pop(key, None)
+            self._byte_counts.pop(key, None)
+
     def alerts(self, session_id: str, *, limit: int = 1000) -> list[dict[str, Any]]:
         bounded = max(1, min(100_000, int(limit)))
         with self._lock:
@@ -115,16 +126,19 @@ class LiveIntelligencePipeline:
     def live_snapshot(self, session_id: str = "") -> dict[str, Any]:
         with self._lock:
             if session_id:
+                key = str(session_id)
+                protocols = self._protocol_counts.get(key)
+                hosts = self._host_counts.get(key)
                 return {
-                    "session_id": session_id,
-                    "events": self._event_counts[session_id],
-                    "bytes": self._byte_counts[session_id],
-                    "protocols": dict(self._protocol_counts[session_id].most_common()),
+                    "session_id": key,
+                    "events": int(self._event_counts.get(key, 0)),
+                    "bytes": int(self._byte_counts.get(key, 0)),
+                    "protocols": {} if protocols is None else dict(protocols.most_common()),
                     "top_hosts": [
                         {"host": host, "events": count}
-                        for host, count in self._host_counts[session_id].most_common(20)
+                        for host, count in (() if hosts is None else hosts.most_common(20))
                     ],
-                    "alerts": len(self._alerts.get(session_id, ())),
+                    "alerts": len(self._alerts.get(key, ())),
                     "stream": self.stream.stats(),
                     "processing_errors": self._processing_errors,
                 }

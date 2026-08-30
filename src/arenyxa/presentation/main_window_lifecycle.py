@@ -213,20 +213,34 @@ class MainWindowLifecycleMixin:
         self._route_generation += 1
         self._status_generation += 1
         self.save_window_state()
-        try:
-            if self.tray is not None:
-                self.tray.hide()
-            self.taskbar_progress.clear()
-            self.taskbar_progress.close()
-                                                                                          
-                                                                                         
-                                                                                          
-            if not begin_background_shutdown(timeout_ms=2500):
-                LOGGER.warning("UI background jobs did not fully quiesce before context shutdown")
-            self.context.shutdown()
-            self.crash_marker.unlink(missing_ok=True)
-        finally:
-            event.accept()
+        if self.tray is not None:
+            self.tray.hide()
+        self.taskbar_progress.clear()
+        self.taskbar_progress.close()
+
+        background_complete = begin_background_shutdown(timeout_ms=2500)
+        if not background_complete:
+            LOGGER.warning("UI background jobs did not fully quiesce before context shutdown")
+            if self._repair_exit_requested:
+                self.show_status(
+                    "Repair 退出已阻止：仍有 UI 后台任务在运行；外部 Repair Worker 将保持 fail-safe。",
+                    9000,
+                )
+                event.ignore()
+                return
+
+        reason = "repair" if self._repair_exit_requested else "user_exit"
+        timeout = 12.0 if self._repair_exit_requested else 20.0
+        if not self.context.shutdown(reason=reason, timeout=timeout):
+            LOGGER.error("ApplicationContext shutdown incomplete; refusing to close MainWindow")
+            self.show_status(
+                "Arenyxa 安全关闭未完成；窗口保持打开，请检查 shutdown blocker 日志。",
+                9000,
+            )
+            event.ignore()
+            return
+        self.crash_marker.unlink(missing_ok=True)
+        event.accept()
 
     def showEvent(self, event: Any) -> None:
         super().showEvent(event)

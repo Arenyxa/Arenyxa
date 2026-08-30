@@ -7,6 +7,7 @@ import threading
 from dataclasses import field
 from arenyxa.compat import dataclass
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import Any, Callable
 
@@ -67,7 +68,7 @@ from arenyxa.infrastructure.capture.proxy import InterceptingProxy
 from arenyxa.infrastructure.capture.mitm_engine import MitmEngine
 from arenyxa.infrastructure.database import SQLiteStore
 from arenyxa.infrastructure.observability import configure_logging, shutdown_logging
-from arenyxa.infrastructure.shutdown import DependencyShutdownCoordinator
+from arenyxa.infrastructure.shutdown import DependencyShutdownCoordinator, ShutdownDeadline
 from arenyxa.performance import PerformancePolicy
 from arenyxa.platform_compat import (
     apply_legacy_environment,
@@ -81,6 +82,14 @@ from arenyxa.security import DeveloperTrustStore, SecurityKernel, Session
 from arenyxa.security.dlp import DlpMode, DlpPolicy, GLOBAL_DLP_ENGINE
 
 LOGGER = logging.getLogger(__name__)
+
+
+class RepairShutdownState(str, Enum):
+    RUNNING = "running"
+    QUIESCING = "quiescing"
+    PREPARED = "prepared"
+    HANDOFF_COMMITTED = "handoff_committed"
+    FAILED_QUIESCED = "failed_quiesced"
 
 
 @dataclass(slots=True)
@@ -154,31 +163,142 @@ class ApplicationContext:
     job_system: JobSystem | None = None
     local_control_session: Session | None = None
     _shutdown: bool = field(default=False, init=False, repr=False)
+    _shutdown_result: bool | None = field(default=None, init=False, repr=False)
+    _shutdown_reason: str = field(default="unspecified", init=False, repr=False)
+    _repair_prepared: bool = field(default=False, init=False, repr=False)
+    _repair_shutdown_state: RepairShutdownState = field(
+        default=RepairShutdownState.RUNNING,
+        init=False,
+        repr=False,
+    )
     _shutdown_lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
-    def shutdown(self) -> None:
-        """Shut down runtime components in dependency order and preserve durable state."""
+    @property
+    def repair_shutdown_state(self) -> RepairShutdownState:
+        with self._shutdown_lock:
+            return self._repair_shutdown_state
+
+    def mark_repair_shutdown_failed(self) -> None:
+        with self._shutdown_lock:
+            if self._repair_shutdown_state is not RepairShutdownState.RUNNING:
+                self._repair_shutdown_state = RepairShutdownState.FAILED_QUIESCED
+
+    def mark_repair_handoff_committed(self) -> None:
+        with self._shutdown_lock:
+            if self._repair_shutdown_state is not RepairShutdownState.PREPARED:
+                raise RuntimeError("Repair handoff requires a prepared execution plane")
+            self._repair_shutdown_state = RepairShutdownState.HANDOFF_COMMITTED
+
+    def _prepare_execution_shutdown(
+        self, *, reason: str, deadline: ShutdownDeadline
+    ) -> bool:
+        """Stop new work, signal cooperative cancellation, and drain execution owners.
+
+        This is intentionally separate from full context teardown so Repair can quiesce
+        dangerous work *before* launching the external worker while preserving one
+        canonical owner for storage/service destruction.
+        """
+        normalized_reason = str(reason or "unspecified")
+        self._shutdown_reason = normalized_reason
+
+        # Close every producer/admission gate before waiting on any one owner.
+        self.scheduler.begin_shutdown()
+        if self.job_system is not None:
+            self.job_system.begin_shutdown()
+        self.workflow_runtime.shutdown(wait=False)
+        self.runner.begin_shutdown()
+
+        checks: list[tuple[str, Callable[[float], bool]]] = [
+            ("scheduler", self.scheduler.drain),
+        ]
+        if self.job_system is not None:
+            checks.append(("job_system", self.job_system.drain))
+        checks.extend(
+            [
+                (
+                    "workflow_runtime",
+                    lambda timeout: self.workflow_runtime.shutdown(wait=True, timeout=timeout),
+                ),
+                ("runner", self.runner.drain),
+            ]
+        )
+
+        complete = True
+        for owner, drain in checks:
+            remaining = deadline.remaining()
+            if remaining <= 0.0:
+                complete = False
+                LOGGER.error(
+                    "Shutdown preparation deadline exhausted reason=%s owner=%s",
+                    normalized_reason,
+                    owner,
+                )
+                continue
+            phase_started = __import__("time").monotonic()
+            owner_complete = bool(drain(remaining))
+            LOGGER.info(
+                "Shutdown preparation reason=%s owner=%s success=%s elapsed_ms=%d deadline_remaining_ms=%d",
+                normalized_reason,
+                owner,
+                owner_complete,
+                int((__import__("time").monotonic() - phase_started) * 1000.0),
+                int(deadline.remaining() * 1000.0),
+            )
+            complete = complete and owner_complete
+
+        if not complete:
+            LOGGER.error(
+                "Shutdown preparation incomplete reason=%s runner=%s job_system=%s scheduler=%s",
+                normalized_reason,
+                self.runner.shutdown_snapshot(),
+                None if self.job_system is None else self.job_system.shutdown_snapshot(),
+                self.scheduler.shutdown_snapshot(),
+            )
+        return complete
+
+    def prepare_for_repair_shutdown(self, timeout: float = 8.0) -> bool:
+        """Canonical Repair pre-shutdown policy shared by manual and startup repair."""
         with self._shutdown_lock:
             if self._shutdown:
-                return
-            self._shutdown = True
+                return bool(self._shutdown_result)
+            if self._repair_shutdown_state in {
+                RepairShutdownState.PREPARED,
+                RepairShutdownState.HANDOFF_COMMITTED,
+            }:
+                return True
+            self._shutdown_reason = "repair"
+            self._repair_shutdown_state = RepairShutdownState.QUIESCING
+        deadline = ShutdownDeadline.from_timeout(timeout)
+        complete = self._prepare_execution_shutdown(reason="repair", deadline=deadline)
+        with self._shutdown_lock:
+            self._repair_prepared = complete
+            self._repair_shutdown_state = (
+                RepairShutdownState.PREPARED
+                if complete
+                else RepairShutdownState.FAILED_QUIESCED
+            )
+        return complete
 
-        coordinator = DependencyShutdownCoordinator(LOGGER)
+    def _shutdown_actions(
+        self, deadline: ShutdownDeadline
+    ) -> dict[str, Callable[[], bool | None]]:
+        """Build owner-level shutdown actions that all consume one deadline."""
 
-        def stop_scheduler() -> None:
-            self.scheduler.stop()
+        def remaining() -> float:
+            return max(0.0, deadline.remaining())
 
         def stop_runtime_supervisor() -> None:
             if self.runtime_supervisor is not None:
-                self.runtime_supervisor.stop()
+                self.runtime_supervisor.stop(timeout=min(2.0, remaining()))
 
         def stop_survivability() -> None:
             if self.survivability is not None:
-                self.survivability.stop()
+                self.survivability.stop(timeout=min(2.0, remaining()))
 
-        def stop_job_system() -> None:
-            if self.job_system is not None:
-                self.job_system.shutdown(wait=True)
+        def stop_job_system() -> bool:
+            if self.job_system is None:
+                return True
+            return self.job_system.shutdown(wait=True, timeout=remaining())
 
         def stop_resilience_scheduler() -> None:
             if self.resilience_scheduler is not None:
@@ -192,30 +312,26 @@ class ApplicationContext:
             if self.office_coordinator is not None:
                 self.office_coordinator.stop()
 
-        def stop_workflow_runtime() -> None:
-            if not self.workflow_runtime.shutdown(wait=True, timeout=10.0):
-                LOGGER.warning("Workflow runtime did not quiesce within shutdown timeout")
+        def stop_workflow_runtime() -> bool:
+            stopped = self.workflow_runtime.shutdown(wait=True, timeout=remaining())
+            if not stopped:
+                LOGGER.warning("Workflow runtime did not quiesce within global shutdown deadline")
+            return stopped
 
         def finalize_capture() -> None:
             if self.capture.session and self.capture.session.state.value in {
-                "preparing",
-                "capturing",
-                "paused",
-                "finalizing",
-                "failed",
+                "preparing", "capturing", "paused", "finalizing", "failed"
             }:
                 self.capture.stop(cancelled=True)
 
-        def stop_proxy() -> None:
-            if self.proxy_engine is not None:
-                self.proxy_engine.close()
+        def stop_proxy() -> bool:
+            if self.proxy_engine is None:
+                return True
+            return self.proxy_engine.close()
 
         def stop_mitm() -> None:
             if self.mitm_engine is not None:
                 self.mitm_engine.stop()
-
-        def stop_runner() -> None:
-            self.runner.shutdown(wait=True)
 
         def close_terminal() -> None:
             self.terminal.close()
@@ -239,62 +355,126 @@ class ApplicationContext:
             if self.enterprise_identity is not None:
                 self.enterprise_identity.close()
 
-        def save_settings() -> None:
-            self.settings.save(self.paths.root / "settings.json")
+        return {
+            "runtime_supervisor": stop_runtime_supervisor,
+            "survivability": stop_survivability,
+            "scheduler": lambda: self.scheduler.stop(timeout=remaining()),
+            "resilience_scheduler": stop_resilience_scheduler,
+            "job_system": stop_job_system,
+            "enterprise_server": stop_enterprise_server,
+            "office_coordinator": stop_office_coordinator,
+            "workflow_runtime": stop_workflow_runtime,
+            "capture": finalize_capture,
+            "proxy": stop_proxy,
+            "mitm": stop_mitm,
+            "runner": lambda: self.runner.shutdown(wait=True, timeout=remaining()),
+            "terminal": close_terminal,
+            "developer_access": logout_developer,
+            "local_control_session": retire_local_control_session,
+            "enterprise_identity": close_enterprise_identity,
+            "settings": lambda: self.settings.save(self.paths.root / "settings.json"),
+            "database_checkpoint": lambda: self.store.checkpoint("PASSIVE"),
+            "database_optimize": self.store.optimize,
+            "logging": shutdown_logging,
+        }
 
-        def checkpoint_database() -> None:
-            self.store.checkpoint("PASSIVE")
-
-        def optimize_database() -> None:
-            self.store.optimize()
-
-        def stop_logging() -> None:
-            shutdown_logging()
-
-        # Dependencies describe data-flow shutdown, rather than relying on source order:
-        # stop intake first, quiesce producers, finalize capture/network interception,
-        # drain execution, close identities/sessions, then persist and checkpoint storage.
-        coordinator.add("runtime_supervisor", stop_runtime_supervisor)
-        coordinator.add("survivability", stop_survivability, after=("runtime_supervisor",))
-        coordinator.add("scheduler", stop_scheduler, after=("runtime_supervisor", "survivability"))
-        coordinator.add("resilience_scheduler", stop_resilience_scheduler)
+    def _shutdown_coordinator(
+        self, *, reason: str, deadline: ShutdownDeadline
+    ) -> DependencyShutdownCoordinator:
+        """Create the existing dependency graph with deadline-aware owner actions."""
+        actions = self._shutdown_actions(deadline)
+        coordinator = DependencyShutdownCoordinator(LOGGER, reason=reason, deadline=deadline)
+        coordinator.add("runtime_supervisor", actions["runtime_supervisor"])
+        coordinator.add("survivability", actions["survivability"], after=("runtime_supervisor",))
+        coordinator.add(
+            "scheduler", actions["scheduler"], after=("runtime_supervisor", "survivability")
+        )
+        coordinator.add("resilience_scheduler", actions["resilience_scheduler"])
         coordinator.add(
             "job_system",
-            stop_job_system,
+            actions["job_system"],
             after=("runtime_supervisor", "survivability", "scheduler", "resilience_scheduler"),
         )
-        coordinator.add("enterprise_server", stop_enterprise_server, after=("job_system",))
-        coordinator.add("office_coordinator", stop_office_coordinator, after=("enterprise_server",))
-        coordinator.add("workflow_runtime", stop_workflow_runtime, after=("scheduler", "enterprise_server"))
-        coordinator.add("capture", finalize_capture, after=("workflow_runtime",))
-        coordinator.add("proxy", stop_proxy, after=("capture",))
-        coordinator.add("mitm", stop_mitm, after=("capture",))
-        coordinator.add("runner", stop_runner, after=("workflow_runtime", "capture", "proxy", "mitm"))
-        coordinator.add("terminal", close_terminal, after=("runner",))
+        coordinator.add("enterprise_server", actions["enterprise_server"], after=("job_system",))
+        coordinator.add(
+            "office_coordinator", actions["office_coordinator"], after=("enterprise_server",)
+        )
+        coordinator.add(
+            "workflow_runtime", actions["workflow_runtime"], after=("scheduler", "enterprise_server")
+        )
+        coordinator.add("capture", actions["capture"], after=("workflow_runtime",))
+        coordinator.add("proxy", actions["proxy"], after=("capture",))
+        coordinator.add("mitm", actions["mitm"], after=("capture",))
+        coordinator.add(
+            "runner", actions["runner"], after=("workflow_runtime", "capture", "proxy", "mitm")
+        )
+        coordinator.add("terminal", actions["terminal"], after=("runner",))
         coordinator.add(
             "developer_access",
-            logout_developer,
+            actions["developer_access"],
             after=("runner", "office_coordinator", "resilience_scheduler"),
         )
         coordinator.add(
             "local_control_session",
-            retire_local_control_session,
+            actions["local_control_session"],
             after=("job_system", "developer_access"),
         )
         coordinator.add(
-            "enterprise_identity", close_enterprise_identity, after=("developer_access", "office_coordinator")
+            "enterprise_identity",
+            actions["enterprise_identity"],
+            after=("developer_access", "office_coordinator"),
         )
         coordinator.add(
-            "settings", save_settings, after=("terminal", "developer_access", "local_control_session")
+            "settings",
+            actions["settings"],
+            after=("terminal", "developer_access", "local_control_session"),
         )
         coordinator.add(
             "database_checkpoint",
-            checkpoint_database,
+            actions["database_checkpoint"],
             after=("runner", "capture", "enterprise_identity", "settings"),
         )
-        coordinator.add("database_optimize", optimize_database, after=("database_checkpoint",))
-        coordinator.add("logging", stop_logging, after=("database_optimize",))
-        coordinator.run()
+        coordinator.add(
+            "database_optimize", actions["database_optimize"], after=("database_checkpoint",)
+        )
+        coordinator.add("logging", actions["logging"], after=("database_optimize",))
+        return coordinator
+
+    def shutdown(self, *, reason: str | None = None, timeout: float = 20.0) -> bool:
+        """Shut down runtime components in dependency order within one global budget."""
+        normalized_reason = str(reason or self._shutdown_reason or "user_exit")
+        if normalized_reason == "unspecified":
+            normalized_reason = "user_exit"
+        with self._shutdown_lock:
+            if self._shutdown:
+                return bool(self._shutdown_result)
+            self._shutdown = True
+            self._shutdown_reason = normalized_reason
+            self._shutdown_result = None
+
+        deadline = ShutdownDeadline.from_timeout(timeout)
+        if not self._repair_prepared or normalized_reason != "repair":
+            if not self._prepare_execution_shutdown(reason=normalized_reason, deadline=deadline):
+                with self._shutdown_lock:
+                    self._shutdown = False
+                    self._shutdown_result = False
+                return False
+
+        failures = self._shutdown_coordinator(reason=normalized_reason, deadline=deadline).run()
+        success = not failures
+        with self._shutdown_lock:
+            self._shutdown_result = success
+            if not success:
+                self._shutdown = False
+        if not success:
+            LOGGER.error(
+                "ApplicationContext shutdown incomplete reason=%s failures=%s elapsed_ms=%d",
+                normalized_reason,
+                failures,
+                int(deadline.elapsed() * 1000.0),
+            )
+        return success
+
 
 
 def _validate_python_runtime() -> Any:
@@ -471,39 +651,60 @@ def _create_enterprise_services(
 ]:
     """Create enterprise identity, governance, Zero Trust context, and distributed runtime services."""
     enterprise_identity = LocalEnterpriseIdentityService(security, paths.root)
-    enrollment = EnrollmentService(enterprise_identity, paths.root)
-    enterprise_governance = EnterpriseGovernanceService(enterprise_identity, store)
-
-    def enterprise_access_context() -> dict[str, object]:
-        context = enterprise_identity.dynamic_access_context()
-        try:
-            context.update(enrollment.local_device_posture())
-        except Exception:
-            LOGGER.exception(
-                "Enterprise device-posture evaluation failed; Zero Trust will fail closed for device signals"
-            )
-            context.update({"managed_device": False, "device_compliant": False})
-        return context
-
-    enterprise_operations = EnterpriseOperationGuard(
-        store,
-        enterprise_identity,
-        enterprise_governance,
-        access_context_provider=enterprise_access_context,
-    )
-    office_coordinator = OfficeCoordinatorService(enterprise_identity, enrollment, paths.root)
-    enterprise_server = EnterpriseServerRuntime(
-        enterprise_identity,
-        enterprise_governance,
-        paths.root,
-        distributed_storage_target=enterprise_runtime_database,
-    )
+    office_coordinator: OfficeCoordinatorService | None = None
+    enterprise_server: EnterpriseServerRuntime | None = None
     try:
-        recovered_distributed = enterprise_server.queue.recover_expired_leases()
-        if recovered_distributed:
-            LOGGER.warning("Recovered %d expired distributed job leases", recovered_distributed)
+        enrollment = EnrollmentService(enterprise_identity, paths.root)
+        enterprise_governance = EnterpriseGovernanceService(enterprise_identity, store)
+
+        def enterprise_access_context() -> dict[str, object]:
+            context = enterprise_identity.dynamic_access_context()
+            try:
+                context.update(enrollment.local_device_posture())
+            except Exception:
+                LOGGER.exception(
+                    "Enterprise device-posture evaluation failed; Zero Trust will fail closed for device signals"
+                )
+                context.update({"managed_device": False, "device_compliant": False})
+            return context
+
+        enterprise_operations = EnterpriseOperationGuard(
+            store,
+            enterprise_identity,
+            enterprise_governance,
+            access_context_provider=enterprise_access_context,
+        )
+        office_coordinator = OfficeCoordinatorService(enterprise_identity, enrollment, paths.root)
+        enterprise_server = EnterpriseServerRuntime(
+            enterprise_identity,
+            enterprise_governance,
+            paths.root,
+            distributed_storage_target=enterprise_runtime_database,
+        )
+        try:
+            recovered_distributed = enterprise_server.queue.recover_expired_leases()
+            if recovered_distributed:
+                LOGGER.warning("Recovered %d expired distributed job leases", recovered_distributed)
+        except Exception:
+            LOGGER.exception("Distributed queue recovery failed; remote enterprise operations remain fail-closed")
+        try:
+            retention = enterprise_server.queue.retain_terminal_jobs()
+            if retention["jobs_pruned"] or retention["idempotent_tombstones_pruned"]:
+                LOGGER.info("Distributed queue startup retention maintenance: %s", retention)
+            elif retention["pruning_disabled"]:
+                LOGGER.warning("Distributed queue startup retention is fail-closed: %s", retention)
+        except Exception:
+            LOGGER.exception("Distributed queue startup retention maintenance failed; no history was assumed pruned")
     except Exception:
-        LOGGER.exception("Distributed queue recovery failed; remote enterprise operations remain fail-closed")
+        if enterprise_server is not None:
+            _run_bootstrap_cleanup(
+                "enterprise_server",
+                lambda: enterprise_server.close(reason="BOOTSTRAP_FAILURE"),
+            )
+        if office_coordinator is not None:
+            _run_bootstrap_cleanup("office_coordinator", office_coordinator.stop)
+        _run_bootstrap_cleanup("enterprise_identity", enterprise_identity.close)
+        raise
     return (
         enterprise_identity,
         enrollment,
@@ -669,13 +870,38 @@ def _create_platform_job_services(
     performance: PerformancePolicy,
 ) -> tuple[Session, JobSystem]:
     session = create_local_control_session(security)
-    jobs = JobSystem(
-        store,
-        security,
-        max_workers=max(1, min(8, performance.runner_workers)),
-        queue_capacity=max(16, min(512, performance.capture_queue_capacity // 100)),
-    )
+    try:
+        jobs = JobSystem(
+            store,
+            security,
+            max_workers=max(1, min(8, performance.runner_workers)),
+            queue_capacity=max(16, min(512, performance.capture_queue_capacity // 100)),
+        )
+    except Exception:
+        _retire_bootstrap_control_session(security, session)
+        raise
     return session, jobs
+
+
+def _retire_bootstrap_control_session(security: SecurityKernel, session: Session) -> None:
+    try:
+        security.state.revoke_session(session.id)
+        security.state.remove_identity(session.identity_id)
+        security.state.forget_session_revocation(session.id)
+    except Exception:
+        LOGGER.exception("Bootstrap rollback failed to retire the local control session")
+
+
+def _run_bootstrap_cleanup(name: str, action: Callable[[], Any]) -> bool:
+    try:
+        result = action()
+    except Exception:
+        LOGGER.exception("Bootstrap rollback action failed owner=%s", name)
+        return False
+    if result is False:
+        LOGGER.error("Bootstrap rollback action incomplete owner=%s", name)
+        return False
+    return True
 
 
 def _attach_platform_control_plane(context: ApplicationContext) -> None:
@@ -794,6 +1020,60 @@ def _prepare_bootstrap_foundation(
     )
 
 
+def _rollback_bootstrap_failure(
+    context: ApplicationContext | None,
+    terminal_workspace: TerminalWorkspaceManager | None,
+    terminal: TerminalSession | None,
+    workflow_runtime: WorkflowDatasetService | None,
+    runner: RunOrchestrator | None,
+    scheduler: SchedulerService | None,
+    enterprise_server: EnterpriseServerRuntime | None,
+    office_coordinator: OfficeCoordinatorService | None,
+    enterprise_identity: LocalEnterpriseIdentityService | None,
+    job_system: JobSystem | None,
+    security: SecurityKernel | None,
+    local_control_session: Session | None,
+) -> None:
+    if context is not None:
+        complete = _run_bootstrap_cleanup(
+            "application_context",
+            lambda: context.shutdown(reason="bootstrap_failure", timeout=8.0),
+        )
+        if not complete:
+            _run_bootstrap_cleanup(
+                "application_context_retry",
+                lambda: context.shutdown(reason="bootstrap_failure", timeout=8.0),
+            )
+        return
+    if terminal_workspace is not None:
+        _run_bootstrap_cleanup("terminal_workspace", terminal_workspace.close_all)
+    if terminal is not None:
+        _run_bootstrap_cleanup("terminal", terminal.close)
+    if workflow_runtime is not None:
+        _run_bootstrap_cleanup(
+            "workflow_runtime", lambda: workflow_runtime.shutdown(wait=True, timeout=5.0)
+        )
+    if runner is not None:
+        _run_bootstrap_cleanup("runner", lambda: runner.shutdown(wait=True, timeout=5.0))
+    if scheduler is not None:
+        _run_bootstrap_cleanup("scheduler", lambda: scheduler.stop(timeout=5.0))
+    if enterprise_server is not None:
+        _run_bootstrap_cleanup(
+            "enterprise_server", lambda: enterprise_server.close(reason="BOOTSTRAP_FAILURE")
+        )
+    if office_coordinator is not None:
+        _run_bootstrap_cleanup("office_coordinator", office_coordinator.stop)
+    if enterprise_identity is not None:
+        _run_bootstrap_cleanup("enterprise_identity", enterprise_identity.close)
+    if job_system is not None:
+        _run_bootstrap_cleanup(
+            "job_system", lambda: job_system.shutdown(wait=True, timeout=5.0)
+        )
+    if security is not None and local_control_session is not None:
+        _retire_bootstrap_control_session(security, local_control_session)
+    _run_bootstrap_cleanup("logging", shutdown_logging)
+
+
 def bootstrap(
     data_dir: Path | None = None,
     safe_mode: bool = False,
@@ -810,133 +1090,167 @@ def bootstrap(
         except Exception:
             LOGGER.exception("Bootstrap progress callback failed")
 
-    (
-        runtime, paths, settings, system_reduce_motion, performance, store, recovery,
-        root_capability_probe, root_workstation_registered,
-    ) = _prepare_bootstrap_foundation(data_dir, safe_mode, report)
-    report(30, "Building resource governor and runtime limits")
-    resource_governor, resource_probe, browser_pool, preflight = _build_resource_controls(
-        performance, settings, paths
-    )
-    report(36, "Initializing Security Kernel and local control plane")
-    security = SecurityKernel.local_foundation(paths.root)
-    local_control_session, job_system = _create_platform_job_services(store, security, performance)
-    report(42, "Loading Developer and Root trust material")
-    developer_access = _create_developer_access(security, paths)
-    root_capability_state = developer_access.root_capability_state()
-    root_workstation_registered = bool(root_workstation_registered or root_capability_state.registered)
-    root_developer_workstation = False
-    report(48, "Initializing Enterprise identity, enrollment, and Zero Trust")
-    (
-        enterprise_identity,
-        enrollment,
-        office_coordinator,
-        enterprise_governance,
-        enterprise_operations,
-        enterprise_server,
-    ) = _create_enterprise_services(security, paths, store, enterprise_runtime_database)
+    try:
+        (
+            runtime, paths, settings, system_reduce_motion, performance, store, recovery,
+            root_capability_probe, root_workstation_registered,
+        ) = _prepare_bootstrap_foundation(data_dir, safe_mode, report)
+    except Exception:
+        _run_bootstrap_cleanup("logging", shutdown_logging)
+        raise
+    context: ApplicationContext | None = None
+    security: SecurityKernel | None = None
+    local_control_session: Session | None = None
+    job_system: JobSystem | None = None
+    enterprise_identity: LocalEnterpriseIdentityService | None = None
+    office_coordinator: OfficeCoordinatorService | None = None
+    enterprise_server: EnterpriseServerRuntime | None = None
+    scheduler: SchedulerService | None = None
+    runner: RunOrchestrator | None = None
+    workflow_runtime: WorkflowDatasetService | None = None
+    terminal: TerminalSession | None = None
+    terminal_workspace: TerminalWorkspaceManager | None = None
+    try:
+        report(30, "Building resource governor and runtime limits")
+        resource_governor, resource_probe, browser_pool, preflight = _build_resource_controls(
+            performance, settings, paths
+        )
+        report(36, "Initializing Security Kernel and local control plane")
+        security = SecurityKernel.local_foundation(paths.root)
+        local_control_session, job_system = _create_platform_job_services(
+            store, security, performance
+        )
+        report(42, "Loading Developer and Root trust material")
+        developer_access = _create_developer_access(security, paths)
+        root_capability_state = developer_access.root_capability_state()
+        root_workstation_registered = bool(
+            root_workstation_registered or root_capability_state.registered
+        )
+        root_developer_workstation = False
+        report(48, "Initializing Enterprise identity, enrollment, and Zero Trust")
+        (
+            enterprise_identity,
+            enrollment,
+            office_coordinator,
+            enterprise_governance,
+            enterprise_operations,
+            enterprise_server,
+        ) = _create_enterprise_services(security, paths, store, enterprise_runtime_database)
 
-    report(56, "Creating scheduler and request execution runtime")
-    scheduler = SchedulerService(
-        on_reschedule=lambda schedule_id, next_run: store.update_schedule_next_run(
-            schedule_id, next_run.isoformat()
-        ),
-        on_executed=lambda schedule_id, attempted_at: store.mark_schedule_executed(
-            schedule_id, attempted_at.isoformat()
-        ),
-        max_callback_workers=max(1, performance.runner_workers),
-    )
-    runner = (RunOrchestrator if runtime.legacy else AsyncRunOrchestrator)(
-        store,
-        performance.runner_workers,
-        settings.max_response_bytes,
-        request_workers=performance.request_workers,
-        per_host_workers=performance.per_host_workers,
-        progress_interval_ms=performance.runner_progress_interval_ms,
-        result_write_batch_size=performance.result_write_batch_size,
-        adaptive_request_concurrency=settings.adaptive_request_concurrency,
-        resource_governor=resource_governor if settings.resource_governor_enabled else None,
-        resource_probe=resource_probe if settings.resource_governor_enabled else None,
-        browser_pool=browser_pool,
-        enterprise_operations=enterprise_operations,
-    )
-    report(64, "Restoring workflow, lineage, and dataset services")
-    workflow_engine, workflow_test_lab, lineage, workflow_runtime = _create_workflow_services(
-        store, performance, enterprise_operations, browser_pool
-    )
-    report(70, "Initializing packet capture and live protocol intelligence")
-    capture_controller = CaptureController(
-        store,
-        queue_capacity=performance.capture_queue_capacity,
-        flush_size=performance.capture_flush_size,
-        enterprise_operations=enterprise_operations,
-    )
-    network_intelligence = LiveIntelligencePipeline(BoundedEventStream(capacity=50_000))
-    capture_controller.add_listener(network_intelligence.on_capture_batch)
-    context = ApplicationContext(
-        paths=paths,
-        settings=settings,
-        store=store,
-        runner=runner,
-        scheduler=scheduler,
-        exporter=ExportService(store),
-        capture=capture_controller,
-        versioning=DatasetVersionService(),
-        workflows=workflow_engine,
-        workflow_test_lab=workflow_test_lab,
-        lineage=lineage,
-        workflow_runtime=workflow_runtime,
-        projects=ArenyxaProjectService(),
-        plugins=PluginManager(paths.plugins, trust_store=paths.root / "trusted-plugin-keys.json"),
-        plugin_sandbox=PluginSandbox(),
-        performance=performance,
-        resource_governor=resource_governor,
-        resource_probe=resource_probe,
-        browser_pool=browser_pool,
-        preflight=preflight,
-        security=security,
-        job_system=job_system,
-        local_control_session=local_control_session,
-        developer_access=developer_access,
-        enterprise_identity=enterprise_identity,
-        enrollment=enrollment,
-        office_coordinator=office_coordinator,
-        enterprise_governance=enterprise_governance,
-        enterprise_operations=enterprise_operations,
-        enterprise_server=enterprise_server,
-        root_developer_workstation=root_developer_workstation,
-        root_workstation_registered=root_workstation_registered,
-        root_capability_state=root_capability_state,
-        safe_mode=bool(safe_mode),
-        terminal=TerminalSession(paths.projects),
-        terminal_workspace=TerminalWorkspaceManager(paths.projects),
-        network_intelligence=network_intelligence,
-        nextgen=NextGenFeatureHub.create(
+        report(56, "Creating scheduler and request execution runtime")
+        scheduler = SchedulerService(
+            on_reschedule=lambda schedule_id, next_run: store.update_schedule_next_run(
+                schedule_id, next_run.isoformat()
+            ),
+            on_executed=lambda schedule_id, attempted_at: store.mark_schedule_executed(
+                schedule_id, attempted_at.isoformat()
+            ),
+            max_callback_workers=max(1, performance.runner_workers),
+        )
+        runner = (RunOrchestrator if runtime.legacy else AsyncRunOrchestrator)(
+            store,
+            performance.runner_workers,
+            settings.max_response_bytes,
+            request_workers=performance.request_workers,
+            per_host_workers=performance.per_host_workers,
+            progress_interval_ms=performance.runner_progress_interval_ms,
+            result_write_batch_size=performance.result_write_batch_size,
+            adaptive_request_concurrency=settings.adaptive_request_concurrency,
+            resource_governor=resource_governor if settings.resource_governor_enabled else None,
+            resource_probe=resource_probe if settings.resource_governor_enabled else None,
+            browser_pool=browser_pool,
+            enterprise_operations=enterprise_operations,
+        )
+        report(64, "Restoring workflow, lineage, and dataset services")
+        workflow_engine, workflow_test_lab, lineage, workflow_runtime = _create_workflow_services(
+            store, performance, enterprise_operations, browser_pool
+        )
+        report(70, "Initializing packet capture and live protocol intelligence")
+        capture_controller = CaptureController(
+            store,
+            queue_capacity=performance.capture_queue_capacity,
+            flush_size=performance.capture_flush_size,
+            enterprise_operations=enterprise_operations,
+        )
+        network_intelligence = LiveIntelligencePipeline(BoundedEventStream(capacity=50_000))
+        capture_controller.add_listener(network_intelligence.on_capture_batch)
+        capture_controller.add_finalization_listener(
+            lambda session: network_intelligence.retire_session(session.id)
+        )
+        terminal = TerminalSession(paths.projects)
+        terminal_workspace = TerminalWorkspaceManager(paths.projects)
+        nextgen = NextGenFeatureHub.create(
             data_root=paths.root,
             projects_root=paths.projects,
             max_response_bytes=settings.max_response_bytes,
             browser_pool=browser_pool,
-        ),
-        runtime_recovery=recovery,
-        system_reduce_motion=system_reduce_motion,
-    )
-    report(78, "Loading proxy, MITM, plugins, and traffic automation")
-    context.proxy_engine = InterceptingProxy(paths.captures / "proxy")
-    _configure_traffic_automation(context, paths)
-    context.mitm_engine = MitmEngine(paths.captures / "mitm")
-    context.protocol_plugin_status = ProtocolPluginLoader(
-        context.plugins, context.plugin_sandbox, global_protocol_registry()
-    ).load()
-    report(84, "Starting runtime supervisor")
-    _start_runtime_supervisor(context, paths)
-    report(90, "Attaching resilience, recovery, and platform control plane")
-    _attach_phase6_survivability(context, paths)
-    _attach_platform_control_plane(context)
-    report(94, "Preparing navigation and command runtime")
-    context.command_runtime = ArenyxaCommandRuntime(context)
-    report(97, "Restoring persisted schedules")
-    _restore_persisted_schedules(store, scheduler, runner, enterprise_operations)
-    if start_scheduler:
-        report(99, "Starting scheduler")
-        scheduler.start()
-    return context
+        )
+        context = ApplicationContext(
+            paths=paths,
+            settings=settings,
+            store=store,
+            runner=runner,
+            scheduler=scheduler,
+            exporter=ExportService(store),
+            capture=capture_controller,
+            versioning=DatasetVersionService(),
+            workflows=workflow_engine,
+            workflow_test_lab=workflow_test_lab,
+            lineage=lineage,
+            workflow_runtime=workflow_runtime,
+            projects=ArenyxaProjectService(),
+            plugins=PluginManager(paths.plugins, trust_store=paths.root / "trusted-plugin-keys.json"),
+            plugin_sandbox=PluginSandbox(),
+            performance=performance,
+            resource_governor=resource_governor,
+            resource_probe=resource_probe,
+            browser_pool=browser_pool,
+            preflight=preflight,
+            security=security,
+            job_system=job_system,
+            local_control_session=local_control_session,
+            developer_access=developer_access,
+            enterprise_identity=enterprise_identity,
+            enrollment=enrollment,
+            office_coordinator=office_coordinator,
+            enterprise_governance=enterprise_governance,
+            enterprise_operations=enterprise_operations,
+            enterprise_server=enterprise_server,
+            root_developer_workstation=root_developer_workstation,
+            root_workstation_registered=root_workstation_registered,
+            root_capability_state=root_capability_state,
+            safe_mode=bool(safe_mode),
+            terminal=terminal,
+            terminal_workspace=terminal_workspace,
+            network_intelligence=network_intelligence,
+            nextgen=nextgen,
+            runtime_recovery=recovery,
+            system_reduce_motion=system_reduce_motion,
+        )
+        report(78, "Loading proxy, MITM, plugins, and traffic automation")
+        context.proxy_engine = InterceptingProxy(paths.captures / "proxy")
+        _configure_traffic_automation(context, paths)
+        context.mitm_engine = MitmEngine(paths.captures / "mitm")
+        context.protocol_plugin_status = ProtocolPluginLoader(
+            context.plugins, context.plugin_sandbox, global_protocol_registry()
+        ).load()
+        report(84, "Starting runtime supervisor")
+        _start_runtime_supervisor(context, paths)
+        report(90, "Attaching resilience, recovery, and platform control plane")
+        _attach_phase6_survivability(context, paths)
+        _attach_platform_control_plane(context)
+        report(94, "Preparing navigation and command runtime")
+        context.command_runtime = ArenyxaCommandRuntime(context)
+        report(97, "Restoring persisted schedules")
+        _restore_persisted_schedules(store, scheduler, runner, enterprise_operations)
+        if start_scheduler:
+            report(99, "Starting scheduler")
+            scheduler.start()
+        return context
+    except Exception:
+        _rollback_bootstrap_failure(
+            context, terminal_workspace, terminal, workflow_runtime, runner, scheduler,
+            enterprise_server, office_coordinator, enterprise_identity, job_system,
+            security, local_control_session,
+        )
+        raise

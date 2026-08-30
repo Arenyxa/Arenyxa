@@ -156,7 +156,7 @@ def test_http_fetcher_dlp_enforcement_blocks_plaintext_secret_before_transport(m
         GLOBAL_DLP_ENGINE.configure(original)
 
 
-def test_dependency_shutdown_coordinator_uses_graph_order_and_continues_after_failure() -> None:
+def test_dependency_shutdown_coordinator_blocks_failed_dependency_and_continues_independent_work() -> None:
     import logging
 
     order = []
@@ -170,9 +170,10 @@ def test_dependency_shutdown_coordinator_uses_graph_order_and_continues_after_fa
 
     coordinator.add("consumer", fail_consumer, after=("producer",))
     coordinator.add("storage", lambda: order.append("storage"), after=("consumer",))
+    coordinator.add("independent", lambda: order.append("independent"))
     failures = coordinator.run()
-    assert order == ["intake", "producer", "consumer", "storage"]
-    assert failures == ("consumer",)
+    assert order == ["independent", "intake", "producer", "consumer"]
+    assert failures == ("consumer", "storage")
 
 
 def test_sqlite_transaction_commit_failure_rolls_back_closes_and_preserves_original(tmp_path: Path, monkeypatch) -> None:

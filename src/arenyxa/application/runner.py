@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor, wait as wait_futures
 from typing import Callable, ClassVar
 from urllib.parse import urlparse
 from arenyxa.application.nextgen import AdaptiveRateLimiter
@@ -116,6 +116,8 @@ class RunOrchestrator(RunExecutionMixin):
         self._request_futures: set[Future[_RequestOutcome]] = set()
         self._lock = threading.RLock()
         self._closed = False
+        self._executor_shutdown_requested = False
+        self._fetcher_closed = False
         self.logger = logging.getLogger("arenyxa.runner")
 
     def submit(
@@ -308,32 +310,109 @@ class RunOrchestrator(RunExecutionMixin):
         """Enable or disable adaptive request concurrency control."""
         return self._adaptive_requests.enable_auto()
 
-    def shutdown(self, wait_for_runs: bool = True, **legacy: object) -> None:
-                                                                                        
-                                                                                            
-        """Stop accepting work, cancel outstanding requests, and close worker pools safely."""
-        if "wait" in legacy:
-            wait_for_runs = bool(legacy["wait"])
+    def begin_shutdown(self) -> None:
+        """Stop intake and signal cooperative cancellation without pretending work is gone."""
         with self._lock:
             self._closed = True
-            handles = list(self._handles.values())
-            request_futures = list(self._request_futures)
-        self.cancel_all()
-                                                                                             
-                                                                                             
-                                                                                            
+            handles = tuple(self._handles.values())
+            request_futures = tuple(self._request_futures)
+        for handle in handles:
+            handle.cancel()
+        # Future.cancel() is only authoritative for work that has not started.
+        # Running request workers receive the shared CancellationToken via handle.cancel().
         for future in request_futures:
             future.cancel()
-        if not wait_for_runs:
-            for handle in handles:
-                handle.future.cancel()
-                                                                                   
-        shutdown_executor(self.executor, wait=wait_for_runs, cancel_futures=not wait_for_runs)
-        shutdown_executor(self.request_executor, wait=wait_for_runs, cancel_futures=True)
+
+    def shutdown_snapshot(self) -> dict[str, object]:
+        """Return truthful run/request lifecycle state for shutdown diagnostics."""
+        with self._lock:
+            handles = tuple(self._handles.values())
+            requests = tuple(self._request_futures)
+            accepting = not self._closed
+        run_futures = tuple(handle.future for handle in handles)
+        return {
+            "accepting": accepting,
+            "active_runs": len(handles),
+            "running_runs": sum(1 for future in run_futures if future.running()),
+            "queued_runs": sum(
+                1 for future in run_futures if not future.running() and not future.done()
+            ),
+            "pending_request_futures": sum(1 for future in requests if not future.done()),
+            "running_request_futures": sum(1 for future in requests if future.running()),
+            "queued_request_futures": sum(
+                1 for future in requests if not future.running() and not future.done()
+            ),
+        }
+
+    def drain(self, timeout: float) -> bool:
+        """Wait up to *timeout* for already-signalled run and request work to really finish."""
+        deadline = time.monotonic() + max(0.0, float(timeout))
+        while True:
+            with self._lock:
+                futures = {
+                    *(handle.future for handle in self._handles.values()),
+                    *self._request_futures,
+                }
+            pending = {future for future in futures if not future.done()}
+            if not pending:
+                return True
+            remaining = deadline - time.monotonic()
+            if remaining <= 0.0:
+                snapshot = self.shutdown_snapshot()
+                self.logger.error("Runner drain deadline exceeded: %s", snapshot)
+                return False
+            wait_futures(pending, timeout=min(0.05, remaining))
+
+    def _request_executor_shutdown(self, *, wait: bool) -> None:
+        # Calling shutdown(wait=False) does not terminate running Python functions.
+        # It merely prevents future executor submissions and lets workers retire after return.
+        shutdown_executor(self.executor, wait=wait, cancel_futures=True)
+        shutdown_executor(self.request_executor, wait=wait, cancel_futures=True)
+        self._executor_shutdown_requested = True
+
+    def _close_fetcher_after_drain(self) -> None:
+        if self._fetcher_closed:
+            return
         close_fetcher = getattr(self.fetcher, "close", None)
         if callable(close_fetcher):
             close_fetcher()
+        self._fetcher_closed = True
 
+    def shutdown(
+        self,
+        wait_for_runs: bool = True,
+        *,
+        timeout: float | None = 10.0,
+        **legacy: object,
+    ) -> bool:
+        """Stop intake, cancel cooperatively, drain truthfully, then retire executors.
+
+        A False result means at least one running function is still alive.  In that case
+        executors are placed into non-waiting shutdown state so no queued/new work can run,
+        but the method never claims those running threads were terminated.
+        """
+        if "wait" in legacy:
+            wait_for_runs = bool(legacy["wait"])
+        if "timeout" in legacy and timeout == 10.0:
+            timeout = None if legacy["timeout"] is None else float(legacy["timeout"])
+
+        self.begin_shutdown()
+        if not wait_for_runs:
+            self._request_executor_shutdown(wait=False)
+            return not any(
+                int(self.shutdown_snapshot()[key])
+                for key in ("active_runs", "pending_request_futures")
+            )
+
+        completed = self.drain(10.0 if timeout is None else max(0.0, float(timeout)))
+        if not completed:
+            self._request_executor_shutdown(wait=False)
+            return False
+
+        # wait=True is safe and useful *after* every owned Future has actually returned.
+        self._request_executor_shutdown(wait=True)
+        self._close_fetcher_after_drain()
+        return True
 
 
 
@@ -405,4 +484,3 @@ class RunOrchestrator(RunExecutionMixin):
     def _forget(self, run_id: str) -> None:
         with self._lock:
             self._handles.pop(run_id, None)
-

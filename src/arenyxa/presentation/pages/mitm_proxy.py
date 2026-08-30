@@ -72,6 +72,45 @@ class MitmEventModel(QAbstractTableModel):
         self.rows = list(rows)
         self.endResetModel()
 
+    def sync(self, rows: list[MitmEvent], *, max_rows: int = 10000) -> None:
+        """Apply append/rolling-window updates without resetting the whole table."""
+        target = list(rows[-max(1, int(max_rows)):])
+        if not self.rows:
+            if target:
+                self.beginInsertRows(QModelIndex(), 0, len(target) - 1)
+                self.rows.extend(target)
+                self.endInsertRows()
+            return
+        if not target:
+            self.replace([])
+            return
+
+        current_ids = [row.sequence for row in self.rows]
+        target_ids = [row.sequence for row in target]
+        if current_ids == target_ids:
+            return
+
+        try:
+            drop = current_ids.index(target_ids[0])
+        except ValueError:
+            drop = -1
+        overlap = len(current_ids) - drop if drop >= 0 else 0
+        if drop >= 0 and overlap <= len(target_ids) and current_ids[drop:] == target_ids[:overlap]:
+            if drop:
+                self.beginRemoveRows(QModelIndex(), 0, drop - 1)
+                del self.rows[:drop]
+                self.endRemoveRows()
+            additions = target[overlap:]
+            if additions:
+                start = len(self.rows)
+                self.beginInsertRows(QModelIndex(), start, start + len(additions) - 1)
+                self.rows.extend(additions)
+                self.endInsertRows()
+            return
+
+        # Filter changes or non-append mutations legitimately require a reset.
+        self.replace(target)
+
 
 class MitmInterceptionPage(WorkspacePage):
     def __init__(self, context: Any, theme: Any, motion: Any, parent: QWidget | None = None) -> None:
@@ -79,7 +118,8 @@ class MitmInterceptionPage(WorkspacePage):
         self.engine = context.mitm_engine or MitmEngine(Path(context.paths.captures) / "mitm")
         context.mitm_engine = self.engine
         self._pending_tokens: list[str] = []
-        self._last_event_count = -1
+        self._last_event_signature: tuple[int, int] = (-1, -1)
+        self._last_message_signature: tuple[int, ...] = ()
         root = page_layout(self)
         header = QHBoxLayout()
         header.addWidget(PageHeader("MITM Proxy", "interception, replay, rules and advanced capture modes"), 1)
@@ -374,8 +414,8 @@ class MitmInterceptionPage(WorkspacePage):
         self.refresh_runtime()
 
     def deactivated(self) -> None:
-        if not self.engine.running:
-            self.timer.stop()
+        # Keep the MITM engine alive, but suspend expensive hidden-page Qt work.
+        self.timer.stop()
 
     def _lines(self, widget: QPlainTextEdit) -> list[str]:
         return [line.strip() for line in widget.toPlainText().splitlines() if line.strip()]
@@ -444,10 +484,11 @@ class MitmInterceptionPage(WorkspacePage):
         if status.last_error:
             self.status_label.setToolTip(status.last_error)
         events = self.engine.poll_events()
-        if len(events) != self._last_event_count:
-            self._last_event_count = len(events)
+        event_signature = (len(events), events[-1].sequence if events else -1)
+        if event_signature != self._last_event_signature:
+            self._last_event_signature = event_signature
             self.refresh_flows()
-            self.refresh_messages()
+            self.refresh_messages(events)
         pending = self.engine.pending()
         tokens = [str(item.get("token") or "") for item in pending]
         if tokens != self._pending_tokens:
@@ -470,7 +511,7 @@ class MitmInterceptionPage(WorkspacePage):
         protocol = self.protocol_filter.currentText()
         query = self.flow_filter.text().strip()
         rows = self.engine.events(query=query if not query.startswith("~") else "", protocol=protocol)
-        self.flow_model.replace(rows[-10000:])
+        self.flow_model.sync(rows, max_rows=10000)
 
     def inspect_flow(self, row: int) -> None:
         if row < 0 or row >= len(self.flow_model.rows):
@@ -495,11 +536,20 @@ class MitmInterceptionPage(WorkspacePage):
             "payload": event.payload,
         }, ensure_ascii=False, indent=2))
 
-    def refresh_messages(self) -> None:
-        rows = [row for row in self.engine.poll_events() if row.protocol in {"websocket", "tcp", "udp", "dns"}]
-        payload = []
-        for row in rows[-500:]:
-            payload.append({"#": row.sequence, "protocol": row.protocol, "event": row.event, "direction": row.direction, "size": row.size, "payload": row.payload})
+    def refresh_messages(self, events: list[MitmEvent] | None = None) -> None:
+        rows = [
+            row
+            for row in (events if events is not None else self.engine.poll_events())
+            if row.protocol in {"websocket", "tcp", "udp", "dns"}
+        ][-500:]
+        signature = tuple(row.sequence for row in rows)
+        if signature == self._last_message_signature:
+            return
+        self._last_message_signature = signature
+        payload = [
+            {"#": row.sequence, "protocol": row.protocol, "event": row.event, "direction": row.direction, "size": row.size, "payload": row.payload}
+            for row in rows
+        ]
         self.message_view.setPlainText(json.dumps(payload, ensure_ascii=False, indent=2))
 
     def load_pending(self, row: int) -> None:

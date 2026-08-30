@@ -330,12 +330,14 @@ class EnterpriseServerRuntime:
         payload = {"task": task.to_dict(), "task_snapshot_sha256": task.snapshot_hash()}
         payload_json, payload_sha = _bounded_json(payload, MAX_JOB_PAYLOAD_BYTES, "job payload")
         if existing is not None:
-            if existing["kind"] != "task.run" or existing["resource_id"] != resource_id or existing["permission"] != permission:
+            if (
+                existing["kind"] != "task.run"
+                or existing["resource_id"] != resource_id
+                or existing["permission"] != permission
+                or existing["side_effect_mode"] != str(side_effect_mode).strip().casefold()
+            ):
                 raise _fail("DISTRIBUTED_IDEMPOTENCY_COLLISION", "Idempotency key is already bound to another operation")
-                                                                             
-            with self.queue._connect() as connection:
-                row = connection.execute("SELECT payload_sha256 FROM distributed_jobs WHERE job_id=?", (existing["job_id"],)).fetchone()
-            if row is None or not hmac.compare_digest(str(row[0]), payload_sha):
+            if not hmac.compare_digest(str(existing["payload_sha256"]), payload_sha):
                 raise _fail("DISTRIBUTED_IDEMPOTENCY_COLLISION", "Idempotency key payload does not match the original job")
             return str(existing["job_id"])
         decision = self.governance.authorize_operation(

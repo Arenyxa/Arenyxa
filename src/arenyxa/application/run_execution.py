@@ -77,9 +77,17 @@ class RunExecutionMixin:
             self._request_gate.release()
             return False
         try:
-            future = self.request_executor.submit(
-                self._process_request, index, task, run.id, spec, token, lease
-            )
+            # Hold the same lifecycle lock used by begin_shutdown() across executor
+            # submission *and* registry publication.  This closes the race where a run
+            # could admit a request after shutdown had already snapshotted its futures.
+            with self._lock:
+                if self._closed or token.cancelled:
+                    token.cancel()
+                    raise ArenyxaError("RUN_CANCELLED", "操作已取消。", domain="RUN")
+                future = self.request_executor.submit(
+                    self._process_request, index, task, run.id, spec, token, lease
+                )
+                self._request_futures.add(future)
         except RuntimeError as exc:
             lease.release()
             self._request_gate.release()
@@ -88,6 +96,10 @@ class RunExecutionMixin:
             if token.cancelled or shutting_down:
                 token.cancel()
                 raise ArenyxaError("RUN_CANCELLED", "操作已取消。", domain="RUN") from exc
+            raise
+        except ArenyxaError:
+            lease.release()
+            self._request_gate.release()
             raise
         # broad-exception-boundary: resource accounting must roll back for every submission failure.
         except Exception:
@@ -98,8 +110,6 @@ class RunExecutionMixin:
                                                                                           
                                                                                   
         future.add_done_callback(ReleaseFutureCallback(self._request_gate.release))
-        with self._lock:
-            self._request_futures.add(future)
         future.add_done_callback(self._forget_request_future)
                                                                                                 
                                                                                                  

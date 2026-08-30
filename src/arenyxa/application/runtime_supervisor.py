@@ -16,6 +16,7 @@ from arenyxa.infrastructure.atomic_io import atomic_write_json
 from arenyxa.infrastructure.external_supervisor import ExternalSupervisorClient
 
 LOGGER = logging.getLogger(__name__)
+_MAX_INCIDENT_FAMILIES = 32
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,7 +46,7 @@ class ArenyxaRuntimeSupervisor:
         self._probes: dict[str, Callable[[], Mapping[str, Any]]] = {}
         self._incident_listeners: list[Callable[[SupervisorIncident], None]] = []
         self._incidents: list[SupervisorIncident] = []
-        self._reported_stalls: set[tuple[str, int]] = set()
+        self._reported_stalls: set[str] = set()
         self._lock = threading.RLock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -71,9 +72,7 @@ class ArenyxaRuntimeSupervisor:
         now = time.monotonic()
         with self._lock:
             self._heartbeats[component_name] = (now, state_copy)
-            self._reported_stalls = {
-                key for key in self._reported_stalls if key[0] != component_name
-            }
+            self._reported_stalls.discard(component_name)
         self._external.heartbeat(component_name, state_copy)
 
     def start(self) -> None:
@@ -148,18 +147,47 @@ class ArenyxaRuntimeSupervisor:
                 blocked = now - seen
                 if blocked <= self.event_loop_block_seconds:
                     continue
-                bucket = int(blocked // self.event_loop_block_seconds)
-                key = (component, bucket)
                 with self._lock:
-                    if key in self._reported_stalls:
+                    if component in self._reported_stalls:
                         continue
-                    self._reported_stalls.add(key)
+                    self._reported_stalls.add(component)
                 self._record_incident(component, blocked, state)
+
+    def _prune_incident_families(self) -> None:
+        families: dict[str, list[Path]] = {}
+        for pattern in ("event-loop-block-*.json", "event-loop-block-*.stacks.log"):
+            for artifact in self.diagnostics_dir.glob(pattern):
+                name = artifact.name
+                if name.endswith(".stacks.log"):
+                    family = name[: -len(".stacks.log")]
+                else:
+                    family = name[: -len(".json")]
+                families.setdefault(family, []).append(artifact)
+
+        def family_age(item: tuple[str, list[Path]]) -> tuple[int, str]:
+            family, artifacts = item
+            timestamps: list[int] = []
+            for artifact in artifacts:
+                try:
+                    timestamps.append(artifact.stat().st_mtime_ns)
+                except OSError:
+                    continue
+            return (min(timestamps) if timestamps else 0, family)
+
+        ordered = sorted(families.items(), key=family_age)
+        while len(ordered) >= _MAX_INCIDENT_FAMILIES:
+            _family, artifacts = ordered.pop(0)
+            for artifact in artifacts:
+                try:
+                    artifact.unlink(missing_ok=True)
+                except OSError:
+                    LOGGER.warning("Runtime Supervisor could not prune diagnostic artifact %s", artifact)
 
     def _record_incident(
         self, component: str, blocked_seconds: float, state: Mapping[str, Any]
     ) -> None:
         self.diagnostics_dir.mkdir(parents=True, exist_ok=True)
+        self._prune_incident_families()
         timestamp_ns = time.time_ns()
         stem = f"event-loop-block-{component}-{timestamp_ns}"
         stack_path = self.diagnostics_dir / f"{stem}.stacks.log"
