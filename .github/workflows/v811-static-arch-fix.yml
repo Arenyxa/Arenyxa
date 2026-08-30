@@ -1,0 +1,103 @@
+name: Arenyxa v8.1.1 Static Architecture Fix
+
+on:
+  push:
+    branches: [v811-final-closure-prep]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: arenyxa-v811-static-arch-fix
+  cancel-in-progress: false
+
+jobs:
+  apply-verify-and-regenerate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      EXPECTED_RC_SHA: b620e9493a872e35cea4f2a6939bdff4f50d25eb
+      PATCH_SHA256: 31834540A618CE6FFEB007F8AAEE7DE375DB4F5EDB1FAFED6DE4C9171CAF2189
+      RELEASE_BRANCH: release/v8.1.1-final
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct and authenticate architecture fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          PATCH_GZ="$RUNNER_TEMP/v811-static-arch-fix.patch.gz"
+          PATCH_RAW="$RUNNER_TEMP/v811-static-arch-fix.patch"
+          tr -d '\r\n' < .release/v811-static-arch-fix.patch.gz.b64 | base64 --decode > "$PATCH_GZ"
+          gzip -dc "$PATCH_GZ" > "$PATCH_RAW"
+          ACTUAL="$(sha256sum "$PATCH_RAW" | awk '{print toupper($1)}')"
+          echo "Expected patch SHA-256: $PATCH_SHA256"
+          echo "Actual patch SHA-256:   $ACTUAL"
+          test "$ACTUAL" = "$PATCH_SHA256"
+          echo "PATCH_RAW=$PATCH_RAW" >> "$GITHUB_ENV"
+
+      - name: Checkout exact release candidate and apply fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$RELEASE_BRANCH"
+          git checkout -B "$RELEASE_BRANCH" "origin/$RELEASE_BRANCH"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_RC_SHA"
+          test -z "$(git status --porcelain)"
+          git apply --check "$PATCH_RAW"
+          git apply --index "$PATCH_RAW"
+          git diff --check --cached
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install release-test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,database]"
+
+      - name: Verify architecture ratchets and syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/architecture_debt_gate.py
+          python -m compileall -q src/arenyxa
+
+      - name: Verify directly affected lifecycle and distributed regressions
+        shell: bash
+        run: >-
+          python -m pytest -q
+          tests/test_v811_long_horizon_invariants.py
+          tests/test_job_system_shutdown_race.py
+          tests/test_v811_lifecycle_windows_hardening.py
+          tests/test_v80_industrialization_hardening.py
+          tests/test_v70_distributed_fault_matrix.py
+
+      - name: Regenerate final source repair trust chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/build_source_repair_seed.py
+          python scripts/build_source_manifest.py
+          python scripts/verify_v81_release_identity.py
+          git add SOURCE_MANIFEST.sha256 src/arenyxa/resources/repair_manifest.json src/arenyxa/resources/repair_seed.zip
+          git diff --check --cached
+
+      - name: Commit verified source and trust chain atomically
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          echo "Staged release changes:"
+          git diff --cached --name-status
+          git commit -m "refactor: satisfy v8.1.1 release architecture gates"
+          FINAL_SHA="$(git rev-parse HEAD)"
+          echo "FINAL_SHA=$FINAL_SHA" >> "$GITHUB_ENV"
+          git push origin "HEAD:refs/heads/$RELEASE_BRANCH"
+          echo "Updated $RELEASE_BRANCH to $FINAL_SHA"
