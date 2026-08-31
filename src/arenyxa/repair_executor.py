@@ -12,10 +12,11 @@ from pathlib import Path
 from typing import Any, Callable
 
 from arenyxa.console_io import console_write
+from arenyxa.infrastructure.atomic_io import atomic_write_json
 from arenyxa.infrastructure.process_safety import validated_argv
 from arenyxa.repair_common import clear_repair_marker, repair_resource, _write_repair_marker
 from arenyxa.repair_engine import RepairEngine
-from arenyxa.repair_models import RepairPlan
+from arenyxa.repair_models import RepairActionResult, RepairPlan, RepairResult, _utc_now
 from arenyxa.repair_planner import validate_repair_plan_origin
 from arenyxa.repair_recovery import relaunch_arenyxa
 
@@ -23,6 +24,32 @@ LOGGER = logging.getLogger(__name__)
 PopenFactory = Callable[..., subprocess.Popen[Any]]
 MarkerWriter = Callable[[Path, int, str, str], Path]
 MarkerClearer = Callable[[Path, str | None], None]
+
+
+def _terminal_failure_result(
+    engine: RepairEngine,
+    plan: RepairPlan,
+    error: Exception,
+) -> RepairResult:
+    detail = f"Repair engine terminated unexpectedly: {type(error).__name__}: {error}"
+    result = RepairResult(
+        started_at=engine.started_at,
+        finished_at=_utc_now(),
+        success=False,
+        categories=list(plan.categories),
+        backup_dir=str(engine.backup_root),
+        actions=list(engine.actions)
+        + [RepairActionResult("Repair worker terminalization", "failed", detail)],
+        unresolved=list(engine.unresolved) + [detail],
+    )
+    try:
+        atomic_write_json(
+            Path(plan.data_root) / "repair" / "last_repair_report.json",
+            result.to_dict(),
+        )
+    except Exception:
+        LOGGER.exception("Unable to persist unexpected Repair Worker failure report")
+    return result
 
 
 def launch_repair_worker(
@@ -115,7 +142,11 @@ def run_repair_worker(plan_path: Path) -> int:
         except (AttributeError, OSError) as exc:
             LOGGER.debug("Unable to set Repair Center console title: %s", exc)
     engine = RepairEngine(plan)
-    result = engine.run()
+    try:
+        result = engine.run()
+    except Exception as exc:
+        LOGGER.exception("Repair Worker terminated unexpectedly")
+        result = _terminal_failure_result(engine, plan, exc)
     try:
         plan_path.unlink(missing_ok=True)
     except OSError as exc:

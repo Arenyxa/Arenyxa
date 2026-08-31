@@ -112,11 +112,14 @@ class MainWindowOperationsMixin:
         handles = self.context.runner.active_handles()
         capture = self.context.capture.session
         capture_text = capture.state.value if capture else "idle"
-        frame = self.motion.profiler.snapshot()
-        self.worker_status.setText(
-            f"{len(handles)} background · capture {capture_text} · DB ready · "
-            f"{self.motion.refresh_hz:.0f}Hz · {self.motion.effective_quality()} · p95 {float(frame['p95_ms']):.1f}ms"
-        )
+        if is_general_user(self.context.settings):
+            self.worker_status.setText(f"{len(handles)} background · capture {capture_text} · ready")
+        else:
+            frame = self.motion.profiler.snapshot()
+            self.worker_status.setText(
+                f"{len(handles)} background · capture {capture_text} · DB ready · "
+                f"{self.motion.refresh_hz:.0f}Hz · {self.motion.effective_quality()} · p95 {float(frame['p95_ms']):.1f}ms"
+            )
         active = [handle for handle in handles if not handle.future.done()]
         if active:
             completed = sum(max(0, int(handle.run.completed_units)) for handle in active)
@@ -357,14 +360,59 @@ class MainWindowOperationsMixin:
         
         self._startup_health_report = report
 
+    def prepare_for_repair_shutdown(self) -> bool:
+        """Apply the one canonical Repair pre-shutdown policy before worker handoff."""
+        if not self.context.prepare_for_repair_shutdown(timeout=8.0):
+            self._enter_repair_terminal_failure(
+                "Repair 已停止：仍有运行中的任务未能在安全期限内退出。请查看 shutdown 日志。",
+            )
+            return False
+        if not begin_background_shutdown(timeout_ms=2500):
+            self._enter_repair_terminal_failure(
+                "Repair 已停止：仍有 UI 后台任务未退出；未启动外部 Repair Worker。",
+            )
+            return False
+        return True
+
+    def _enter_repair_terminal_failure(self, message: str) -> None:
+        self.context.mark_repair_shutdown_failed()
+        self.setEnabled(False)
+        self.show_status(message, 9000)
+        self.request_repair_exit()
+
+    def handoff_repair(self, plan_path: Path) -> bool:
+        """Quiesce owned work, launch Repair Worker, then request canonical application exit."""
+        from arenyxa.repair import launch_repair_worker
+
+        if not self.prepare_for_repair_shutdown():
+            try:
+                Path(plan_path).unlink(missing_ok=True)
+            except OSError:
+                LOGGER.warning("Unable to remove unused Repair plan after shutdown preparation failure")
+            return False
+        try:
+            launch_repair_worker(Path(plan_path))
+            self.context.mark_repair_handoff_committed()
+        except Exception:
+            self._enter_repair_terminal_failure(
+                "Repair Worker 启动失败；Arenyxa 已进入安全终止状态。",
+            )
+            raise
+        self.request_repair_exit()
+        return True
+
     def request_repair_exit(self) -> None:
-        
         self._repair_exit_requested = True
-        self.close()
+        # MainWindow is embedded as a child widget inside ArenyxaShellWindow. Closing
+        # only this child does not terminate QApplication because the application uses
+        # setQuitOnLastWindowClosed(False). After the child has closed successfully,
+        # explicitly ask its top-level shell owner to close as well.
+        if self.close():
+            self.shellCloseRequested.emit()
 
     def launch_repair_center(self) -> None:
         from arenyxa.presentation.repair_dialog import RepairSelectionDialog
-        from arenyxa.repair import StartupHealthScanner, create_repair_plan, installation_root, launch_repair_worker
+        from arenyxa.repair import StartupHealthScanner, create_repair_plan, installation_root
 
         if self._repair_scan_in_progress:
             self.show_status("Repair Center 正在后台检查安装与运行状态…")
@@ -404,7 +452,6 @@ class MainWindowOperationsMixin:
                     if choice != QMessageBox.StandardButton.Yes:
                         self.show_status("Repair Center 已取消；后台任务保持运行")
                         return
-                    self.context.runner.cancel_all()
                 plan_path = create_repair_plan(
                     self.context.paths,
                     report,
@@ -412,11 +459,11 @@ class MainWindowOperationsMixin:
                     parent_pid=__import__("os").getpid(),
                     relaunch=True,
                 )
-                launch_repair_worker(plan_path)
+                if not self.handoff_repair(plan_path):
+                    return
             except Exception as exc:                                                                   
                 QMessageBox.critical(self, "Repair Center", str(exc))
                 return
-            self.request_repair_exit()
 
         def failed(message: str) -> None:
             self._repair_scan_in_progress = False

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from arenyxa.exception_boundary import call_exception_boundary
 from arenyxa.recoverable import record_current_exception
 from arenyxa.startup_diagnostics import checkpoint, record_crash
 
@@ -299,10 +300,12 @@ def _create_runtime_splash(
     except Exception:
         LOGGER.exception("Startup splash failed; continuing with ordinary startup")
         if startup_splash is not None:
-            try:
-                startup_splash.abort()
-            except Exception:
-                LOGGER.debug("Startup splash cleanup also failed", exc_info=True)
+            call_exception_boundary(
+                startup_splash.abort,
+                on_error=lambda exc: LOGGER.debug(
+                    "Startup splash cleanup also failed", exc_info=True
+                ),
+            )
         startup_splash = None
     return startup_splash
 
@@ -403,14 +406,24 @@ def _make_runtime_finalizer(context: Any, crash_marker: Path, data_root_lease: A
                 LOGGER.warning("UI background jobs did not fully quiesce during application finalization")
         except Exception:
             LOGGER.exception("UI background shutdown boundary failed")
+        shutdown_complete = False
         try:
-            context.shutdown()
+            shutdown_complete = bool(context.shutdown(reason="application_quit", timeout=20.0))
         finally:
-            try:
-                crash_marker.unlink(missing_ok=True)
-            except OSError:
-                LOGGER.exception("Failed to remove crash marker during application finalization")
-            data_root_lease.release()
+            if shutdown_complete:
+                try:
+                    crash_marker.unlink(missing_ok=True)
+                except OSError:
+                    LOGGER.exception("Failed to remove crash marker during application finalization")
+                data_root_lease.release()
+            else:
+                # Keep the data-root lease/crash marker owned by this still-live process.
+                # Releasing them while worker threads remain would allow unsafe overlap.
+                LOGGER.critical(
+                    "Application finalization incomplete; retaining data-root lease and crash marker until process exit"
+                )
+                with finalization_lock:
+                    runtime_finalized = False
 
     return finalize_runtime
 
@@ -538,8 +551,8 @@ def _schedule_startup_health_checks(
                 parent_pid=os.getpid(),
                 relaunch=True,
             )
-            launch_repair_worker(plan_path)
-            window.request_repair_exit()
+            if not window.handoff_repair(plan_path):
+                return
 
         def failed(message: str) -> None:
             window.show_status(f"启动健康检查未完成：{message}", 8000)
@@ -778,12 +791,13 @@ def main(argv: list[str] | None = None) -> int:
                                                                                                
                                                                                               
                                                                                       
-        try:
-            context.shutdown()
-        except Exception:
-            LOGGER.exception("Context shutdown failed after main-window construction failure")
-        finally:
-            data_root_lease.release()
+        call_exception_boundary(
+            context.shutdown,
+            on_error=lambda exc: LOGGER.exception(
+                "Context shutdown failed after main-window construction failure"
+            ),
+        )
+        data_root_lease.release()
         QMessageBox.critical(None, "Arenyxa", f"Arenyxa interface initialization failed:\n{exc}")
         return 1
     _write_crash_marker(crash_marker, "running")

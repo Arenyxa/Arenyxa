@@ -66,6 +66,7 @@ class DistributedQueueHealthMixin:
                 self._health_event_count_checked_at = now_mono
             event_count = self._health_event_count
         with self._connection() as connection:
+            authoritative_now = self._lease_now(connection)
             job_rows = connection.execute(
                 """SELECT state,count(*) AS state_count,
                    sum(CASE WHEN
@@ -81,7 +82,7 @@ class DistributedQueueHealthMixin:
                    sum(CASE WHEN state IN ('leased','running') AND lease_expires_at>?
                        THEN 1 ELSE 0 END) AS implausible_future_count
                    FROM distributed_jobs GROUP BY state""",
-                (self._clock.stable_epoch() + MAX_LEASE_SECONDS + 60.0,),
+                (authoritative_now + MAX_LEASE_SECONDS + 60.0,),
             ).fetchall()
             states = {str(row["state"]): int(row["state_count"]) for row in job_rows}
             inconsistent_leases = sum(int(row["inconsistent_count"] or 0) for row in job_rows)

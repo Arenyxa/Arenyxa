@@ -436,7 +436,13 @@ class ArenyxaShellWindow(QMainWindow):
         self.main_page.attach(window)
         close_requested = getattr(window, "shellCloseRequested", None)
         if close_requested is not None:
-            close_requested.connect(self.hide)
+            close_requested.connect(self._close_from_main_window)
+
+    def _close_from_main_window(self) -> None:
+        """Close the top-level owner after an embedded MainWindow intentionally exits."""
+        if self._closing:
+            return
+        self.close()
 
     def show_main(self) -> None:
         if self.main_window is None:

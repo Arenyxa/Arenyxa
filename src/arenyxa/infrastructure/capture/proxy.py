@@ -1,6 +1,5 @@
 from __future__ import annotations
 from arenyxa.recoverable import record_current_exception
-
 import fnmatch
 import json
 import logging
@@ -518,11 +517,11 @@ class InterceptingProxy(ProxyResilienceMixin):
                 self._emit("error", {"code": "PROXY_SESSION_FINALIZE_FAILED", "session_id": session_id})
         self._emit("stopped", self.status())
 
-    def close(self) -> None:
+    def close(self) -> bool:
         """Permanently stop the proxy and close its durable history database."""
         with self._lock:
             if self._closed:
-                return
+                return True
         self.stop()
         with self._client_condition:
             if self._active_clients:
@@ -530,17 +529,18 @@ class InterceptingProxy(ProxyResilienceMixin):
                     "Proxy history database remains open because %d client handler(s) did not quiesce",
                     len(self._active_clients),
                 )
-                return
+                return False
         with self._persistence_lifecycle_lock:
             with self._lock:
                 if self._closed:
-                    return
+                    return True
             if not self.persistence.close(float(self.settings.persistence_flush_timeout_seconds)):
                 LOGGER.warning("Proxy persistence writer did not quiesce before close")
-                return
+                return False
             self.history_store.close()
             with self._lock:
                 self._closed = True
+        return True
 
     def _client_started(self, client: socket.socket) -> None:
         with self._client_condition:

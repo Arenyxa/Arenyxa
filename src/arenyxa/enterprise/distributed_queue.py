@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from arenyxa.enterprise.distributed_queue_maintenance import DistributedQueueMaintenanceMixin
+
 import base64
 import binascii
 import hashlib
@@ -66,7 +68,7 @@ from arenyxa.enterprise.distributed_protocol import (
     _NoopLock,
 )
 
-class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealthMixin):
+class DurableDistributedQueue(DistributedQueueMaintenanceMixin, DistributedQueueWorkerMixin, DistributedQueueHealthMixin):
 
     def __init__(
         self, path: Path | str, *, storage_backend: DistributedRuntimeStorageBackend | None = None,
@@ -115,6 +117,14 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
     def initialize(self) -> None:
         with self._lock:
             self._storage.initialize_schema(DISTRIBUTED_SCHEMA, CURRENT_PROTOCOL, MIN_COMPATIBLE_PROTOCOL)
+        self._idempotency_backfill_complete = False
+        try:
+            self._backfill_idempotency_tombstones()
+            self._idempotency_backfill_complete = True
+        except Exception:
+            LOGGER.exception(
+                "Idempotency tombstone backfill failed; destructive terminal retention is disabled"
+            )
         self._last_reconciliation = self.reconcile_durable_state()
         self._last_reconciliation["stale_worker_leases_recovered"] = self.recover_stale_worker_leases()
         self._last_reconciliation["expired_leases_recovered"] = self.recover_expired_leases()
@@ -150,92 +160,7 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
             return "queued", "LEASE_STATE_RECONCILED"
         return "failed", exhausted_code
 
-    def reconcile_durable_state(self) -> dict[str, int]:
 
-        summary = {"worker_counters_repaired": 0, "leases_recovered": 0}
-        current_wall = self._clock.stable_epoch()
-        with self._lock, self._connection() as connection:
-            self._begin(connection)
-            invalid = connection.execute(
-                self._storage.invalid_lease_candidates_sql(),
-                (current_wall + MAX_LEASE_SECONDS + 60.0,),
-            ).fetchall()
-            for row in invalid:
-                target, code = self._recovery_target(row, exhausted_code="LEASE_STATE_INVALID_MAX_ATTEMPTS")
-                previous = str(row["state"])
-                connection.execute(
-                    """UPDATE distributed_jobs SET state=?,lease_worker_id='',lease_token_sha256='',
-                       lease_expires_at=0,error_code=?,updated_at=? WHERE job_id=?""",
-                    (target, code, utc_now(), str(row["job_id"])),
-                )
-                self._record_event_locked(
-                    connection, str(row["job_id"]), "lease_reconciled", previous, target,
-                    worker_id=str(row["lease_worker_id"]), code=code,
-                )
-                summary["leases_recovered"] += 1
-
-            active_by_worker = {
-                str(row[0]): int(row[1])
-                for row in connection.execute(
-                    """SELECT lease_worker_id,count(*) FROM distributed_jobs
-                       WHERE state IN ('leased','running') AND lease_worker_id<>''
-                       GROUP BY lease_worker_id"""
-                ).fetchall()
-            }
-            workers = connection.execute("SELECT worker_id,active_leases FROM distributed_workers").fetchall()
-            for worker in workers:
-                worker_id = str(worker["worker_id"])
-                actual = active_by_worker.get(worker_id, 0)
-                if actual != int(worker["active_leases"]):
-                    connection.execute(
-                        "UPDATE distributed_workers SET active_leases=?,updated_at=? WHERE worker_id=?",
-                        (actual, utc_now(), worker_id),
-                    )
-                    summary["worker_counters_repaired"] += 1
-            connection.commit()
-        self._last_reconciliation = dict(summary)
-        return summary
-
-    def invariant_violations(self) -> list[str]:
-        """Return durable queue invariant violations without mutating state.
-
-        This is intentionally cheap enough for CI/fault-injection checkpoints and explicit
-        health diagnostics, but is not run on every hot-path transition.
-        """
-        violations: list[str] = []
-        with self._connection() as connection:
-            rows = connection.execute(
-                "SELECT job_id,state,lease_worker_id,lease_token_sha256,lease_expires_at "
-                "FROM distributed_jobs"
-            ).fetchall()
-            for row in rows:
-                state = str(row["state"])
-                has_lease = bool(str(row["lease_worker_id"])) or bool(str(row["lease_token_sha256"])) or float(row["lease_expires_at"]) > 0
-                if state in {"leased", "running"} and not (
-                    str(row["lease_worker_id"]) and str(row["lease_token_sha256"]) and float(row["lease_expires_at"]) > 0
-                ):
-                    violations.append(f"job:{row['job_id']}:active-state-missing-lease")
-                elif state not in {"leased", "running"} and has_lease:
-                    violations.append(f"job:{row['job_id']}:inactive-state-retains-lease")
-            actual = {
-                str(row[0]): int(row[1])
-                for row in connection.execute(
-                    "SELECT lease_worker_id,count(*) FROM distributed_jobs "
-                    "WHERE state IN ('leased','running') AND lease_worker_id<>'' GROUP BY lease_worker_id"
-                ).fetchall()
-            }
-            workers = connection.execute(
-                "SELECT worker_id,active_leases,max_slots FROM distributed_workers"
-            ).fetchall()
-            for worker in workers:
-                worker_id = str(worker["worker_id"])
-                reported = int(worker["active_leases"])
-                expected = actual.get(worker_id, 0)
-                if reported != expected:
-                    violations.append(f"worker:{worker_id}:active-leases:{reported}!={expected}")
-                if reported < 0 or reported > int(worker["max_slots"]):
-                    violations.append(f"worker:{worker_id}:slot-bound:{reported}")
-        return violations
 
     def job_events(self, job_id: str, *, limit: int = 200) -> list[dict[str, Any]]:
         cap = max(1, min(MAX_JOB_EVENTS_PER_JOB, int(limit)))
@@ -266,16 +191,81 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
     def _begin(self, connection: Any) -> None:
         self._storage.begin_write(connection)
 
+    def _lease_now(self, connection: Any) -> float:
+        return float(self._storage.authoritative_lease_epoch(connection, self._clock))
+
     def _job_count_guard(self, connection: Any) -> None:
         count = int(connection.execute("SELECT count(*) FROM distributed_jobs").fetchone()[0])
+        if count >= MAX_JOBS and self._idempotency_backfill_complete:
+            self._retain_terminal_jobs_locked(
+                connection,
+                max_terminal=max(0, MAX_JOBS // 2),
+                max_idempotent_tombstones=MAX_JOBS,
+            )
+            count = int(connection.execute("SELECT count(*) FROM distributed_jobs").fetchone()[0])
         if count >= MAX_JOBS:
             raise _fail("DISTRIBUTED_QUEUE_FULL", "Distributed job queue reached its configured safety bound")
 
-    def job_for_idempotency(self, key: str) -> dict[str, Any] | None:
-        token = _clean_token(key, "idempotency key", 192)
-        with self._connection() as connection:
-            row = connection.execute("SELECT * FROM distributed_jobs WHERE idempotency_key=?", (token,)).fetchone()
-            return None if row is None else distributed_job_row(row)
+
+    @staticmethod
+    def _lookup_idempotency_locked(connection: Any, key: str) -> Any | None:
+        return connection.execute(
+            "SELECT * FROM distributed_job_idempotency WHERE idempotency_key=?", (key,)
+        ).fetchone()
+
+
+
+    @staticmethod
+    def _retention_counts_locked(connection: Any) -> tuple[int, int, int]:
+        jobs = int(connection.execute("SELECT count(*) FROM distributed_jobs").fetchone()[0])
+        idempotent = int(
+            connection.execute(
+                "SELECT count(*) FROM distributed_job_idempotency WHERE side_effect_mode='idempotent'"
+            ).fetchone()[0]
+        )
+        non_idempotent = int(
+            connection.execute(
+                "SELECT count(*) FROM distributed_job_idempotency WHERE side_effect_mode='non_idempotent'"
+            ).fetchone()[0]
+        )
+        return jobs, idempotent, non_idempotent
+
+
+
+    def retain_terminal_jobs(
+        self,
+        max_terminal: int | None = None,
+        *,
+        max_idempotent_tombstones: int | None = None,
+    ) -> dict[str, int | bool]:
+        terminal_limit = max(0, MAX_JOBS // 2) if max_terminal is None else max(0, int(max_terminal))
+        tombstone_limit = (
+            MAX_JOBS
+            if max_idempotent_tombstones is None
+            else max(0, int(max_idempotent_tombstones))
+        )
+        with self._lock, self._connection() as connection:
+            if not self._idempotency_backfill_complete:
+                jobs, idempotent, non_idempotent = self._retention_counts_locked(connection)
+                return {
+                    "jobs_pruned": 0,
+                    "idempotent_tombstones_pruned": 0,
+                    "jobs_remaining": jobs,
+                    "idempotent_tombstones_remaining": idempotent,
+                    "non_idempotent_tombstones_remaining": non_idempotent,
+                    "pruning_disabled": True,
+                }
+            self._begin(connection)
+            report = self._retain_terminal_jobs_locked(
+                connection,
+                max_terminal=terminal_limit,
+                max_idempotent_tombstones=tombstone_limit,
+            )
+            connection.commit()
+        if report["jobs_pruned"] or report["idempotent_tombstones_pruned"]:
+            LOGGER.info("Distributed queue retention maintenance: %s", report)
+        return report
+
 
     def enqueue(
         self,
@@ -311,8 +301,25 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
         now = utc_now()
         with self._lock, self._connection() as connection:
             self._begin(connection)
+            tombstone = self._lookup_idempotency_locked(connection, idem)
+            if tombstone is not None:
+                if (
+                    str(tombstone["kind"]) == kind_id
+                    and hmac.compare_digest(str(tombstone["payload_sha256"]), payload_sha)
+                    and str(tombstone["resource_id"]) == resource
+                    and str(tombstone["permission"]) == capability
+                    and str(tombstone["side_effect_mode"]) == mode
+                ):
+                    connection.commit()
+                    return str(tombstone["job_id"])
+                connection.rollback()
+                raise _fail(
+                    "DISTRIBUTED_IDEMPOTENCY_COLLISION",
+                    "Idempotency key was already used for a different retained operation",
+                )
             existing = connection.execute(
-                "SELECT job_id,kind,payload_sha256,resource_id,permission FROM distributed_jobs WHERE idempotency_key=?",
+                "SELECT job_id,kind,payload_sha256,resource_id,permission,side_effect_mode "
+                "FROM distributed_jobs WHERE idempotency_key=?",
                 (idem,),
             ).fetchone()
             if existing is not None:
@@ -321,6 +328,7 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
                     and str(existing["payload_sha256"]) == payload_sha
                     and str(existing["resource_id"]) == resource
                     and str(existing["permission"]) == capability
+                    and str(existing["side_effect_mode"]) == mode
                 ):
                     connection.commit()
                     return str(existing["job_id"])
@@ -330,8 +338,14 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
                 prefix = _clean_token(idempotency_prefix, "idempotency prefix", 192)
                 limit = max(1, min(MAX_JOBS, int(idempotency_prefix_limit)))
                 prefix_count = int(connection.execute(
-                    "SELECT count(*) FROM distributed_jobs WHERE substr(idempotency_key,1,?)=?",
-                    (len(prefix), prefix),
+                    """SELECT count(*) FROM (
+                           SELECT idempotency_key FROM distributed_jobs
+                           WHERE substr(idempotency_key,1,?)=?
+                           UNION
+                           SELECT idempotency_key FROM distributed_job_idempotency
+                           WHERE substr(idempotency_key,1,?)=?
+                       ) AS retained_keys""",
+                    (len(prefix), prefix, len(prefix), prefix),
                 ).fetchone()[0])
                 if prefix_count >= limit:
                     connection.rollback()
@@ -449,21 +463,24 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
         if fast_sql is not None:
             token = secrets.token_urlsafe(32)
             digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
-            expires = self._clock.deadline_epoch(duration)
             now = utc_now()
             detail_created = utc_now()
+            expires = 0.0
             with self._storage.lease_admission_guard():
                 with self._lock, self._connection() as connection:
+                    lease_now = self._lease_now(connection)
+                    expires = lease_now + duration
+                    expiry_parameter = self._storage.fast_lease_expiry_parameter(lease_now, duration)
                     row = connection.execute(
                         fast_sql,
                         (
                             worker,
-                            self._clock.stable_epoch(),
+                            lease_now,
                             now,
                             worker,
                             worker,
                             digest,
-                            expires,
+                            expiry_parameter,
                             now,
                             worker,
                             "",
@@ -473,14 +490,16 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
                         ),
                     ).fetchone()
             if row is not None:
+                expires = self._storage.fast_lease_expiry_from_row(row, expires)
                 return self._lease_from_row(row, worker, token, expires, int(row["attempt"]))
 
         with self._lock, self._connection() as connection:
             self._begin(connection)
+            lease_now = self._lease_now(connection)
             atomic_slot_sql = self._storage.claim_worker_slot_for_lease_sql()
             if atomic_slot_sql is not None:
                 worker_row = connection.execute(
-                    atomic_slot_sql, (self._clock.stable_epoch(), utc_now(), worker)
+                    atomic_slot_sql, (lease_now, utc_now(), worker)
                 ).fetchone()
                 if worker_row is None:
                     state_row = connection.execute(
@@ -523,7 +542,8 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
                 return None
             token = secrets.token_urlsafe(32)
             digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
-            expires = self._clock.deadline_epoch(duration)
+            lease_now = self._lease_now(connection)
+            expires = lease_now + duration
             job_id = str(row["job_id"])
             attempt = int(row["attempt"]) + 1
             updated_at = utc_now()
@@ -538,14 +558,14 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
             if not slot_claimed:
                 slot_cursor = connection.execute(
                     self._storage.claim_worker_slot_sql(),
-                    (self._clock.stable_epoch(), updated_at, worker),
+                    (lease_now, updated_at, worker),
                 )
                 if slot_cursor.rowcount != 1:
                     connection.rollback()
                     return None
             self._record_event_locked(
                 connection, job_id, "leased", "queued", "leased", worker_id=worker,
-                details={"attempt": attempt, "lease_seconds": duration, "clock": "stable-monotonic-epoch"},
+                details={"attempt": attempt, "lease_seconds": duration, "clock": "storage-authoritative-epoch"},
             )
             connection.commit()
         return self._lease_from_row(row, worker, token, expires, attempt)
@@ -598,7 +618,8 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
                     break
                 token = secrets.token_urlsafe(32)
                 digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
-                expires = self._clock.deadline_epoch(duration)
+                lease_now = self._lease_now(connection)
+                expires = lease_now + duration
                 job_id = str(row["job_id"])
                 attempt = int(row["attempt"]) + 1
                 updated_at = utc_now()
@@ -611,14 +632,14 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
                     continue
                 slot_cursor = connection.execute(
                     self._storage.claim_worker_slot_sql(),
-                    (self._clock.stable_epoch(), updated_at, worker),
+                    (lease_now, updated_at, worker),
                 )
                 if slot_cursor.rowcount != 1:
                     connection.rollback()
                     return []
                 self._record_event_locked(
                     connection, job_id, "leased", "queued", "leased", worker_id=worker,
-                    details={"attempt": attempt, "lease_seconds": duration, "batch": True, "clock": "stable-monotonic-epoch"},
+                    details={"attempt": attempt, "lease_seconds": duration, "batch": True, "clock": "storage-authoritative-epoch"},
                 )
                 leases.append(DistributedLease(
                     job_id=job_id,
@@ -654,7 +675,7 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
         actual = hashlib.sha256(str(lease_token).encode("utf-8")).hexdigest()
         if not expected or not hmac.compare_digest(expected, actual):
             raise _fail("DISTRIBUTED_LEASE_STALE", "Distributed job lease token is invalid")
-        now = self._clock.stable_epoch()
+        now = self._lease_now(connection)
         expires = float(row["lease_expires_at"])
         if expires <= now:
             raise _fail(
@@ -663,7 +684,7 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
                 job_id=str(job_id),
                 worker_id=str(worker_id),
                 lease_expires_at=expires,
-                clock_stable_epoch=now,
+                clock_authoritative_epoch=now,
                 lease_remaining_seconds=expires - now,
             )
         if expires > now + MAX_LEASE_SECONDS + 60.0:
@@ -679,7 +700,7 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
             fast_sql = self._storage.start_job_fast_sql()
             if fast_sql is not None:
                 token_sha = hashlib.sha256(str(lease_token).encode("utf-8")).hexdigest()
-                now = self._clock.stable_epoch()
+                now = self._lease_now(connection)
                 updated_at = utc_now()
                 cursor = connection.execute(
                     fast_sql,
@@ -703,14 +724,15 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
         with self._lock, self._connection() as connection:
             self._begin(connection)
             self._require_lease_locked(connection, job_id, worker_id, lease_token)
-            expires = self._clock.deadline_epoch(duration)
+            lease_now = self._lease_now(connection)
+            expires = lease_now + duration
             connection.execute(
                 "UPDATE distributed_jobs SET lease_expires_at=?,updated_at=? WHERE job_id=?",
                 (expires, utc_now(), str(job_id)),
             )
             connection.execute(
                 "UPDATE distributed_workers SET heartbeat_at=?,updated_at=? WHERE worker_id=?",
-                (self._clock.stable_epoch(), utc_now(), str(worker_id)),
+                (lease_now, utc_now(), str(worker_id)),
             )
             connection.commit()
         return expires
@@ -737,14 +759,21 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
                    error_code=?,updated_at=? WHERE job_id=?""",
                 (target, code, utc_now(), str(job_id)),
             )
+            lease_now = self._lease_now(connection)
             connection.execute(
                 "UPDATE distributed_workers SET active_leases=max(0,active_leases-1),heartbeat_at=?,updated_at=? WHERE worker_id=?",
-                (self._clock.stable_epoch(), utc_now(), str(worker_id)),
+                (lease_now, utc_now(), str(worker_id)),
             )
             self._record_event_locked(
                 connection, str(job_id), "lease_handover", previous, target, worker_id=str(worker_id), code=code,
                 details={"review_required": target == "review_required"},
             )
+            if target in {"failed", "review_required"}:
+                terminal_row = connection.execute(
+                    "SELECT * FROM distributed_jobs WHERE job_id=?", (str(job_id),)
+                ).fetchone()
+                if terminal_row is not None:
+                    self._fence_terminal_from_row_locked(connection, terminal_row, target)
             connection.commit()
             return target
 
@@ -796,15 +825,15 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
         with self._lock, self._connection() as connection:
             fast_sql = self._storage.complete_fast_sql()
             if fast_sql is not None:
-                now = self._clock.stable_epoch()
+                now = self._lease_now(connection)
                 terminal_at = utc_now()
                 details_json, _ = _bounded_json({"result_sha256": result_sha}, MAX_EVENT_DETAILS_BYTES, "distributed event details")
                 cursor = connection.execute(
                     fast_sql,
                     (
                         str(job_id), str(worker_id), token_sha, now,
-                        result_json, result_sha, str(worker_id), token_sha, terminal_at, terminal_at,
-                        self._clock.stable_epoch(), utc_now(), str(worker_id),
+                        terminal_at, terminal_at, result_json, result_sha, str(worker_id), token_sha,
+                        now, utc_now(), str(worker_id),
                         str(worker_id), "", details_json, utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,
                     ),
                 )
@@ -843,14 +872,20 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
             if cursor.rowcount != 1:
                 connection.rollback()
                 raise _fail("DISTRIBUTED_TERMINAL_CONFLICT", "Distributed job completion lost its fenced lease")
+            lease_now = self._lease_now(connection)
             connection.execute(
                 "UPDATE distributed_workers SET active_leases=max(0,active_leases-1),heartbeat_at=?,updated_at=? WHERE worker_id=?",
-                (self._clock.stable_epoch(), utc_now(), str(worker_id)),
+                (lease_now, utc_now(), str(worker_id)),
             )
             self._record_event_locked(
                 connection, str(job_id), "completed", previous, "completed", worker_id=str(worker_id),
                 details={"result_sha256": result_sha},
             )
+            terminal_row = connection.execute(
+                "SELECT * FROM distributed_jobs WHERE job_id=?", (str(job_id),)
+            ).fetchone()
+            if terminal_row is not None:
+                self._fence_terminal_from_row_locked(connection, terminal_row, "completed")
             connection.commit()
 
     def fail(
@@ -881,10 +916,17 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
                 connection, str(job_id), "execution_failed", previous, state, worker_id=str(worker_id), code=code,
                 details={"retryable": bool(retryable), "attempt": attempt, "max_attempts": max_attempts},
             )
+            lease_now = self._lease_now(connection)
             connection.execute(
                 "UPDATE distributed_workers SET active_leases=max(0,active_leases-1),heartbeat_at=?,updated_at=? WHERE worker_id=?",
-                (self._clock.stable_epoch(), utc_now(), str(worker_id)),
+                (lease_now, utc_now(), str(worker_id)),
             )
+            if state in {"failed", "review_required"}:
+                terminal_row = connection.execute(
+                    "SELECT * FROM distributed_jobs WHERE job_id=?", (str(job_id),)
+                ).fetchone()
+                if terminal_row is not None:
+                    self._fence_terminal_from_row_locked(connection, terminal_row, state)
             connection.commit()
             return state
 
@@ -943,24 +985,3 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
                     (len(token), token),
                 ).fetchone()
         return 0 if row is None else int(row[0] or 0)
-
-    def list_jobs_by_idempotency_prefix(
-        self, prefix: str, *, state: str = "", limit: int = 500
-    ) -> list[dict[str, Any]]:
-        """List jobs belonging to one bounded distributed-work namespace."""
-        token = _clean_token(prefix, "idempotency prefix", 192)
-        cap = max(1, min(5000, int(limit)))
-        with self._connection() as connection:
-            if state:
-                rows = connection.execute(
-                    "SELECT * FROM distributed_jobs WHERE substr(idempotency_key,1,?)=? AND state=? "
-                    "ORDER BY created_at ASC LIMIT ?",
-                    (len(token), token, str(state), cap),
-                ).fetchall()
-            else:
-                rows = connection.execute(
-                    "SELECT * FROM distributed_jobs WHERE substr(idempotency_key,1,?)=? "
-                    "ORDER BY created_at ASC LIMIT ?",
-                    (len(token), token, cap),
-                ).fetchall()
-        return [distributed_job_row(row) for row in rows]

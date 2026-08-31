@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import threading
-from concurrent.futures import Future, ThreadPoolExecutor
+import time
+from concurrent.futures import Future, ThreadPoolExecutor, wait as wait_futures
 from collections.abc import Callable
 from dataclasses import field
 from arenyxa.application.future_callbacks import WeakMethodFutureCallback
@@ -134,6 +135,8 @@ class SchedulerService:
             due_at = due_at.replace(tzinfo=UTC)
         with self._definition_io_lock:
             with self._condition:
+                if self._stopping:
+                    raise RuntimeError("SchedulerService 已停止，不能再添加计划。")
                                                                                             
                                                                                                 
                                                                                         
@@ -219,24 +222,63 @@ class SchedulerService:
         if cancel_future is not None:
             cancel_future.cancel()
 
-    def stop(self) -> None:
+    def begin_shutdown(self) -> None:
+        """Stop schedule intake and cancel callbacks that have not started yet."""
         with self._condition:
-            if self._stopping:
-                return
             self._stopping = True
+            callback_futures = tuple(self._callback_futures.values())
             self._condition.notify_all()
-        if self._thread.is_alive() and self._thread is not threading.current_thread():
-            self._thread.join(timeout=5)
-                                                                                         
-                                                                                         
-                                                                                       
-        current_name = threading.current_thread().name
-        wait_callbacks = not current_name.startswith("arenyxa-schedule")
-        with self._condition:
-            callback_futures = list(self._callback_futures.values())
         for future in callback_futures:
             future.cancel()
-        shutdown_executor(self._callback_executor, wait=wait_callbacks, cancel_futures=True)
+
+    def shutdown_snapshot(self) -> dict[str, object]:
+        with self._condition:
+            futures = tuple(self._callback_futures.values())
+            stopping = self._stopping
+        return {
+            "accepting": not stopping,
+            "scheduler_thread_alive": self._thread.is_alive(),
+            "pending_callbacks": sum(1 for future in futures if not future.done()),
+            "running_callbacks": sum(1 for future in futures if future.running()),
+            "queued_callbacks": sum(
+                1 for future in futures if not future.running() and not future.done()
+            ),
+        }
+
+    def drain(self, timeout: float) -> bool:
+        deadline = time.monotonic() + max(0.0, float(timeout))
+        if self._thread.is_alive() and self._thread is not threading.current_thread():
+            self._thread.join(timeout=min(max(0.0, deadline - time.monotonic()), 5.0))
+        while True:
+            with self._condition:
+                pending = {future for future in self._callback_futures.values() if not future.done()}
+            if not pending and not self._thread.is_alive():
+                return True
+            remaining = deadline - time.monotonic()
+            if remaining <= 0.0:
+                LOGGER.error("Scheduler drain deadline exceeded: %s", self.shutdown_snapshot())
+                return False
+            if pending:
+                wait_futures(pending, timeout=min(0.05, remaining))
+            elif self._thread.is_alive() and self._thread is not threading.current_thread():
+                self._thread.join(timeout=min(0.05, remaining))
+            else:
+                return False
+
+    def stop(self, *, timeout: float | None = 10.0) -> bool:
+        self.begin_shutdown()
+        current_name = threading.current_thread().name
+        if current_name.startswith("arenyxa-schedule"):
+            # A callback cannot wait for its own Future. Mark the executor closed to
+            # new work and let this callback return naturally.
+            shutdown_executor(self._callback_executor, wait=False, cancel_futures=True)
+            return False
+        completed = self.drain(10.0 if timeout is None else max(0.0, float(timeout)))
+        if not completed:
+            shutdown_executor(self._callback_executor, wait=False, cancel_futures=True)
+            return False
+        shutdown_executor(self._callback_executor, wait=True, cancel_futures=True)
+        return True
 
     def _run(self) -> None:
         while True:

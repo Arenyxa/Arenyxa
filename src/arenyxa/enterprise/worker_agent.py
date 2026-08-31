@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import http.client
 import logging
 import ssl
@@ -18,6 +19,9 @@ from arenyxa.enterprise.server_api import EnterpriseWorkerHTTPClient
 
 MIN_RECONNECT_BACKOFF_SECONDS = 1.0
 MAX_RECONNECT_BACKOFF_SECONDS = 30.0
+RECONNECT_JITTER_FRACTION = 0.20
+MAX_RECONNECT_BASE_SECONDS = MAX_RECONNECT_BACKOFF_SECONDS / (1.0 + RECONNECT_JITTER_FRACTION)
+MAX_LIVE_GENERATIONS = 2
 LOGGER = logging.getLogger(__name__)
 
 
@@ -207,6 +211,19 @@ class EnterpriseWorkerAgent:
     def _recoverable_control_error(cls, exc: Exception) -> bool:
         return cls._session_expired(exc) or cls._transient_transport_error(exc) or cls._lease_lost_error(exc)
 
+    def _reconnect_delay(self, base_seconds: float, attempt: int) -> float:
+        """Return deterministic per-Worker jitter in the bounded retry time domain."""
+        material = f"{self.worker_id}\0{max(0, int(attempt))}".encode("utf-8")
+        sample = int.from_bytes(hashlib.sha256(material).digest()[:8], "big") / float((1 << 64) - 1)
+        base = max(
+            MIN_RECONNECT_BACKOFF_SECONDS,
+            min(MAX_RECONNECT_BASE_SECONDS, float(base_seconds)),
+        )
+        return min(
+            MAX_RECONNECT_BACKOFF_SECONDS,
+            base * (1.0 + RECONNECT_JITTER_FRACTION * sample),
+        )
+
     def _active_client(self) -> EnterpriseWorkerHTTPClient:
         client = getattr(self._client_local, "client", None)
         if client is None:
@@ -263,6 +280,16 @@ class EnterpriseWorkerAgent:
             return self._request(path, body, correlation_id=correlation_id)
 
     def _new_generation_locked(self) -> _AgentGeneration:
+        self._prune_draining_locked()
+        live_generations = len(self._draining_generations) + (
+            1 if self._current_generation is not None else 0
+        )
+        if live_generations >= MAX_LIVE_GENERATIONS:
+            raise ArenyxaError(
+                "WORKER_GENERATION_CAPACITY_EXHAUSTED",
+                "Previous Worker generations are still physically live",
+                domain="ENTERPRISE",
+            )
         self._generation_serial += 1
         generation = _AgentGeneration(
             number=self._generation_serial,
@@ -551,6 +578,7 @@ class EnterpriseWorkerAgent:
 
     def _run(self, generation: _AgentGeneration, *, propagate_fatal: bool = False) -> None:
         backoff = max(MIN_RECONNECT_BACKOFF_SECONDS, self.idle_seconds)
+        retry_attempt = 0
         while not generation.stop.is_set():
             try:
                 if not self._authenticated_at:
@@ -585,6 +613,7 @@ class EnterpriseWorkerAgent:
                         break
                     accepted += 1
                 backoff = self.idle_seconds
+                retry_attempt = 0
                 if accepted == 0:
                     generation.stop.wait(self.idle_seconds)
             except (ArenyxaError, OSError, RuntimeError, ValueError, TypeError, http.client.HTTPException) as exc:
@@ -609,9 +638,11 @@ class EnterpriseWorkerAgent:
                     with self._lock:
                         if self._current_generation is generation:
                             self._authenticated_at = ""
-                generation.stop.wait(backoff)
+                delay = self._reconnect_delay(backoff, retry_attempt)
+                retry_attempt += 1
+                generation.stop.wait(delay)
                 backoff = min(
-                    MAX_RECONNECT_BACKOFF_SECONDS,
+                    MAX_RECONNECT_BASE_SECONDS,
                     max(MIN_RECONNECT_BACKOFF_SECONDS, self.idle_seconds, backoff * 2.0),
                 )
         self._reap(generation)

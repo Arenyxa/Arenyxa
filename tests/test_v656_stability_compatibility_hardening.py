@@ -70,9 +70,19 @@ def test_application_context_shutdown_is_thread_safe(tmp_path: Path) -> None:
     checkpoint_count = Counter()
     optimize_count = Counter()
 
-    scheduler = SimpleNamespace(stop=lambda: scheduler_count.hit(0.04))
+    scheduler = SimpleNamespace(
+        begin_shutdown=lambda: None,
+        drain=lambda _timeout: True,
+        stop=lambda *, timeout: scheduler_count.hit(0.04) or True,
+        shutdown_snapshot=lambda: {},
+    )
     workflow_runtime = SimpleNamespace(shutdown=lambda **_kwargs: workflow_count.hit() or True)
-    runner = SimpleNamespace(shutdown=lambda **_kwargs: runner_count.hit())
+    runner = SimpleNamespace(
+        begin_shutdown=lambda: None,
+        drain=lambda _timeout: True,
+        shutdown=lambda **_kwargs: runner_count.hit() or True,
+        shutdown_snapshot=lambda: {},
+    )
     terminal = SimpleNamespace(close=lambda: terminal_count.hit())
     settings = SimpleNamespace(save=lambda _path: settings_count.hit())
     store = SimpleNamespace(checkpoint=lambda _mode: checkpoint_count.hit(), optimize=lambda: optimize_count.hit())
@@ -98,14 +108,31 @@ def test_application_context_shutdown_is_thread_safe(tmp_path: Path) -> None:
         nextgen=object(),
         runtime_recovery=object(),
     )
-    threads = [threading.Thread(target=context.shutdown) for _ in range(12)]
+    results: list[bool] = []
+    errors: list[BaseException] = []
+    outcome_lock = threading.Lock()
+
+    def shutdown() -> None:
+        try:
+            result = context.shutdown()
+        except BaseException as exc:  # noqa: BLE001 - relay worker failures to pytest
+            with outcome_lock:
+                errors.append(exc)
+        else:
+            with outcome_lock:
+                results.append(result)
+
+    threads = [threading.Thread(target=shutdown) for _ in range(12)]
     for thread in threads:
         thread.start()
     for thread in threads:
         thread.join(timeout=2)
     assert all(not thread.is_alive() for thread in threads)
+    assert errors == []
+    assert len(results) == 12
+    assert any(results)
     assert scheduler_count.count == 1
-    assert workflow_count.count == 1
+    assert workflow_count.count == 3
     assert runner_count.count == 1
     assert terminal_count.count == 1
     assert settings_count.count == 1

@@ -3,11 +3,12 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor, wait as wait_futures
 from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
+from arenyxa.exception_boundary import call_exception_boundary
 from arenyxa.application.future_callbacks import WeakMethodFutureCallback
 from arenyxa.compat import shutdown_executor
 from arenyxa.domain.errors import ArenyxaError
@@ -70,6 +71,7 @@ class JobSystem:
         self._futures: dict[str, Future[None]] = {}
         self._cancellation: dict[str, threading.Event] = {}
         self._accepting = True
+        self._executor_shutdown_requested = False
         self._admission_provider: Callable[[], Mapping[str, bool]] | None = None
         self._telemetry: Any = None
         self.recovered_jobs = int(self.store.recover_platform_jobs())
@@ -196,48 +198,67 @@ class JobSystem:
         self._metric_increment("job.submitted")
         created_at = utc_now()
         actor = "anonymous" if session is None else session.principal_id
-        self.store.create_platform_job(
-            {
-                "id": job_id,
-                "kind": normalized_kind,
-                "surface": normalized_surface,
-                "state": "queued",
-                "progress": 0.0,
-                "message": "Queued",
-                "actor": actor,
-                "correlation_id": correlation_id,
-                "timeout_seconds": timeout,
-                "created_at": created_at,
-            }
+        call_exception_boundary(
+            lambda: self.store.create_platform_job(
+                {
+                    "id": job_id,
+                    "kind": normalized_kind,
+                    "surface": normalized_surface,
+                    "state": "queued",
+                    "progress": 0.0,
+                    "message": "Queued",
+                    "actor": actor,
+                    "correlation_id": correlation_id,
+                    "timeout_seconds": timeout,
+                    "created_at": created_at,
+                }
+            ),
+            # The semaphore permit remains owned by submit() until Future publication.
+            on_error=lambda exc: self._slots.release(),
+            reraise=True,
         )
         try:
-            future = self._executor.submit(
-                self._run,
-                job_id,
-                normalized_kind,
-                operation,
-                cancelled,
-                timeout,
-                session,
-                correlation_id,
-                str(resource),
-                submitted_monotonic,
-            )
-        except RuntimeError:
+            # Admission and registry publication share the shutdown lock.  Without
+            # this boundary, shutdown could snapshot futures between submit() and
+            # _futures registration, leaving an owned job outside cancellation.
+            with self._lock:
+                if not self._accepting:
+                    raise ArenyxaError(
+                        "JOB_SYSTEM_STOPPING",
+                        "the platform Job System is not accepting new work",
+                        domain="JOB",
+                    )
+                future = self._executor.submit(
+                    self._run,
+                    job_id,
+                    normalized_kind,
+                    operation,
+                    cancelled,
+                    timeout,
+                    session,
+                    correlation_id,
+                    str(resource),
+                    submitted_monotonic,
+                )
+                self._futures[job_id] = future
+                self._cancellation[job_id] = cancelled
+        except (RuntimeError, ArenyxaError) as exc:
             self._slots.release()
             self.store.update_platform_job(
                 job_id,
-                state="failed",
+                state="cancelled" if isinstance(exc, ArenyxaError) else "failed",
                 progress=1.0,
-                message="Executor rejected the job",
-                error_code="JOB_SUBMIT_FAILED",
-                error_message="The executor rejected the job before it started.",
+                message=(
+                    "Job System shutdown began before the job could start"
+                    if isinstance(exc, ArenyxaError)
+                    else "Executor rejected the job"
+                ),
+                error_code=("JOB_SYSTEM_STOPPING" if isinstance(exc, ArenyxaError) else "JOB_SUBMIT_FAILED"),
+                error_message=str(exc),
                 finished_at=utc_now(),
+                expected_states=("queued",),
             )
             raise
-        with self._lock:
-            self._futures[job_id] = future
-            self._cancellation[job_id] = cancelled
         future.add_done_callback(WeakMethodFutureCallback(self, "_retire", prefix=(job_id,)))
         row = self.store.get_platform_job(job_id)
         if row is None:
@@ -425,14 +446,18 @@ class JobSystem:
                 "the job is not active in this process and cannot be cancelled here",
                 domain="JOB",
             )
-        event.set()
-        future.cancel()
+        # Publish the acknowledgement before waking a running worker.  Otherwise a
+        # fast cooperative cancellation can commit its terminal row first and make
+        # this synchronous API appear to have skipped the request acknowledgement.
         self.store.update_platform_job(
             job_id,
             message="Cancellation requested",
             expected_states=("queued", "running"),
         )
-        return self.store.get_platform_job(job_id) or row
+        acknowledged = self.store.get_platform_job(job_id) or row
+        event.set()
+        future.cancel()
+        return acknowledged
 
     def wait(self, job_id: str, timeout_seconds: float | None = None) -> dict[str, Any]:
         with self._lock:
@@ -473,15 +498,59 @@ class JobSystem:
             "survivability_admission": admission,
         }
 
-    def shutdown(self, *, wait: bool = True) -> None:
+    def begin_shutdown(self) -> None:
+        """Stop admission and signal every active job's cooperative cancellation event."""
         with self._lock:
-            if not self._accepting:
-                return
             self._accepting = False
             events = tuple(self._cancellation.values())
             futures = tuple(self._futures.values())
         for event in events:
             event.set()
         for future in futures:
+            # Authoritative only for queued jobs. Running operations must observe
+            # JobExecutionContext.check_cancelled()/report_progress().
             future.cancel()
-        shutdown_executor(self._executor, wait=bool(wait), cancel_futures=True)
+
+    def shutdown_snapshot(self) -> dict[str, object]:
+        with self._lock:
+            futures = tuple(self._futures.values())
+            accepting = self._accepting
+        return {
+            "accepting": accepting,
+            "active_futures": sum(1 for future in futures if not future.done()),
+            "running_futures": sum(1 for future in futures if future.running()),
+            "queued_futures": sum(
+                1 for future in futures if not future.running() and not future.done()
+            ),
+        }
+
+    def drain(self, timeout: float) -> bool:
+        deadline = time.monotonic() + max(0.0, float(timeout))
+        while True:
+            with self._lock:
+                pending = {future for future in self._futures.values() if not future.done()}
+            if not pending:
+                return True
+            remaining = deadline - time.monotonic()
+            if remaining <= 0.0:
+                LOGGER.error("JobSystem drain deadline exceeded: %s", self.shutdown_snapshot())
+                return False
+            wait_futures(pending, timeout=min(0.05, remaining))
+
+    def shutdown(self, *, wait: bool = True, timeout: float | None = 10.0) -> bool:
+        self.begin_shutdown()
+        if not wait:
+            shutdown_executor(self._executor, wait=False, cancel_futures=True)
+            self._executor_shutdown_requested = True
+            return int(self.shutdown_snapshot()["active_futures"]) == 0
+
+        completed = self.drain(10.0 if timeout is None else max(0.0, float(timeout)))
+        if not completed:
+            # Do not claim success: wait=False only retires executor workers *after*
+            # running functions return on their own.
+            shutdown_executor(self._executor, wait=False, cancel_futures=True)
+            self._executor_shutdown_requested = True
+            return False
+        shutdown_executor(self._executor, wait=True, cancel_futures=True)
+        self._executor_shutdown_requested = True
+        return True

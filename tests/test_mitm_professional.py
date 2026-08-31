@@ -1,12 +1,35 @@
 from __future__ import annotations
 
+import asyncio
+import importlib.util
 import json
+import sys
+import types
 from pathlib import Path
 
 import pytest
 
 from arenyxa.infrastructure.capture.mitm_engine import MitmEngine, MitmSettings
 
+
+
+def _load_bridge_module(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    package = types.ModuleType("mitmproxy")
+    package.__path__ = []
+    flowfilter = types.ModuleType("mitmproxy.flowfilter")
+    flowfilter.parse = lambda source: source
+    flowfilter.match = lambda _compiled, _flow: False
+    monkeypatch.setitem(sys.modules, "mitmproxy", package)
+    monkeypatch.setitem(sys.modules, "mitmproxy.flowfilter", flowfilter)
+    monkeypatch.setenv("ARENYXA_MITM_EVENT_FILE", str(tmp_path / "events.jsonl"))
+    monkeypatch.setenv("ARENYXA_MITM_PENDING_DIR", str(tmp_path / "pending"))
+    monkeypatch.setenv("ARENYXA_MITM_CONTROL_DIR", str(tmp_path / "control"))
+    bridge = Path(__file__).parents[1] / "src" / "arenyxa" / "infrastructure" / "capture" / "mitm_bridge.py"
+    spec = importlib.util.spec_from_file_location("arenyxa_test_mitm_bridge", bridge)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 def _fake_executable(tmp_path: Path) -> Path:
     path = tmp_path / ("mitmdump.exe" if __import__("os").name == "nt" else "mitmdump")
@@ -123,6 +146,58 @@ def test_mitm_runtime_bridge_compiles_without_importing_dependency():
     bridge = Path(__file__).parents[1] / "src" / "arenyxa" / "infrastructure" / "capture" / "mitm_bridge.py"
     compile(bridge.read_text(encoding="utf-8"), str(bridge), "exec")
 
+
+
+def test_mitm_bridge_background_tasks_have_strong_ownership_until_done(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_bridge_module(tmp_path, monkeypatch)
+
+    async def scenario() -> None:
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        async def blocked() -> None:
+            started.set()
+            await release.wait()
+
+        task = module._spawn_background(blocked())
+        await asyncio.wait_for(started.wait(), 1.0)
+        assert task in module._BACKGROUND_TASKS
+
+        release.set()
+        await asyncio.wait_for(task, 1.0)
+        await asyncio.sleep(0)
+        assert task not in module._BACKGROUND_TASKS
+
+    asyncio.run(scenario())
+
+
+def test_mitm_bridge_background_task_exceptions_are_observed_and_retired(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_bridge_module(tmp_path, monkeypatch)
+    observed: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        module,
+        "record_current_exception",
+        lambda module_name, operation: observed.append((module_name, operation)),
+    )
+
+    async def scenario() -> None:
+        async def fail() -> None:
+            raise RuntimeError("simulated bridge task failure")
+
+        task = module._spawn_background(fail())
+        for _ in range(5):
+            await asyncio.sleep(0)
+            if task.done() and task not in module._BACKGROUND_TASKS:
+                break
+        assert task.done()
+        assert task not in module._BACKGROUND_TASKS
+
+    asyncio.run(scenario())
+    assert observed == [(module.__name__, "mitm_bridge.background_task")]
 
 def test_mitm_runtime_is_integrated_into_professional_suite():
     root = Path(__file__).parents[1]

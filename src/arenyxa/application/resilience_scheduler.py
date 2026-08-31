@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from arenyxa.exception_boundary import call_exception_boundary
 from arenyxa.application.resilience_drills import ResilienceDrillService
 from arenyxa.infrastructure.atomic_io import atomic_write_json, read_text_limited
 
 _MAX_HISTORY = 64
 _MAX_FILE_BYTES = 2 * 1024 * 1024
+LOGGER = logging.getLogger(__name__)
 
 
 class ResilienceDrillScheduler:
@@ -34,6 +37,8 @@ class ResilienceDrillScheduler:
         self._enabled = False
         self._last_run_at = ""
         self._last_state = "never"
+        self._failure_count = 0
+        self._last_error = ""
         self._load_config()
 
     def _load_config(self) -> None:
@@ -114,7 +119,20 @@ class ResilienceDrillScheduler:
                 enabled = self._enabled
             if not enabled:
                 return
-            self.run_once()
+            def record_failure(exc: Exception) -> None:
+                with self._lock:
+                    self._failure_count += 1
+                    self._last_error = f"{type(exc).__name__}: {exc}"[:512]
+                LOGGER.exception("Scheduled resilience drill failed; scheduler remains active")
+
+            sentinel = object()
+            outcome = call_exception_boundary(
+                lambda: (self.run_once(), sentinel)[1],
+                on_error=record_failure,
+            )
+            if outcome is sentinel:
+                with self._lock:
+                    self._last_error = ""
 
     def start_if_enabled(self) -> None:
         with self._lock:
@@ -158,5 +176,7 @@ class ResilienceDrillScheduler:
                 "running": bool(self._thread is not None and self._thread.is_alive()),
                 "last_run_at": self._last_run_at,
                 "last_state": self._last_state,
+                "failure_count": self._failure_count,
+                "last_error": self._last_error,
                 "history": self._load_history()[-10:],
             }

@@ -172,8 +172,12 @@ class CommandPlatformMixin:
             }
         if action == "repair":
             self._expect_count(args, 0, 0, "recovery repair")
-            result = service.recover()
-            return result.to_dict()
+            raise CommandRuntimeError(
+                "LIVE_RUNTIME_RECOVERY_FORBIDDEN",
+                "Runtime recovery mutation is offline-only. Exit Arenyxa and use Startup Repair "
+                "or Repair Center so the current process owns no active runtime state.",
+                exit_code=5,
+            )
         raise CommandRuntimeError("UNKNOWN_ACTION", f"Unknown recovery action: {action}")
 
     def _traffic_automation_engine(self) -> TrafficAutomationEngine:
