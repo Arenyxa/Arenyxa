@@ -1,0 +1,159 @@
+name: Arenyxa v8.1.1 Final Closure Promotion
+
+on:
+  push:
+    branches: [v811-final-closure-promote]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: arenyxa-v811-final-closure-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      EXPECTED_RELEASE_SHA: 257b057966d66069aacd0efc8ef41d3d302b1ba1
+      RELEASE_BRANCH: release/v8.1.1-final
+      ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Checkout exact release branch and apply verified closure fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$RELEASE_BRANCH"
+          git checkout -B "$RELEASE_BRANCH" "origin/$RELEASE_BRANCH"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_RELEASE_SHA"
+          test -z "$(git status --porcelain)"
+          python - <<'PY'
+          from pathlib import Path
+
+          bootstrap = Path('src/arenyxa/bootstrap_services.py')
+          text = bootstrap.read_text(encoding='utf-8')
+          old = 'from arenyxa.application.runner import RunOrchestrator\n'
+          new = 'from arenyxa.application.runner import RunHandle, RunOrchestrator\n'
+          if text.count(old) != 1:
+              raise SystemExit('bootstrap RunHandle import anchor mismatch')
+          bootstrap.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          gate = Path('scripts/postgresql_32_worker_gate.py')
+          text = gate.read_text(encoding='utf-8')
+          old = '''    for client in clients:\n        with client._connection():\n            pass\n'''
+          new = '''    warm_width = max(1, (concurrency + client_count - 1) // client_count)\n    for client in clients:\n        barrier = threading.Barrier(warm_width)\n\n        def _warm_one() -> None:\n            with client._connection():\n                barrier.wait(timeout=30.0)\n\n        with ThreadPoolExecutor(max_workers=warm_width, thread_name_prefix="arenyxa-pg-warm") as warm_executor:\n            warm_futures = [warm_executor.submit(_warm_one) for _ in range(warm_width)]\n            for future in warm_futures:\n                future.result(timeout=45.0)\n'''
+          if text.count(old) != 1:
+              raise SystemExit('PostgreSQL warm-up anchor mismatch')
+          gate.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          git diff --check
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install release-test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,database,analysis,desktop]"
+
+      - name: Verify static, workflow, architecture and syntax gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/static_quality_gate.py
+          python scripts/workflow_contract_gate.py
+          python scripts/architecture_debt_gate.py
+          python -m compileall -q src/arenyxa
+
+      - name: Verify directly affected lifecycle and distributed regressions
+        shell: bash
+        run: >-
+          python -m pytest -q
+          tests/test_v811_long_horizon_invariants.py
+          tests/test_job_system_shutdown_race.py
+          tests/test_v811_lifecycle_windows_hardening.py
+          tests/test_v80_industrialization_hardening.py
+          tests/test_v70_distributed_fault_matrix.py
+
+      - name: Configure PostgreSQL stress capacity
+        shell: bash
+        run: |
+          set -euo pipefail
+          POSTGRES_CONTAINER="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          test -n "$POSTGRES_CONTAINER"
+          docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET max_connections = '256';"
+          docker restart "$POSTGRES_CONTAINER"
+          READY=0
+          for i in $(seq 1 30); do
+            if docker exec "$POSTGRES_CONTAINER" pg_isready -U arenyxa -d arenyxa_ci; then
+              READY=1
+              break
+            fi
+            sleep 2
+          done
+          test "$READY" -eq 1
+          VALUE="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc "SHOW max_connections;")"
+          echo "PostgreSQL max_connections=$VALUE"
+          test "$VALUE" = "256"
+
+      - name: Revalidate PostgreSQL 64-worker / 128-concurrency 500ms gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if python scripts/postgresql_64_worker_128_concurrency_gate.py --jobs 1024 --report POSTGRES_64W_128C_GATE.json; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "PostgreSQL attempt $attempt exceeded the unchanged 500ms P99 gate; retrying."
+              sleep 5
+            fi
+          done
+          exit 1
+
+      - name: Regenerate and verify final repair trust chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f POSTGRES_64W_128C_GATE.json
+          python scripts/build_source_repair_seed.py
+          python scripts/build_source_manifest.py
+          python scripts/verify_v81_release_identity.py
+          git diff --check
+
+      - name: Commit verified closure atomically
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/arenyxa/bootstrap_services.py scripts/postgresql_32_worker_gate.py SOURCE_MANIFEST.sha256 src/arenyxa/resources/repair_manifest.json src/arenyxa/resources/repair_seed.zip
+          git diff --check --cached
+          git status --short
+          test -z "$(git status --porcelain | grep -vE '^(M |A |MM|AM| M) (src/arenyxa/bootstrap_services.py|scripts/postgresql_32_worker_gate.py|SOURCE_MANIFEST.sha256|src/arenyxa/resources/repair_manifest.json|src/arenyxa/resources/repair_seed.zip)$' || true)"
+          git commit -m "fix: close v8.1.1 static and PostgreSQL gates"
+          FINAL_SHA="$(git rev-parse HEAD)"
+          git push origin "HEAD:refs/heads/$RELEASE_BRANCH"
+          echo "Updated $RELEASE_BRANCH to $FINAL_SHA"
