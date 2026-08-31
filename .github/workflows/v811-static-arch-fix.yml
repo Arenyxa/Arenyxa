@@ -32,6 +32,7 @@ jobs:
           PATCH_B64="$RUNNER_TEMP/v811-static-arch-fix.b64"
           PATCH_GZ="$RUNNER_TEMP/v811-static-arch-fix.patch.gz"
           PATCH_RAW="$RUNNER_TEMP/v811-static-arch-fix.patch"
+          export PATCH_B64 PATCH_GZ PATCH_RAW
           cat .release/v811-static-arch-fix-v2/part*.b64 > "$PATCH_B64"
           python - <<'PY'
           import base64
