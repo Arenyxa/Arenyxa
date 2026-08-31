@@ -35,47 +35,37 @@ jobs:
           import base64
           import gzip
           import hashlib
-          import itertools
           import os
           from pathlib import Path
 
           parts = [b''.join(p.read_bytes().split()) for p in sorted(Path('.release/v811-static-arch-fix-v2').glob('part*.b64'))]
+          compact = b''.join(parts)
           expected = os.environ['PATCH_SHA256'].upper()
           target = Path(os.environ['PATCH_RAW'])
-          print('part lengths:', [len(p) for p in parts])
+          print('part lengths:', [len(p) for p in parts], 'total:', len(compact))
 
-          # Every partition of six ordered slices into consecutive Base64 members.
-          # Authentication is by the expected SHA-256 of the decompressed patch.
-          for mask in range(1 << (len(parts) - 1)):
-              groups = []
-              start = 0
-              for boundary in range(len(parts) - 1):
-                  if mask & (1 << boundary):
-                      groups.append(parts[start:boundary + 1])
-                      start = boundary + 1
-              groups.append(parts[start:])
-              decoded = bytearray()
-              ok = True
+          def check(candidate: bytes):
               try:
-                  for group in groups:
-                      text = b''.join(group)
-                      text += b'=' * ((4 - len(text) % 4) % 4)
-                      decoded.extend(base64.b64decode(text, validate=True))
+                  padded = candidate + b'=' * ((4 - len(candidate) % 4) % 4)
+                  compressed = base64.b64decode(padded, validate=True)
+                  raw = gzip.decompress(compressed)
               except Exception:
-                  ok = False
-              if not ok:
-                  continue
-              try:
-                  raw = gzip.decompress(bytes(decoded))
-              except Exception:
-                  continue
-              actual = hashlib.sha256(raw).hexdigest().upper()
-              if actual == expected:
-                  target.write_bytes(raw)
-                  print('authenticated partition mask:', mask, 'groups:', len(groups), 'bytes:', len(raw))
-                  break
-          else:
-              raise SystemExit('No Base64 partition reconstructed the authenticated patch SHA-256')
+                  return None
+              return raw if hashlib.sha256(raw).hexdigest().upper() == expected else None
+
+          raw = check(compact)
+          removed_at = None
+          if raw is None:
+              for i in range(len(compact)):
+                  candidate = compact[:i] + compact[i + 1:]
+                  raw = check(candidate)
+                  if raw is not None:
+                      removed_at = i
+                      break
+          if raw is None:
+              raise SystemExit('Authenticated patch not recoverable by exact stream or one-character transport repair')
+          target.write_bytes(raw)
+          print('authenticated patch recovered; removed_at=', removed_at, 'bytes=', len(raw))
           PY
           ACTUAL="$(sha256sum "$PATCH_RAW" | awk '{print toupper($1)}')"
           echo "Expected patch SHA-256: $PATCH_SHA256"
