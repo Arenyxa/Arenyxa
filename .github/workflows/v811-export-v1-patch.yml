@@ -26,3 +26,4 @@ jobs:
           path: ${{ runner.temp }}/v811-static-arch-fix-v1.patch
           if-no-files-found: error
           retention-days: 1
+      # This workflow exports only the already-authenticated v1 transport.
