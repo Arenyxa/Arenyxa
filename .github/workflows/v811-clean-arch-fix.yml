@@ -103,3 +103,4 @@ jobs:
           echo "FINAL_SHA=$FINAL_SHA" >> "$GITHUB_ENV"
           git push origin "HEAD:refs/heads/$RELEASE_BRANCH"
           echo "Updated $RELEASE_BRANCH to $FINAL_SHA"
+      # Trigger marker: authenticated clean transport only.
