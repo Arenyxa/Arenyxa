@@ -29,20 +29,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          PATCH_B64="$RUNNER_TEMP/v811-static-arch-fix.b64"
           PATCH_GZ="$RUNNER_TEMP/v811-static-arch-fix.patch.gz"
           PATCH_RAW="$RUNNER_TEMP/v811-static-arch-fix.patch"
-          export PATCH_B64 PATCH_GZ PATCH_RAW
-          cat .release/v811-static-arch-fix-v2/part*.b64 > "$PATCH_B64"
-          python - <<'PY'
-          import base64
-          import os
-          from pathlib import Path
-          source = Path(os.environ["PATCH_B64"])
-          target = Path(os.environ["PATCH_GZ"])
-          compact = b"".join(source.read_bytes().split())
-          target.write_bytes(base64.b64decode(compact, validate=True))
-          PY
+          : > "$PATCH_GZ"
+          for part in .release/v811-static-arch-fix-v2/part*.b64; do
+            tr -d '\r\n\t ' < "$part" | base64 --decode >> "$PATCH_GZ"
+          done
           gzip -dc "$PATCH_GZ" > "$PATCH_RAW"
           ACTUAL="$(sha256sum "$PATCH_RAW" | awk '{print toupper($1)}')"
           echo "Expected patch SHA-256: $PATCH_SHA256"
