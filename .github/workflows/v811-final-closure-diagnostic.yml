@@ -1,0 +1,109 @@
+name: Arenyxa v8.1.1 Final Closure Diagnostic
+
+on:
+  push:
+    branches: [v811-final-closure-diagnostic]
+
+permissions:
+  contents: read
+
+jobs:
+  static-and-postgres:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Apply diagnostic-only closure fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          bootstrap = Path('src/arenyxa/bootstrap_services.py')
+          text = bootstrap.read_text(encoding='utf-8')
+          old = 'from arenyxa.application.runner import RunOrchestrator\n'
+          new = 'from arenyxa.application.runner import RunHandle, RunOrchestrator\n'
+          if text.count(old) != 1:
+              raise SystemExit('bootstrap RunHandle import anchor mismatch')
+          bootstrap.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          gate = Path('scripts/postgresql_32_worker_gate.py')
+          text = gate.read_text(encoding='utf-8')
+          old = '''    for client in clients:\n        with client._connection():\n            pass\n'''
+          new = '''    warm_width = max(1, (concurrency + client_count - 1) // client_count)\n    for client in clients:\n        barrier = threading.Barrier(warm_width)\n\n        def _warm_one() -> None:\n            with client._connection():\n                barrier.wait(timeout=30.0)\n\n        with ThreadPoolExecutor(max_workers=warm_width, thread_name_prefix="arenyxa-pg-warm") as warm_executor:\n            warm_futures = [warm_executor.submit(_warm_one) for _ in range(warm_width)]\n            for future in warm_futures:\n                future.result(timeout=45.0)\n'''
+          if text.count(old) != 1:
+              raise SystemExit('PostgreSQL warm-up anchor mismatch')
+          gate.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          git diff --check
+      - name: Install release-test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,database,analysis]"
+      - name: Verify static gates without changing ratchets
+        run: |
+          python scripts/static_quality_gate.py
+          python scripts/workflow_contract_gate.py
+          python scripts/architecture_debt_gate.py
+          python -m compileall -q src
+          python -c "import arenyxa.bootstrap_services"
+      - name: Configure PostgreSQL stress capacity
+        shell: bash
+        run: |
+          POSTGRES_CONTAINER="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          test -n "$POSTGRES_CONTAINER"
+          docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET max_connections = '256';"
+          docker restart "$POSTGRES_CONTAINER"
+          READY=0
+          for i in $(seq 1 30); do
+            if docker exec "$POSTGRES_CONTAINER" pg_isready -U arenyxa -d arenyxa_ci; then
+              READY=1
+              break
+            fi
+            sleep 2
+          done
+          test "$READY" -eq 1
+          VALUE="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc "SHOW max_connections;")"
+          echo "PostgreSQL max_connections=$VALUE"
+          test "$VALUE" = "256"
+      - name: PostgreSQL 64-worker / 128-concurrency 500ms gate
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if python scripts/postgresql_64_worker_128_concurrency_gate.py --jobs 1024 --report POSTGRES_64W_128C_GATE.json; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Diagnostic PostgreSQL attempt $attempt exceeded the unchanged 500ms P99 gate; retrying."
+              sleep 5
+            fi
+          done
+          exit 1
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: v811-final-closure-diagnostic
+          path: POSTGRES_64W_128C_GATE.json
+          if-no-files-found: warn
+          retention-days: 1
