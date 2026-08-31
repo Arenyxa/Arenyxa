@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from arenyxa.exception_boundary import call_exception_boundary
 from arenyxa.application.resilience_drills import ResilienceDrillService
 from arenyxa.infrastructure.atomic_io import atomic_write_json, read_text_limited
 
@@ -118,14 +119,18 @@ class ResilienceDrillScheduler:
                 enabled = self._enabled
             if not enabled:
                 return
-            try:
-                self.run_once()
-            except Exception as exc:
+            def record_failure(exc: Exception) -> None:
                 with self._lock:
                     self._failure_count += 1
                     self._last_error = f"{type(exc).__name__}: {exc}"[:512]
                 LOGGER.exception("Scheduled resilience drill failed; scheduler remains active")
-            else:
+
+            sentinel = object()
+            outcome = call_exception_boundary(
+                lambda: (self.run_once(), sentinel)[1],
+                on_error=record_failure,
+            )
+            if outcome is sentinel:
                 with self._lock:
                     self._last_error = ""
 

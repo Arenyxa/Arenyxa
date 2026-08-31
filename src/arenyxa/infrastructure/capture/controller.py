@@ -1,4 +1,5 @@
 from __future__ import annotations
+from arenyxa.exception_boundary import call_exception_boundary
 from arenyxa.recoverable import record_current_exception
 
 import logging
@@ -97,10 +98,12 @@ class CaptureController:
             self._finalization_notified_session = session
             listeners = tuple(self._finalization_listeners)
         for callback in listeners:
-            try:
-                callback(session)
-            except Exception:
-                LOGGER.exception("Capture finalization listener failed for session %s", session.id)
+            call_exception_boundary(
+                lambda callback=callback: callback(session),
+                on_error=lambda exc: LOGGER.exception(
+                    "Capture finalization listener failed for session %s", session.id
+                ),
+            )
 
     def _drain_queue(self) -> None:
         while True:
@@ -503,10 +506,10 @@ class CaptureController:
         failure_method = getattr(self.adapter, "failure", None)
         if not callable(failure_method):
             return None
-        try:
-            failure = failure_method()
-        except Exception as exc:                                                         
-            return exc
+        failure = call_exception_boundary(
+            failure_method,
+            fallback=lambda exc: exc,
+        )
         return failure if isinstance(failure, Exception) else None
 
     def _commit_batch(self, batch: list[NetworkEvent]) -> None:
@@ -540,9 +543,7 @@ class CaptureController:
         with self._state_lock:
             listeners = tuple(self._listeners)
         for listener in listeners:
-            try:
-                listener(snapshot)
-            except Exception:
-                                                                                         
-                                                                       
-                LOGGER.exception("Capture listener failed")
+            call_exception_boundary(
+                lambda listener=listener: listener(snapshot),
+                on_error=lambda exc: LOGGER.exception("Capture listener failed"),
+            )

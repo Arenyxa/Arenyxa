@@ -8,6 +8,7 @@ from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
+from arenyxa.exception_boundary import call_exception_boundary
 from arenyxa.application.future_callbacks import WeakMethodFutureCallback
 from arenyxa.compat import shutdown_executor
 from arenyxa.domain.errors import ArenyxaError
@@ -197,8 +198,8 @@ class JobSystem:
         self._metric_increment("job.submitted")
         created_at = utc_now()
         actor = "anonymous" if session is None else session.principal_id
-        try:
-            self.store.create_platform_job(
+        call_exception_boundary(
+            lambda: self.store.create_platform_job(
                 {
                     "id": job_id,
                     "kind": normalized_kind,
@@ -211,14 +212,11 @@ class JobSystem:
                     "timeout_seconds": timeout,
                     "created_at": created_at,
                 }
-            )
-        except Exception:
-            # The semaphore permit is owned by submit() until a Future is
-            # successfully handed to the executor and published in the
-            # registries. Persistence failures occur before that ownership
-            # transfer, so return the permit here exactly once.
-            self._slots.release()
-            raise
+            ),
+            # The semaphore permit remains owned by submit() until Future publication.
+            on_error=lambda exc: self._slots.release(),
+            reraise=True,
+        )
         try:
             # Admission and registry publication share the shutdown lock.  Without
             # this boundary, shutdown could snapshot futures between submit() and

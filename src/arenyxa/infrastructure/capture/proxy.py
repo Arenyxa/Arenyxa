@@ -1,6 +1,5 @@
 from __future__ import annotations
 from arenyxa.recoverable import record_current_exception
-
 import fnmatch
 import json
 import logging

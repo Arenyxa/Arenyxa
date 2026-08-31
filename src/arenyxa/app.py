@@ -1,4 +1,5 @@
 from __future__ import annotations
+from arenyxa.exception_boundary import call_exception_boundary
 from arenyxa.recoverable import record_current_exception
 from arenyxa.startup_diagnostics import checkpoint, record_crash
 
@@ -299,10 +300,12 @@ def _create_runtime_splash(
     except Exception:
         LOGGER.exception("Startup splash failed; continuing with ordinary startup")
         if startup_splash is not None:
-            try:
-                startup_splash.abort()
-            except Exception:
-                LOGGER.debug("Startup splash cleanup also failed", exc_info=True)
+            call_exception_boundary(
+                startup_splash.abort,
+                on_error=lambda exc: LOGGER.debug(
+                    "Startup splash cleanup also failed", exc_info=True
+                ),
+            )
         startup_splash = None
     return startup_splash
 
@@ -788,12 +791,13 @@ def main(argv: list[str] | None = None) -> int:
                                                                                                
                                                                                               
                                                                                       
-        try:
-            context.shutdown()
-        except Exception:
-            LOGGER.exception("Context shutdown failed after main-window construction failure")
-        finally:
-            data_root_lease.release()
+        call_exception_boundary(
+            context.shutdown,
+            on_error=lambda exc: LOGGER.exception(
+                "Context shutdown failed after main-window construction failure"
+            ),
+        )
+        data_root_lease.release()
         QMessageBox.critical(None, "Arenyxa", f"Arenyxa interface initialization failed:\n{exc}")
         return 1
     _write_crash_marker(crash_marker, "running")

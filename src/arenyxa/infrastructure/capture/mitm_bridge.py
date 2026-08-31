@@ -1,4 +1,5 @@
 from __future__ import annotations
+from arenyxa.exception_boundary import call_exception_boundary
 from arenyxa.recoverable import record_current_exception
 
 import asyncio
@@ -30,12 +31,14 @@ _BACKGROUND_TASKS: set[asyncio.Task[Any]] = set()
 
 def _background_task_done(task: asyncio.Task[Any]) -> None:
     _BACKGROUND_TASKS.discard(task)
-    try:
-        task.result()
-    except asyncio.CancelledError:
+    if task.cancelled():
         return
-    except Exception:
-        record_current_exception(__name__, "mitm_bridge.background_task")
+    call_exception_boundary(
+        task.result,
+        on_error=lambda exc: record_current_exception(
+            __name__, "mitm_bridge.background_task"
+        ),
+    )
 
 
 def _spawn_background(coro: Any) -> asyncio.Task[Any]:
