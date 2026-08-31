@@ -31,38 +31,13 @@ jobs:
           set -euo pipefail
           PATCH_GZ="$RUNNER_TEMP/v811-static-arch-fix.patch.gz"
           PATCH_RAW="$RUNNER_TEMP/v811-static-arch-fix.patch"
-          export PATCH_GZ PATCH_RAW
-          python - <<'PY'
-          import base64
-          import os
-          from pathlib import Path
-
-          parts = sorted(Path('.release/v811-static-arch-fix-v2').glob('part*.b64'))
-          compact = b''.join(b''.join(p.read_bytes().split()) for p in parts)
-          decoded = bytearray()
-          start = 0
-          i = 0
-          segments = 0
-          while i < len(compact):
-              if compact[i:i+1] == b'=':
-                  j = i
-                  while j + 1 < len(compact) and compact[j+1:j+2] == b'=':
-                      j += 1
-                  segment = compact[start:j+1]
-                  decoded.extend(base64.b64decode(segment, validate=True))
-                  segments += 1
-                  start = j + 1
-                  i = j + 1
-              else:
-                  i += 1
-          if start < len(compact):
-              segment = compact[start:]
-              segment += b'=' * ((4 - len(segment) % 4) % 4)
-              decoded.extend(base64.b64decode(segment, validate=True))
-              segments += 1
-          Path(os.environ['PATCH_GZ']).write_bytes(decoded)
-          print(f'decoded base64 members: {segments}; bytes={len(decoded)}')
-          PY
+          MEMBER1="$RUNNER_TEMP/member1.b64"
+          MEMBER2="$RUNNER_TEMP/member2.b64"
+          cat .release/v811-static-arch-fix-v2/part00.b64 .release/v811-static-arch-fix-v2/part01.b64 .release/v811-static-arch-fix-v2/part02.b64 | tr -d '\r\n\t ' > "$MEMBER1"
+          cat .release/v811-static-arch-fix-v2/part03.b64 .release/v811-static-arch-fix-v2/part04.b64 .release/v811-static-arch-fix-v2/part05.b64 | tr -d '\r\n\t ' > "$MEMBER2"
+          : > "$PATCH_GZ"
+          base64 --decode "$MEMBER1" >> "$PATCH_GZ"
+          base64 --decode "$MEMBER2" >> "$PATCH_GZ"
           gzip -dc "$PATCH_GZ" > "$PATCH_RAW"
           ACTUAL="$(sha256sum "$PATCH_RAW" | awk '{print toupper($1)}')"
           echo "Expected patch SHA-256: $PATCH_SHA256"
