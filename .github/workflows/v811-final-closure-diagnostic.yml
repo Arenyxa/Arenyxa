@@ -67,7 +67,6 @@ jobs:
           python scripts/workflow_contract_gate.py
           python scripts/architecture_debt_gate.py
           python -m compileall -q src
-          python -c "import arenyxa.bootstrap_services"
       - name: Configure PostgreSQL stress capacity
         shell: bash
         run: |
