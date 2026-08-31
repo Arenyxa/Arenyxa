@@ -1,0 +1,28 @@
+name: Export v8.1.1 Architecture V1 Patch
+
+on:
+  push:
+    branches: [v811-final-closure-prep]
+
+permissions:
+  contents: read
+
+jobs:
+  export-patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Reconstruct v1 patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 --decode .release/v811-static-arch-fix.patch.gz.b64 > "$RUNNER_TEMP/v1.patch.gz"
+          gzip -dc "$RUNNER_TEMP/v1.patch.gz" > "$RUNNER_TEMP/v811-static-arch-fix-v1.patch"
+          sha256sum "$RUNNER_TEMP/v811-static-arch-fix-v1.patch"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: v811-static-arch-fix-v1-raw
+          path: ${{ runner.temp }}/v811-static-arch-fix-v1.patch
+          if-no-files-found: error
+          retention-days: 1
