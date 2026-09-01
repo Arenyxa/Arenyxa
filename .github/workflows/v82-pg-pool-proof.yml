@@ -1,4 +1,4 @@
-name: v8.2 PostgreSQL Pool Warmup Proof
+name: v8.2 PostgreSQL Checkout Hot Path Proof
 
 on:
   push:
@@ -55,6 +55,9 @@ jobs:
               p.write_text(t.replace(old,new),encoding='utf-8',newline='\n')
           # Fully warm the existing bounded capacity; max_size remains 8.
           rep('src/arenyxa/enterprise/runtime_storage.py','            min_size=4,\n            max_size=8,','            min_size=8,\n            max_size=8,')
+          # Do not run a SELECT 1 before every hot-path checkout. Business SQL remains the liveness probe,
+          # and integrity_check() still performs an explicit SELECT 1 when health is requested.
+          rep('src/arenyxa/enterprise/runtime_storage.py','            check=self._check_pool_connection,\n','')
           # Remove redundant client-side server-clock preflight round trips; atomic PostgreSQL SQL remains authoritative.
           rep('src/arenyxa/enterprise/runtime_storage_sql.py','heartbeat_at=GREATEST(w.heartbeat_at,?,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?','heartbeat_at=GREATEST(w.heartbeat_at,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?',2)
           rep('src/arenyxa/enterprise/runtime_storage_sql.py','lease_token_sha256=? AND lease_expires_at>GREATEST(?,EXTRACT(EPOCH FROM clock_timestamp()))','lease_token_sha256=? AND lease_expires_at>EXTRACT(EPOCH FROM clock_timestamp())',2)
@@ -68,9 +71,8 @@ jobs:
           rep('tests/test_v70_distributed_fault_matrix.py','"WHERE state=\'queued\' " + " AND ? IS NOT NULL" * 13 + " RETURNING *"','"WHERE state=\'queued\' " + " AND ? IS NOT NULL" * 12 + " RETURNING *"')
           rep('tests/test_v70_distributed_fault_matrix.py','"WHERE job_id=? AND state=\'leased\' " + " AND ? IS NOT NULL" * 9 + " RETURNING job_id"','"WHERE job_id=? AND state=\'leased\' " + " AND ? IS NOT NULL" * 8 + " RETURNING job_id"')
           rep('tests/test_v70_distributed_fault_matrix.py','"WHERE job_id=? AND state=\'running\' " + " AND ? IS NOT NULL" * 17 + " RETURNING state"','"WHERE job_id=? AND state=\'running\' " + " AND ? IS NOT NULL" * 15 + " RETURNING state"')
-          # Regression: production pool must pre-warm its full bounded size, not grow on timed traffic.
           p=Path('tests/test_v82_postgresql_pool_warmup.py')
-          p.write_text('''from pathlib import Path\n\n\ndef test_postgresql_pool_prewarms_full_bounded_capacity() -> None:\n    source = Path("src/arenyxa/enterprise/runtime_storage.py").read_text(encoding="utf-8")\n    block = source[source.index("pool = connection_pool("):source.index("opened = False", source.index("pool = connection_pool("))]\n    assert "min_size=8" in block\n    assert "max_size=8" in block\n    assert "max_size=9" not in block\n''',encoding='utf-8',newline='\n')
+          p.write_text('''from pathlib import Path\n\n\ndef _pool_block() -> str:\n    source = Path("src/arenyxa/enterprise/runtime_storage.py").read_text(encoding="utf-8")\n    start = source.index("pool = connection_pool(")\n    return source[start:source.index("opened = False", start)]\n\n\ndef test_postgresql_pool_prewarms_full_bounded_capacity() -> None:\n    block = _pool_block()\n    assert "min_size=8" in block\n    assert "max_size=8" in block\n    assert "max_size=9" not in block\n\n\ndef test_postgresql_hot_path_has_no_per_checkout_network_probe() -> None:\n    block = _pool_block()\n    assert "check=self._check_pool_connection" not in block\n    source = Path("src/arenyxa/enterprise/runtime_storage.py").read_text(encoding="utf-8")\n    assert 'row = connection.execute("SELECT 1 AS healthy")' in source\n''',encoding='utf-8',newline='\n')
       - name: Regression and architecture proof
         run: |
           python -m pytest -q tests/test_v82_postgresql_pool_warmup.py tests/test_v70_distributed_fault_matrix.py::test_postgresql_fast_path_hooks_short_circuit_portable_fallback tests/test_v811_long_horizon_invariants.py::test_postgresql_lease_fencing_sql_uses_database_wall_clock tests/test_v811_long_horizon_invariants.py::test_postgresql_completion_fast_path_writes_tombstone_without_extra_binds
@@ -87,5 +89,5 @@ jobs:
           git rm -f .github/workflows/v82-pg-fastpath-fix.yml .github/workflows/v82-pg-fastpath-fix-v2.yml .github/workflows/v82-pg-pool-proof.yml
           git add src/arenyxa/enterprise/runtime_storage.py src/arenyxa/enterprise/runtime_storage_sql.py src/arenyxa/enterprise/distributed_queue.py tests/test_v70_distributed_fault_matrix.py tests/test_v811_long_horizon_invariants.py tests/test_v82_postgresql_pool_warmup.py POSTGRES_PERFORMANCE_RESULTS.json
           git diff --cached --check
-          git commit -m "perf: prewarm bounded PostgreSQL worker pools"
+          git commit -m "perf: close PostgreSQL hot-path tail latency"
           git push origin HEAD:release/v8.2
