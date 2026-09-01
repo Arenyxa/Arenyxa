@@ -11,27 +11,28 @@ permissions:
   contents: write
 
 env:
-  PYTHONUTF8: '1'
+  PYTHONUTF8: "1"
   QT_QPA_PLATFORM: offscreen
-  ARENYXA_POSTGRES_TEST_DSN: postgresql://postgres:postgres@127.0.0.1:5432/arenyxa_ci
+  ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
 
 jobs:
   repair-and-prove:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
     services:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
           POSTGRES_DB: arenyxa_ci
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d arenyxa_ci"
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
           --health-interval 5s
           --health-timeout 5s
-          --health-retries 20
+          --health-retries 12
     steps:
       - uses: actions/checkout@v6
         with:
@@ -39,7 +40,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: "3.11"
           cache: pip
       - name: Install runtime and test dependencies
         run: |
@@ -47,134 +48,237 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-keysyms1 libxcb-xinerama0
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev,full]"
+      - name: Configure PostgreSQL stress capacity
+        run: |
+          POSTGRES_CONTAINER="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          test -n "$POSTGRES_CONTAINER"
+          docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET max_connections = '256';"
+          docker restart "$POSTGRES_CONTAINER"
+          READY=0
+          for i in $(seq 1 30); do
+            if docker exec "$POSTGRES_CONTAINER" pg_isready -U arenyxa -d arenyxa_ci; then
+              READY=1
+              break
+            fi
+            sleep 2
+          done
+          test "$READY" -eq 1
+          VALUE="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc "SHOW max_connections;")"
+          echo "PostgreSQL max_connections=$VALUE"
+          test "$VALUE" = "256"
       - name: Apply server-clock fast-path repair and deterministic regressions
         shell: python
         run: |
           from pathlib import Path
+          from textwrap import dedent
 
-          sql_path = Path('src/arenyxa/enterprise/runtime_storage_sql.py')
-          sql = sql_path.read_text(encoding='utf-8')
-          replacements = {
-              "heartbeat_at=GREATEST(w.heartbeat_at,?,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?":
-              "heartbeat_at=GREATEST(w.heartbeat_at,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?",
-              "lease_token_sha256=? AND lease_expires_at>GREATEST(?,EXTRACT(EPOCH FROM clock_timestamp()))":
-              "lease_token_sha256=? AND lease_expires_at>EXTRACT(EPOCH FROM clock_timestamp())",
-              "heartbeat_at=GREATEST(w.heartbeat_at,?,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?":
-              "heartbeat_at=GREATEST(w.heartbeat_at,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?",
-          }
-          # The heartbeat text occurs in both lease and complete SQL. Replace all matching instances.
+          sql_path = Path("src/arenyxa/enterprise/runtime_storage_sql.py")
+          sql = sql_path.read_text(encoding="utf-8")
           heartbeat_old = "heartbeat_at=GREATEST(w.heartbeat_at,?,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?"
           heartbeat_new = "heartbeat_at=GREATEST(w.heartbeat_at,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?"
           if sql.count(heartbeat_old) != 2:
-              raise SystemExit(f'expected 2 redundant heartbeat clock binds, found {sql.count(heartbeat_old)}')
+              raise SystemExit(f"expected 2 redundant heartbeat clock binds, found {sql.count(heartbeat_old)}")
           sql = sql.replace(heartbeat_old, heartbeat_new)
           expiry_old = "lease_token_sha256=? AND lease_expires_at>GREATEST(?,EXTRACT(EPOCH FROM clock_timestamp()))"
           expiry_new = "lease_token_sha256=? AND lease_expires_at>EXTRACT(EPOCH FROM clock_timestamp())"
           if sql.count(expiry_old) != 2:
-              raise SystemExit(f'expected 2 redundant lease-expiry clock binds, found {sql.count(expiry_old)}')
+              raise SystemExit(f"expected 2 redundant lease-expiry clock binds, found {sql.count(expiry_old)}")
           sql = sql.replace(expiry_old, expiry_new)
-          sql_path.write_text(sql, encoding='utf-8', newline='\n')
+          sql_path.write_text(sql, encoding="utf-8", newline="\n")
 
-          queue_path = Path('src/arenyxa/enterprise/distributed_queue.py')
-          queue = queue_path.read_text(encoding='utf-8')
-          lease_old = '''                    lease_now = self._lease_now(connection)\n                    expires = lease_now + duration\n                    expiry_parameter = self._storage.fast_lease_expiry_parameter(lease_now, duration)\n                    row = connection.execute(\n                        fast_sql,\n                        (\n                            worker,\n                            lease_now,\n                            now,\n                            worker,\n                            worker,\n                            digest,\n                            expiry_parameter,\n                            now,\n                            worker,\n                            "",\n                            duration,\n                            detail_created,\n                            MAX_JOB_EVENTS_PER_JOB - 1,\n                        ),\n                    ).fetchone()\n'''
-          lease_new = '''                    # PostgreSQL fast SQL owns the authoritative server clock.  Avoid a\n                    # redundant SELECT clock_timestamp() round trip before the atomic lease.\n                    expires = 0.0\n                    expiry_parameter = self._storage.fast_lease_expiry_parameter(0.0, duration)\n                    row = connection.execute(\n                        fast_sql,\n                        (\n                            worker,\n                            now,\n                            worker,\n                            worker,\n                            digest,\n                            expiry_parameter,\n                            now,\n                            worker,\n                            "",\n                            duration,\n                            detail_created,\n                            MAX_JOB_EVENTS_PER_JOB - 1,\n                        ),\n                    ).fetchone()\n'''
+          queue_path = Path("src/arenyxa/enterprise/distributed_queue.py")
+          queue = queue_path.read_text(encoding="utf-8")
+          lease_old = dedent("""\
+                              lease_now = self._lease_now(connection)
+                              expires = lease_now + duration
+                              expiry_parameter = self._storage.fast_lease_expiry_parameter(lease_now, duration)
+                              row = connection.execute(
+                                  fast_sql,
+                                  (
+                                      worker,
+                                      lease_now,
+                                      now,
+                                      worker,
+                                      worker,
+                                      digest,
+                                      expiry_parameter,
+                                      now,
+                                      worker,
+                                      "",
+                                      duration,
+                                      detail_created,
+                                      MAX_JOB_EVENTS_PER_JOB - 1,
+                                  ),
+                              ).fetchone()
+          """)
+          lease_old = "                    " + lease_old.replace("\n", "\n                    ").rstrip() + "\n"
+          lease_new = dedent("""\
+                              # PostgreSQL fast SQL owns the authoritative server clock. Avoid a
+                              # redundant SELECT clock_timestamp() round trip before the atomic lease.
+                              expires = 0.0
+                              expiry_parameter = self._storage.fast_lease_expiry_parameter(0.0, duration)
+                              row = connection.execute(
+                                  fast_sql,
+                                  (
+                                      worker,
+                                      now,
+                                      worker,
+                                      worker,
+                                      digest,
+                                      expiry_parameter,
+                                      now,
+                                      worker,
+                                      "",
+                                      duration,
+                                      detail_created,
+                                      MAX_JOB_EVENTS_PER_JOB - 1,
+                                  ),
+                              ).fetchone()
+          """)
+          lease_new = "                    " + lease_new.replace("\n", "\n                    ").rstrip() + "\n"
           if queue.count(lease_old) != 1:
-              raise SystemExit(f'lease fast-path anchor mismatch: {queue.count(lease_old)}')
+              raise SystemExit(f"lease fast-path anchor mismatch: {queue.count(lease_old)}")
           queue = queue.replace(lease_old, lease_new, 1)
 
-          start_old = '''                now = self._lease_now(connection)\n                updated_at = utc_now()\n                cursor = connection.execute(\n                    fast_sql,\n                    (\n                        str(job_id), str(worker_id), token_sha, now, updated_at,\n                        str(worker_id), "", "{}", utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,\n                    ),\n                )\n'''
-          start_new = '''                updated_at = utc_now()\n                cursor = connection.execute(\n                    fast_sql,\n                    (\n                        str(job_id), str(worker_id), token_sha, updated_at,\n                        str(worker_id), "", "{}", utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,\n                    ),\n                )\n'''
+          start_old = dedent("""\
+                          now = self._lease_now(connection)
+                          updated_at = utc_now()
+                          cursor = connection.execute(
+                              fast_sql,
+                              (
+                                  str(job_id), str(worker_id), token_sha, now, updated_at,
+                                  str(worker_id), "", "{}", utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,
+                              ),
+                          )
+          """)
+          start_old = "                " + start_old.replace("\n", "\n                ").rstrip() + "\n"
+          start_new = dedent("""\
+                          updated_at = utc_now()
+                          cursor = connection.execute(
+                              fast_sql,
+                              (
+                                  str(job_id), str(worker_id), token_sha, updated_at,
+                                  str(worker_id), "", "{}", utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,
+                              ),
+                          )
+          """)
+          start_new = "                " + start_new.replace("\n", "\n                ").rstrip() + "\n"
           if queue.count(start_old) != 1:
-              raise SystemExit(f'start fast-path anchor mismatch: {queue.count(start_old)}')
+              raise SystemExit(f"start fast-path anchor mismatch: {queue.count(start_old)}")
           queue = queue.replace(start_old, start_new, 1)
 
-          complete_old = '''                now = self._lease_now(connection)\n                terminal_at = utc_now()\n                details_json, _ = _bounded_json({"result_sha256": result_sha}, MAX_EVENT_DETAILS_BYTES, "distributed event details")\n                cursor = connection.execute(\n                    fast_sql,\n                    (\n                        str(job_id), str(worker_id), token_sha, now,\n                        terminal_at, terminal_at, result_json, result_sha, str(worker_id), token_sha,\n                        now, utc_now(), str(worker_id),\n                        str(worker_id), "", details_json, utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,\n                    ),\n                )\n'''
-          complete_new = '''                terminal_at = utc_now()\n                details_json, _ = _bounded_json({"result_sha256": result_sha}, MAX_EVENT_DETAILS_BYTES, "distributed event details")\n                cursor = connection.execute(\n                    fast_sql,\n                    (\n                        str(job_id), str(worker_id), token_sha,\n                        terminal_at, terminal_at, result_json, result_sha, str(worker_id), token_sha,\n                        utc_now(), str(worker_id),\n                        str(worker_id), "", details_json, utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,\n                    ),\n                )\n'''
+          complete_old = dedent("""\
+                          now = self._lease_now(connection)
+                          terminal_at = utc_now()
+                          details_json, _ = _bounded_json({"result_sha256": result_sha}, MAX_EVENT_DETAILS_BYTES, "distributed event details")
+                          cursor = connection.execute(
+                              fast_sql,
+                              (
+                                  str(job_id), str(worker_id), token_sha, now,
+                                  terminal_at, terminal_at, result_json, result_sha, str(worker_id), token_sha,
+                                  now, utc_now(), str(worker_id),
+                                  str(worker_id), "", details_json, utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,
+                              ),
+                          )
+          """)
+          complete_old = "                " + complete_old.replace("\n", "\n                ").rstrip() + "\n"
+          complete_new = dedent("""\
+                          terminal_at = utc_now()
+                          details_json, _ = _bounded_json({"result_sha256": result_sha}, MAX_EVENT_DETAILS_BYTES, "distributed event details")
+                          cursor = connection.execute(
+                              fast_sql,
+                              (
+                                  str(job_id), str(worker_id), token_sha,
+                                  terminal_at, terminal_at, result_json, result_sha, str(worker_id), token_sha,
+                                  utc_now(), str(worker_id),
+                                  str(worker_id), "", details_json, utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,
+                              ),
+                          )
+          """)
+          complete_new = "                " + complete_new.replace("\n", "\n                ").rstrip() + "\n"
           if queue.count(complete_old) != 1:
-              raise SystemExit(f'complete fast-path anchor mismatch: {queue.count(complete_old)}')
+              raise SystemExit(f"complete fast-path anchor mismatch: {queue.count(complete_old)}")
           queue = queue.replace(complete_old, complete_new, 1)
-          queue_path.write_text(queue, encoding='utf-8', newline='\n')
+          queue_path.write_text(queue, encoding="utf-8", newline="\n")
 
-          long_path = Path('tests/test_v811_long_horizon_invariants.py')
-          long = long_path.read_text(encoding='utf-8')
-          old_assert = '    assert sql.count("?") == 18\n'
-          new_assert = '    # Server clock is read inside the atomic completion statement; no preflight clock binds remain.\n    assert sql.count("?") == 16\n'
+          long_path = Path("tests/test_v811_long_horizon_invariants.py")
+          long = long_path.read_text(encoding="utf-8")
+          old_assert = "    assert sql.count(\"?\") == 18\n"
+          new_assert = "    # Server clock is read inside the atomic completion statement; no preflight clock binds remain.\n    assert sql.count(\"?\") == 16\n"
           if long.count(old_assert) != 1:
-              raise SystemExit(f'completion bind-count test anchor mismatch: {long.count(old_assert)}')
+              raise SystemExit(f"completion bind-count test anchor mismatch: {long.count(old_assert)}")
           long = long.replace(old_assert, new_assert, 1)
-          long_path.write_text(long, encoding='utf-8', newline='\n')
+          long_path.write_text(long, encoding="utf-8", newline="\n")
 
-          state_path = Path('tests/test_distributed_state_consistency_hardening.py')
-          state = state_path.read_text(encoding='utf-8')
-          test_name = 'test_postgresql_fast_state_transitions_do_not_preflight_server_clock'
+          state_path = Path("tests/test_distributed_state_consistency_hardening.py")
+          state = state_path.read_text(encoding="utf-8")
+          test_name = "test_postgresql_fast_state_transitions_do_not_preflight_server_clock"
           if test_name not in state:
-              state += r'''
-
-class _FastPathCursor:
-    def fetchone(self):
-        return {"ok": True}
-
-
-class _FastPathConnection:
-    def __init__(self) -> None:
-        self.calls: list[tuple[str, tuple[object, ...]]] = []
-
-    def execute(self, sql: str, params=()):
-        self.calls.append((sql, tuple(params)))
-        return _FastPathCursor()
+              snippet = dedent("""
+                  class _FastPathCursor:
+                      def fetchone(self):
+                          return {"ok": True}
 
 
-class _FastPathContext:
-    def __init__(self, connection: _FastPathConnection) -> None:
-        self.connection = connection
+                  class _FastPathConnection:
+                      def __init__(self) -> None:
+                          self.calls: list[tuple[str, tuple[object, ...]]] = []
 
-    def __enter__(self):
-        return self.connection
-
-    def __exit__(self, exc_type, exc, tb) -> bool:
-        return False
+                      def execute(self, sql: str, params=()):
+                          self.calls.append((sql, tuple(params)))
+                          return _FastPathCursor()
 
 
-class _FastPathStorage:
-    def __init__(self) -> None:
-        self.connection_object = _FastPathConnection()
+                  class _FastPathContext:
+                      def __init__(self, connection) -> None:
+                          self.connection = connection
 
-    def connection(self):
-        return _FastPathContext(self.connection_object)
+                      def __enter__(self):
+                          return self.connection
 
-    def start_job_fast_sql(self) -> str:
-        return "FAST_START"
-
-    def complete_fast_sql(self) -> str:
-        return "FAST_COMPLETE"
+                      def __exit__(self, exc_type, exc, tb) -> bool:
+                          return False
 
 
-def test_postgresql_fast_state_transitions_do_not_preflight_server_clock() -> None:
-    queue = object.__new__(DurableDistributedQueue)
-    queue._storage = _FastPathStorage()
-    queue._lock = _FastPathContext(object())
+                  class _FastPathStorage:
+                      def __init__(self) -> None:
+                          self.connection_object = _FastPathConnection()
 
-    def forbidden_clock(_connection):
-        raise AssertionError("fast PostgreSQL state transition performed a redundant clock round trip")
+                      def connection(self):
+                          return _FastPathContext(self.connection_object)
 
-    queue._lease_now = forbidden_clock
-    queue.start_job("job-fast", "worker-fast", "lease-fast")
-    queue.complete("job-fast", "worker-fast", "lease-fast", {"status": "ok"})
+                      def start_job_fast_sql(self) -> str:
+                          return "FAST_START"
 
-    calls = queue._storage.connection_object.calls
-    assert [sql for sql, _params in calls] == ["FAST_START", "FAST_COMPLETE"]
-    assert len(calls[0][1]) == 9
-    assert len(calls[1][1]) == 16
-'''
-          state_path.write_text(state, encoding='utf-8', newline='\n')
+                      def complete_fast_sql(self) -> str:
+                          return "FAST_COMPLETE"
 
-          # Contract checks before expensive CI work.
-          patched_sql = sql_path.read_text(encoding='utf-8')
-          if 'GREATEST(?,EXTRACT(EPOCH FROM clock_timestamp()))' in patched_sql:
-              raise SystemExit('redundant preflight clock bind remains in PostgreSQL fast SQL')
-          if patched_sql.count('clock_timestamp()') < 4:
-              raise SystemExit('authoritative PostgreSQL server clock fencing was accidentally removed')
+
+                  def test_postgresql_fast_state_transitions_do_not_preflight_server_clock() -> None:
+                      queue = object.__new__(DurableDistributedQueue)
+                      queue._storage = _FastPathStorage()
+                      queue._lock = _FastPathContext(object())
+
+                      def forbidden_clock(_connection):
+                          raise AssertionError("fast PostgreSQL state transition performed a redundant clock round trip")
+
+                      queue._lease_now = forbidden_clock
+                      queue.start_job("job-fast", "worker-fast", "lease-fast")
+                      queue.complete("job-fast", "worker-fast", "lease-fast", {"status": "ok"})
+
+                      calls = queue._storage.connection_object.calls
+                      assert [sql for sql, _params in calls] == ["FAST_START", "FAST_COMPLETE"]
+                      assert len(calls[0][1]) == 9
+                      assert len(calls[1][1]) == 16
+              """)
+              state = state.rstrip() + "\n\n" + snippet.lstrip()
+          state_path.write_text(state, encoding="utf-8", newline="\n")
+
+          patched_sql = sql_path.read_text(encoding="utf-8")
+          if "GREATEST(?,EXTRACT(EPOCH FROM clock_timestamp()))" in patched_sql:
+              raise SystemExit("redundant preflight clock bind remains in PostgreSQL fast SQL")
+          if patched_sql.count("clock_timestamp()") < 4:
+              raise SystemExit("authoritative PostgreSQL server clock fencing was accidentally removed")
       - name: Targeted RED-to-GREEN regressions
         run: |
           python -m pytest -q \
@@ -198,7 +302,6 @@ def test_postgresql_fast_state_transitions_do_not_preflight_server_clock() -> No
           python scripts/critical_coverage_gate.py coverage.json
       - name: Real PostgreSQL 64-worker 128-concurrency release gate
         run: |
-          psql "$ARENYXA_POSTGRES_TEST_DSN" -c "ALTER SYSTEM SET max_connections = '256';" || true
           python scripts/postgresql_64_worker_128_concurrency_gate.py \
             --dsn "$ARENYXA_POSTGRES_TEST_DSN" \
             --jobs 1024 \
@@ -211,10 +314,10 @@ def test_postgresql_fast_state_transitions_do_not_preflight_server_clock() -> No
       - name: Commit proven repair and remove temporary workflow
         shell: bash
         run: |
-          git config user.name 'Arenyxa Release Bot'
-          git config user.email 'actions@users.noreply.github.com'
+          git config user.name "Arenyxa Release Bot"
+          git config user.email "actions@users.noreply.github.com"
           git rm .github/workflows/v82-pg-fastpath-fix.yml
           git add src/arenyxa/enterprise/distributed_queue.py src/arenyxa/enterprise/runtime_storage_sql.py tests/test_distributed_state_consistency_hardening.py tests/test_v811_long_horizon_invariants.py POSTGRES_PERFORMANCE_RESULTS.json
           git diff --cached --check
-          git commit -m 'perf: remove redundant PostgreSQL fast-path clock trips'
+          git commit -m "perf: remove redundant PostgreSQL fast-path clock trips"
           git push origin HEAD:release/v8.2
