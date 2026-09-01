@@ -1,4 +1,4 @@
-name: v8.2 PostgreSQL Checkout Hot Path Proof
+name: v8.2 PostgreSQL Bounded Admission Proof
 
 on:
   push:
@@ -53,12 +53,17 @@ jobs:
               p=Path(path); t=p.read_text(encoding='utf-8')
               if t.count(old)!=count: raise SystemExit(f'{path}: anchor {old!r} count={t.count(old)} expected={count}')
               p.write_text(t.replace(old,new),encoding='utf-8',newline='\n')
-          # Fully warm the existing bounded capacity; max_size remains 8.
-          rep('src/arenyxa/enterprise/runtime_storage.py','            min_size=4,\n            max_size=8,','            min_size=8,\n            max_size=8,')
-          # Do not run a SELECT 1 before every hot-path checkout. Business SQL remains the liveness probe,
-          # and integrity_check() still performs an explicit SELECT 1 when health is requested.
-          rep('src/arenyxa/enterprise/runtime_storage.py','            check=self._check_pool_connection,\n','')
-          # Remove redundant client-side server-clock preflight round trips; atomic PostgreSQL SQL remains authoritative.
+
+          storage='src/arenyxa/enterprise/runtime_storage.py'
+          # Keep each client's existing capacity but prevent many independent clients in one
+          # process from oversubscribing PostgreSQL with 128 simultaneously active sessions.
+          rep(storage, 'LOGGER = logging.getLogger(__name__)\n', 'LOGGER = logging.getLogger(__name__)\n\n_POSTGRES_PROCESS_CONNECTION_ADMISSION = threading.BoundedSemaphore(32)\n')
+          rep(storage, '            min_size=4,\n            max_size=8,', '            min_size=8,\n            max_size=8,')
+          rep(storage, '            check=self._check_pool_connection,\n', '')
+          rep(storage, '        try:\n            with pool.connection(timeout=15.0) as raw:\n', '        _POSTGRES_PROCESS_CONNECTION_ADMISSION.acquire()\n        try:\n            with pool.connection(timeout=15.0) as raw:\n')
+          rep(storage, '            with self._pool_condition:\n                self._active_connections -= 1\n                self._pool_condition.notify_all()\n\n    def close(self)', '            with self._pool_condition:\n                self._active_connections -= 1\n                self._pool_condition.notify_all()\n            _POSTGRES_PROCESS_CONNECTION_ADMISSION.release()\n\n    def close(self)')
+
+          # PostgreSQL atomic SQL owns the authoritative server clock; remove redundant preflight round trips.
           rep('src/arenyxa/enterprise/runtime_storage_sql.py','heartbeat_at=GREATEST(w.heartbeat_at,?,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?','heartbeat_at=GREATEST(w.heartbeat_at,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?',2)
           rep('src/arenyxa/enterprise/runtime_storage_sql.py','lease_token_sha256=? AND lease_expires_at>GREATEST(?,EXTRACT(EPOCH FROM clock_timestamp()))','lease_token_sha256=? AND lease_expires_at>EXTRACT(EPOCH FROM clock_timestamp())',2)
           rep('src/arenyxa/enterprise/distributed_queue.py','                    lease_now = self._lease_now(connection)\n                    expires = lease_now + duration\n                    expiry_parameter = self._storage.fast_lease_expiry_parameter(lease_now, duration)\n','                    expires = 0.0\n                    expiry_parameter = self._storage.fast_lease_expiry_parameter(0.0, duration)\n')
@@ -71,11 +76,12 @@ jobs:
           rep('tests/test_v70_distributed_fault_matrix.py','"WHERE state=\'queued\' " + " AND ? IS NOT NULL" * 13 + " RETURNING *"','"WHERE state=\'queued\' " + " AND ? IS NOT NULL" * 12 + " RETURNING *"')
           rep('tests/test_v70_distributed_fault_matrix.py','"WHERE job_id=? AND state=\'leased\' " + " AND ? IS NOT NULL" * 9 + " RETURNING job_id"','"WHERE job_id=? AND state=\'leased\' " + " AND ? IS NOT NULL" * 8 + " RETURNING job_id"')
           rep('tests/test_v70_distributed_fault_matrix.py','"WHERE job_id=? AND state=\'running\' " + " AND ? IS NOT NULL" * 17 + " RETURNING state"','"WHERE job_id=? AND state=\'running\' " + " AND ? IS NOT NULL" * 15 + " RETURNING state"')
+
           p=Path('tests/test_v82_postgresql_pool_warmup.py')
-          p.write_text('''from pathlib import Path\n\n\ndef _pool_block() -> str:\n    source = Path("src/arenyxa/enterprise/runtime_storage.py").read_text(encoding="utf-8")\n    start = source.index("pool = connection_pool(")\n    return source[start:source.index("opened = False", start)]\n\n\ndef test_postgresql_pool_prewarms_full_bounded_capacity() -> None:\n    block = _pool_block()\n    assert "min_size=8" in block\n    assert "max_size=8" in block\n    assert "max_size=9" not in block\n\n\ndef test_postgresql_hot_path_has_no_per_checkout_network_probe() -> None:\n    block = _pool_block()\n    assert "check=self._check_pool_connection" not in block\n    source = Path("src/arenyxa/enterprise/runtime_storage.py").read_text(encoding="utf-8")\n    assert 'row = connection.execute("SELECT 1 AS healthy")' in source\n''',encoding='utf-8',newline='\n')
+          p.write_text('''from pathlib import Path\n\n\ndef _storage_source() -> str:\n    return Path("src/arenyxa/enterprise/runtime_storage.py").read_text(encoding="utf-8")\n\n\ndef _pool_block() -> str:\n    source = _storage_source()\n    start = source.index("pool = connection_pool(")\n    return source[start:source.index("opened = False", start)]\n\n\ndef test_postgresql_pool_prewarms_full_bounded_capacity() -> None:\n    block = _pool_block()\n    assert "min_size=8" in block\n    assert "max_size=8" in block\n    assert "max_size=9" not in block\n\n\ndef test_postgresql_hot_path_has_no_per_checkout_network_probe() -> None:\n    block = _pool_block()\n    assert "check=self._check_pool_connection" not in block\n    assert 'row = connection.execute("SELECT 1 AS healthy")' in _storage_source()\n\n\ndef test_postgresql_process_admission_is_bounded_without_growing_client_pool() -> None:\n    source = _storage_source()\n    assert "threading.BoundedSemaphore(32)" in source\n    assert "_POSTGRES_PROCESS_CONNECTION_ADMISSION.acquire()" in source\n    assert "_POSTGRES_PROCESS_CONNECTION_ADMISSION.release()" in source\n    assert "max_size=8" in _pool_block()\n''',encoding='utf-8',newline='\n')
       - name: Regression and architecture proof
         run: |
-          python -m pytest -q tests/test_v82_postgresql_pool_warmup.py tests/test_v70_distributed_fault_matrix.py::test_postgresql_fast_path_hooks_short_circuit_portable_fallback tests/test_v811_long_horizon_invariants.py::test_postgresql_lease_fencing_sql_uses_database_wall_clock tests/test_v811_long_horizon_invariants.py::test_postgresql_completion_fast_path_writes_tombstone_without_extra_binds
+          python -m pytest -q tests/test_v82_postgresql_pool_warmup.py tests/test_v70_distributed_fault_matrix.py::test_postgresql_fast_path_hooks_short_circuit_portable_fallback tests/test_v70_distributed_fault_matrix.py::test_storage_circuit_breaker_backpressures_then_opens_fail_closed tests/test_v811_long_horizon_invariants.py::test_postgresql_lease_fencing_sql_uses_database_wall_clock tests/test_v811_long_horizon_invariants.py::test_postgresql_completion_fast_path_writes_tombstone_without_extra_binds
           python -m pytest -q tests/test_v78_p0_p1_closure.py tests/test_v70_distributed_fault_matrix.py tests/test_distributed_state_consistency_hardening.py tests/test_protocol_intelligence_depth.py tests/test_v78_architecture_consolidation.py --cov=arenyxa.enterprise.distributed_queue --cov=arenyxa.infrastructure.capture.tcp_reassembly --cov=arenyxa.application.async_runner --cov=arenyxa.infrastructure.external_tools --cov=arenyxa.application.headless_developer_access --cov-report=json:coverage.json --cov-fail-under=0
           python scripts/critical_coverage_gate.py coverage.json
           ruff check src/arenyxa/enterprise/runtime_storage.py src/arenyxa/enterprise/runtime_storage_sql.py src/arenyxa/enterprise/distributed_queue.py tests/test_v82_postgresql_pool_warmup.py --select F821,E9
