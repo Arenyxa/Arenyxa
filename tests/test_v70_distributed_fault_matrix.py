@@ -177,3 +177,29 @@ def test_corrupt_active_lease_binding_is_reconciled_before_it_can_be_reused(tmp_
     assert state is not None and state["state"] == "queued"
     assert state["lease_worker_id"] == ""
     assert queue.worker("worker-0")["active_leases"] == 0
+
+
+def test_storage_circuit_breaker_backpressures_then_opens_fail_closed(tmp_path: Path, monkeypatch) -> None:
+    queue = _queue(tmp_path, workers=1)
+
+    def unavailable(*_args, **_kwargs):
+        raise sqlite3.OperationalError("synthetic storage unavailable")
+
+    monkeypatch.setattr(queue, "_lease_next_storage", unavailable)
+    for _attempt in range(queue._storage_circuit_threshold - 1):
+        with pytest.raises(Exception) as backpressure:
+            queue.lease_next("worker-0")
+        assert getattr(backpressure.value, "code", "") == "DISTRIBUTED_STORAGE_BACKPRESSURE"
+
+    with pytest.raises(Exception) as opened:
+        queue.lease_next("worker-0")
+    assert getattr(opened.value, "code", "") == "DISTRIBUTED_STORAGE_CIRCUIT_OPEN"
+    snapshot = queue.storage_circuit_snapshot()
+    assert snapshot["state"] == "open"
+    assert snapshot["consecutive_failures"] == queue._storage_circuit_threshold
+    assert "OperationalError" in snapshot["last_error"]
+    assert snapshot["retry_after_seconds"] > 0
+
+    with pytest.raises(Exception) as preflight:
+        queue.lease_next("worker-0")
+    assert getattr(preflight.value, "code", "") == "DISTRIBUTED_STORAGE_CIRCUIT_OPEN"
