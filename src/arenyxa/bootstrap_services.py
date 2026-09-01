@@ -13,6 +13,7 @@ from arenyxa.exception_boundary import call_exception_boundary
 from arenyxa.application.export import ExportService
 from arenyxa.application.project_format import ArenyxaProjectService
 from arenyxa.application.runner import RunOrchestrator
+from arenyxa.application.runner_support import RunHandle
 from arenyxa.application.async_runner import AsyncRunOrchestrator
 from arenyxa.application.scheduler import SchedulerService, ScheduleRule
 from arenyxa.application.terminal import TerminalSession
