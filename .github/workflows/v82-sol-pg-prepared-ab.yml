@@ -1,0 +1,101 @@
+name: v8.2 Sol PostgreSQL Prepared A-B
+
+on:
+  push:
+    branches: ["release/v8.2-sol-final"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cold-proof:
+    name: ${{ matrix.variant }} fresh-${{ matrix.replicate }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [prewarm-only, prepared]
+        replicate: [1, 2, 3]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
+      VARIANT: ${{ matrix.variant }}
+      REPLICATE: ${{ matrix.replicate }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.11", cache: pip }
+      - run: python -m pip install --upgrade pip && python -m pip install -e ".[dev,database]"
+      - name: Configure PostgreSQL stress capacity
+        shell: bash
+        run: |
+          C="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          test -n "$C"
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET max_connections='256';"
+          docker restart "$C"
+          for i in $(seq 1 30); do
+            docker exec "$C" pg_isready -U arenyxa -d arenyxa_ci && break
+            sleep 2
+          done
+          test "$(docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW max_connections;')" = "256"
+      - name: Apply isolated A-B candidate
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+
+          path = Path("src/arenyxa/enterprise/runtime_storage.py")
+          text = path.read_text(encoding="utf-8")
+          pool_anchor = "            min_size=4,\n            max_size=8,"
+          if text.count(pool_anchor) != 1:
+              raise SystemExit(f"pool anchor count={text.count(pool_anchor)}")
+          text = text.replace(pool_anchor, "            min_size=8,\n            max_size=8,")
+
+          if os.environ["VARIANT"] == "prepared":
+              kwargs_anchor = '                "connect_timeout": 10,\n'
+              if text.count(kwargs_anchor) != 1:
+                  raise SystemExit(f"kwargs anchor count={text.count(kwargs_anchor)}")
+              text = text.replace(
+                  kwargs_anchor,
+                  kwargs_anchor + '                "prepare_threshold": 0,\n',
+              )
+          path.write_text(text, encoding="utf-8", newline="\n")
+      - name: Candidate contract
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          text = Path("src/arenyxa/enterprise/runtime_storage.py").read_text(encoding="utf-8")
+          assert "min_size=8,\n            max_size=8," in text
+          if os.environ["VARIANT"] == "prepared":
+              assert '"prepare_threshold": 0' in text
+          else:
+              assert '"prepare_threshold": 0' not in text
+          print(f"A-B candidate contract PASS: {os.environ['VARIANT']} fresh-{os.environ['REPLICATE']}")
+      - name: Strict cold PostgreSQL release gate
+        run: >-
+          python scripts/postgresql_64_worker_128_concurrency_gate.py
+          --dsn "$ARENYXA_POSTGRES_TEST_DSN"
+          --jobs 1024
+          --p99-ms 500
+          --report "POSTGRES_${VARIANT}_${REPLICATE}.json"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: pg-${{ matrix.variant }}-fresh-${{ matrix.replicate }}
+          path: POSTGRES_${{ matrix.variant }}_${{ matrix.replicate }}.json
