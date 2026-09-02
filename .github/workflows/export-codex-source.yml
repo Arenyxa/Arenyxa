@@ -1,0 +1,41 @@
+name: Export Codex Source Snapshot
+
+on:
+  push:
+    branches:
+      - export/codex-v82-73bcb646
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact Arenyxa release candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 73bcb6466520c649ff2f2a74d19d49cf90a5e506
+          fetch-depth: 1
+
+      - name: Verify immutable baseline and export tracked tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="73bcb6466520c649ff2f2a74d19d49cf90a5e506"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          mkdir -p export_artifacts
+          archive="export_artifacts/Arenyxa_v8.2_release_73bcb646_Source.zip"
+          git archive --format=zip --prefix=Arenyxa_v8.2_release_73bcb646/ -o "$archive" HEAD
+          (cd export_artifacts && sha256sum "$(basename "$archive")" > SHA256SUMS.txt)
+          printf 'repository=Arenyxa/Arenyxa\nbranch=release/v8.2\ncommit=%s\narchive_method=git archive\n' "$actual" > export_artifacts/CODEX_BASELINE.txt
+          unzip -t "$archive"
+
+      - name: Upload immutable source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: Arenyxa-v8.2-Codex-Source-73bcb646
+          path: export_artifacts/*
+          if-no-files-found: error
+          retention-days: 1
