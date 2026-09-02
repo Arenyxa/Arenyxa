@@ -78,8 +78,8 @@ jobs:
       - name: Regression proof
         run: |
           python - <<'PY'
-          from arenyxa.enterprise.runtime_storage_sql import PostgreSQLRuntimeStorageSqlMixin
-          sql = PostgreSQLRuntimeStorageSqlMixin.lease_next_fast_sql(object())
+          from arenyxa.enterprise.runtime_storage_sql import PostgreSQLFastSqlMixin
+          sql = PostgreSQLFastSqlMixin.lease_next_fast_sql(object())
           assert "active_leases<max_slots\n                FOR UPDATE SKIP LOCKED" in sql
           assert sql.count("FOR UPDATE") >= 2
           print("nonblocking worker claim SQL contract: PASS")
