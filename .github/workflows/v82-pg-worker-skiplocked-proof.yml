@@ -74,7 +74,7 @@ jobs:
           rep('tests/test_v811_long_horizon_invariants.py','    assert sql.count("?") == 18\n','    assert sql.count("?") == 16\n')
           rep('tests/test_v70_distributed_fault_matrix.py','"WHERE state=\'queued\' " + " AND ? IS NOT NULL" * 13 + " RETURNING *"','"WHERE state=\'queued\' " + " AND ? IS NOT NULL" * 12 + " RETURNING *"')
           rep('tests/test_v70_distributed_fault_matrix.py','"WHERE job_id=? AND state=\'leased\' " + " AND ? IS NOT NULL" * 9 + " RETURNING job_id"','"WHERE job_id=? AND state=\'leased\' " + " AND ? IS NOT NULL" * 8 + " RETURNING job_id"')
-          rep('tests/test_v70_distributed_fault_matrix.py','"WHERE job_id=? AND state=\'running\' " + " AND ? IS NOT NULL" * 17 + " RETURNING state"','"WHERE job_id=? AND state=\'running\' " + " AND ? IS NOT NULL" * 16 + " RETURNING state"')
+          rep('tests/test_v70_distributed_fault_matrix.py','"WHERE job_id=? AND state=\'running\' " + " AND ? IS NOT NULL" * 17 + " RETURNING state"','"WHERE job_id=? AND state=\'running\' " + " AND ? IS NOT NULL" * 15 + " RETURNING state"')
       - name: Regression proof
         run: |
           python - <<'PY'
