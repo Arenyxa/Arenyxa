@@ -1,0 +1,23 @@
+name: v8.2 PostgreSQL Pool TDD Red
+
+on:
+  push:
+    branches: ["release/v8.2-pool-tdd"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m pip install --upgrade pip && python -m pip install -e ".[dev,database]"
+      - name: PostgreSQL bounded pool prewarm regression
+        run: python -m pytest -q tests/test_v82_postgresql_pool_capacity.py
