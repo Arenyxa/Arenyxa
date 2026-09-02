@@ -1,0 +1,97 @@
+name: v8.2 PostgreSQL Lease Hot Path Profile
+
+on:
+  push:
+    branches: [release/v8.2]
+    paths: [.github/workflows/v82-pg-profile.yml]
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+  QT_QPA_PLATFORM: offscreen
+  ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
+
+jobs:
+  profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@v6
+        with: {ref: release/v8.2}
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.11", cache: pip}
+      - name: Install
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-keysyms1 libxcb-xinerama0
+          python -m pip install -e ".[dev,full]"
+      - name: Configure PostgreSQL profiling
+        run: |
+          C="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET max_connections='256';"
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET shared_preload_libraries='pg_stat_statements';"
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET track_io_timing='on';"
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET track_wal_io_timing='on';"
+          docker restart "$C"
+          for i in $(seq 1 30); do docker exec "$C" pg_isready -U arenyxa -d arenyxa_ci && break; sleep 2; done
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements; SELECT pg_stat_statements_reset();"
+      - name: Apply measured candidate without event trimming
+        shell: python
+        run: |
+          from pathlib import Path
+          def rep(path, old, new, count=1):
+              p=Path(path); text=p.read_text(encoding='utf-8'); actual=text.count(old)
+              if actual != count: raise SystemExit(f'{path}: anchor count={actual} expected={count}: {old!r}')
+              p.write_text(text.replace(old,new),encoding='utf-8',newline='\n')
+          rep('src/arenyxa/enterprise/runtime_storage.py','            min_size=4,\n            max_size=8,','            min_size=8,\n            max_size=8,')
+          rep('src/arenyxa/enterprise/runtime_storage.py','            check=self._check_pool_connection,\n','')
+          rep('src/arenyxa/enterprise/runtime_storage_sql.py','heartbeat_at=GREATEST(w.heartbeat_at,?,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?','heartbeat_at=GREATEST(w.heartbeat_at,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?',2)
+          rep('src/arenyxa/enterprise/runtime_storage_sql.py','lease_token_sha256=? AND lease_expires_at>GREATEST(?,EXTRACT(EPOCH FROM clock_timestamp()))','lease_token_sha256=? AND lease_expires_at>EXTRACT(EPOCH FROM clock_timestamp())',2)
+          rep('src/arenyxa/enterprise/distributed_queue.py','                    lease_now = self._lease_now(connection)\n                    expires = lease_now + duration\n                    expiry_parameter = self._storage.fast_lease_expiry_parameter(lease_now, duration)\n','                    expires = 0.0\n                    expiry_parameter = self._storage.fast_lease_expiry_parameter(0.0, duration)\n')
+          rep('src/arenyxa/enterprise/distributed_queue.py','                            worker,\n                            lease_now,\n                            now,\n','                            worker,\n                            now,\n')
+          rep('src/arenyxa/enterprise/distributed_queue.py','                now = self._lease_now(connection)\n                updated_at = utc_now()\n','                updated_at = utc_now()\n')
+          rep('src/arenyxa/enterprise/distributed_queue.py','                        str(job_id), str(worker_id), token_sha, now, updated_at,\n','                        str(job_id), str(worker_id), token_sha, updated_at,\n')
+          rep('src/arenyxa/enterprise/distributed_queue.py','                now = self._lease_now(connection)\n                terminal_at = utc_now()\n','                terminal_at = utc_now()\n')
+          rep('src/arenyxa/enterprise/distributed_queue.py','                        str(job_id), str(worker_id), token_sha, now,\n                        terminal_at, terminal_at, result_json, result_sha, str(worker_id), token_sha,\n                        now, utc_now(), str(worker_id),\n','                        str(job_id), str(worker_id), token_sha,\n                        terminal_at, terminal_at, result_json, result_sha, str(worker_id), token_sha,\n                        utc_now(), str(worker_id),\n')
+          sql=Path('src/arenyxa/enterprise/runtime_storage_sql.py'); text=sql.read_text(encoding='utf-8')
+          block="""            ), trimmed AS (\n                DELETE FROM distributed_job_events\n                WHERE job_id=(SELECT job_id FROM event)\n                  AND event_id NOT IN (\n                      SELECT event_id FROM distributed_job_events\n                      WHERE job_id=(SELECT job_id FROM event)\n                      ORDER BY event_id DESC LIMIT ?\n                  )\n            )\n"""
+          if text.count(block)!=3: raise SystemExit(f'trim CTE count={text.count(block)} expected=3')
+          sql.write_text(text.replace(block,'            )\n'),encoding='utf-8',newline='\n')
+          rep('src/arenyxa/enterprise/distributed_queue.py','                            duration,\n                            detail_created,\n                            MAX_JOB_EVENTS_PER_JOB - 1,\n','                            duration,\n                            detail_created,\n')
+          rep('src/arenyxa/enterprise/distributed_queue.py','                        str(worker_id), "", "{}", utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,\n','                        str(worker_id), "", "{}", utc_now(),\n')
+          rep('src/arenyxa/enterprise/distributed_queue.py','                        str(worker_id), "", details_json, utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,\n','                        str(worker_id), "", details_json, utc_now(),\n')
+      - name: Profile 64 workers / 128 concurrency
+        shell: bash
+        run: |
+          set -u
+          C="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          : > waits.log
+          python scripts/postgresql_64_worker_128_concurrency_gate.py --dsn "$ARENYXA_POSTGRES_TEST_DSN" --jobs 1024 --p99-ms 10000 --report POSTGRES_PROFILE_GATE.json > gate.log 2>&1 &
+          PID=$!
+          while kill -0 "$PID" 2>/dev/null; do
+            docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc "SELECT coalesce(wait_event_type,'CPU'),coalesce(wait_event,'ACTIVE'),count(*) FROM pg_stat_activity WHERE datname='arenyxa_ci' AND state='active' AND pid<>pg_backend_pid() GROUP BY 1,2 ORDER BY 3 DESC" >> waits.log || true
+            sleep 0.05
+          done
+          wait "$PID"
+          RC=$?
+          cat gate.log
+          echo '=== WAIT EVENT HISTOGRAM ==='
+          sort waits.log | uniq -c | sort -nr | head -80
+          echo '=== PG_STAT_STATEMENTS ==='
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -P pager=off -c "SELECT calls,round(total_exec_time::numeric,1) total_ms,round(mean_exec_time::numeric,3) mean_ms,round(stddev_exec_time::numeric,3) stddev_ms,rows,shared_blks_hit,shared_blks_read,shared_blks_dirtied,shared_blks_written,wal_records,wal_bytes,left(regexp_replace(query,E'\\s+',' ','g'),240) query FROM pg_stat_statements WHERE dbid=(SELECT oid FROM pg_database WHERE datname='arenyxa_ci') ORDER BY total_exec_time DESC LIMIT 30;"
+          echo '=== DATABASE IO ==='
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -P pager=off -c "SELECT datname,blks_read,blks_hit,tup_returned,tup_fetched,tup_inserted,tup_updated,tup_deleted,conflicts,deadlocks FROM pg_stat_database WHERE datname='arenyxa_ci';"
+          exit "$RC"
