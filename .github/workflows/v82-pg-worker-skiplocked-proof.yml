@@ -1,0 +1,91 @@
+name: v8.2 PostgreSQL Nonblocking Worker Claim Proof
+
+on:
+  push:
+    branches: [release/v8.2]
+    paths: [.github/workflows/v82-pg-worker-skiplocked-proof.yml]
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+  QT_QPA_PLATFORM: offscreen
+  ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
+
+jobs:
+  prove:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@v6
+        with: {ref: release/v8.2}
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.11", cache: pip}
+      - name: Install
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-keysyms1 libxcb-xinerama0
+          python -m pip install -e ".[dev,full]"
+      - name: Configure PostgreSQL
+        run: |
+          C="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET max_connections='256';"
+          docker restart "$C"
+          for i in $(seq 1 30); do docker exec "$C" pg_isready -U arenyxa -d arenyxa_ci && break; sleep 2; done
+      - name: Apply candidate
+        shell: python
+        run: |
+          from pathlib import Path
+          def rep(path, old, new, count=1):
+              p=Path(path); t=p.read_text(encoding='utf-8'); n=t.count(old)
+              if n != count: raise SystemExit(f'{path}: anchor count={n} expected={count}: {old!r}')
+              p.write_text(t.replace(old,new),encoding='utf-8',newline='\n')
+
+          # Previously measured beneficial changes, with event retention preserved.
+          rep('src/arenyxa/enterprise/runtime_storage.py','            min_size=4,\n            max_size=8,','            min_size=8,\n            max_size=8,')
+          rep('src/arenyxa/enterprise/runtime_storage.py','            check=self._check_pool_connection,\n','')
+          rep('src/arenyxa/enterprise/runtime_storage_sql.py','heartbeat_at=GREATEST(w.heartbeat_at,?,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?','heartbeat_at=GREATEST(w.heartbeat_at,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?',2)
+          rep('src/arenyxa/enterprise/runtime_storage_sql.py','lease_token_sha256=? AND lease_expires_at>GREATEST(?,EXTRACT(EPOCH FROM clock_timestamp()))','lease_token_sha256=? AND lease_expires_at>EXTRACT(EPOCH FROM clock_timestamp())',2)
+          rep('src/arenyxa/enterprise/distributed_queue.py','                    lease_now = self._lease_now(connection)\n                    expires = lease_now + duration\n                    expiry_parameter = self._storage.fast_lease_expiry_parameter(lease_now, duration)\n','                    expires = 0.0\n                    expiry_parameter = self._storage.fast_lease_expiry_parameter(0.0, duration)\n')
+          rep('src/arenyxa/enterprise/distributed_queue.py','                            worker,\n                            lease_now,\n                            now,\n','                            worker,\n                            now,\n')
+          rep('src/arenyxa/enterprise/distributed_queue.py','                now = self._lease_now(connection)\n                updated_at = utc_now()\n','                updated_at = utc_now()\n')
+          rep('src/arenyxa/enterprise/distributed_queue.py','                        str(job_id), str(worker_id), token_sha, now, updated_at,\n','                        str(job_id), str(worker_id), token_sha, updated_at,\n')
+          rep('src/arenyxa/enterprise/distributed_queue.py','                now = self._lease_now(connection)\n                terminal_at = utc_now()\n','                terminal_at = utc_now()\n')
+          rep('src/arenyxa/enterprise/distributed_queue.py','                        str(job_id), str(worker_id), token_sha, now,\n                        terminal_at, terminal_at, result_json, result_sha, str(worker_id), token_sha,\n                        now, utc_now(), str(worker_id),\n','                        str(job_id), str(worker_id), token_sha,\n                        terminal_at, terminal_at, result_json, result_sha, str(worker_id), token_sha,\n                        utc_now(), str(worker_id),\n')
+
+          # A-B variable: acquire the worker capacity row non-blockingly before candidate selection.
+          rep('src/arenyxa/enterprise/runtime_storage_sql.py',
+              "                WHERE worker_id=? AND state='active' AND active_leases<max_slots\n            ), candidate AS (",
+              "                WHERE worker_id=? AND state='active' AND active_leases<max_slots\n                FOR UPDATE SKIP LOCKED\n            ), candidate AS (")
+
+          # Adjust existing bind-shape tests only for the already-measured server-clock change.
+          rep('tests/test_v811_long_horizon_invariants.py','    assert sql.count("?") == 18\n','    assert sql.count("?") == 16\n')
+          rep('tests/test_v70_distributed_fault_matrix.py','"WHERE state=\'queued\' " + " AND ? IS NOT NULL" * 13 + " RETURNING *"','"WHERE state=\'queued\' " + " AND ? IS NOT NULL" * 12 + " RETURNING *"')
+          rep('tests/test_v70_distributed_fault_matrix.py','"WHERE job_id=? AND state=\'leased\' " + " AND ? IS NOT NULL" * 9 + " RETURNING job_id"','"WHERE job_id=? AND state=\'leased\' " + " AND ? IS NOT NULL" * 8 + " RETURNING job_id"')
+          rep('tests/test_v70_distributed_fault_matrix.py','"WHERE job_id=? AND state=\'running\' " + " AND ? IS NOT NULL" * 17 + " RETURNING state"','"WHERE job_id=? AND state=\'running\' " + " AND ? IS NOT NULL" * 16 + " RETURNING state"')
+      - name: Regression proof
+        run: |
+          python - <<'PY'
+          from arenyxa.enterprise.runtime_storage_sql import PostgreSQLRuntimeStorageSqlMixin
+          sql = PostgreSQLRuntimeStorageSqlMixin.lease_next_fast_sql(object())
+          assert "active_leases<max_slots\n                FOR UPDATE SKIP LOCKED" in sql
+          assert sql.count("FOR UPDATE") >= 2
+          print("nonblocking worker claim SQL contract: PASS")
+          PY
+          python -m pytest -q tests/test_v70_distributed_fault_matrix.py::test_postgresql_fast_path_hooks_short_circuit_portable_fallback tests/test_v70_distributed_fault_matrix.py::test_storage_circuit_breaker_backpressures_then_opens_fail_closed tests/test_v811_long_horizon_invariants.py::test_postgresql_lease_fencing_sql_uses_database_wall_clock tests/test_v811_long_horizon_invariants.py::test_postgresql_completion_fast_path_writes_tombstone_without_extra_binds
+          ruff check src/arenyxa/enterprise/runtime_storage.py src/arenyxa/enterprise/runtime_storage_sql.py src/arenyxa/enterprise/distributed_queue.py --select F821,E9
+          git diff --check
+      - name: Strict PostgreSQL gate
+        run: python scripts/postgresql_64_worker_128_concurrency_gate.py --dsn "$ARENYXA_POSTGRES_TEST_DSN" --jobs 1024 --p99-ms 500 --report POSTGRES_WORKER_SKIPLOCKED.json
