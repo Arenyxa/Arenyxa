@@ -1,4 +1,4 @@
-name: v8.2 PostgreSQL Nonblocking Worker Claim Proof
+name: v8.2 PostgreSQL Clock Pool A-B Proof
 
 on:
   push:
@@ -16,7 +16,7 @@ env:
 jobs:
   prove:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 40
     services:
       postgres:
         image: postgres:16
@@ -38,13 +38,16 @@ jobs:
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-keysyms1 libxcb-xinerama0
           python -m pip install -e ".[dev,full]"
-      - name: Configure PostgreSQL
+      - name: Configure PostgreSQL diagnostics
         run: |
           C="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
           docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET max_connections='256';"
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET shared_preload_libraries='pg_stat_statements';"
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET track_io_timing='on';"
           docker restart "$C"
           for i in $(seq 1 30); do docker exec "$C" pg_isready -U arenyxa -d arenyxa_ci && break; sleep 2; done
-      - name: Apply candidate
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
+      - name: Apply isolated candidate
         shell: python
         run: |
           from pathlib import Path
@@ -53,9 +56,17 @@ jobs:
               if n != count: raise SystemExit(f'{path}: anchor count={n} expected={count}: {old!r}')
               p.write_text(t.replace(old,new),encoding='utf-8',newline='\n')
 
-          # Previously measured beneficial changes, with event retention preserved.
+          # Keep the existing maximum at eight connections per independent client,
+          # but create all eight before the timed workload instead of growing 4->8
+          # under load.  The gate has exactly eight execution threads per client.
           rep('src/arenyxa/enterprise/runtime_storage.py','            min_size=4,\n            max_size=8,','            min_size=8,\n            max_size=8,')
+          # Pool checkout health checks add an extra network round trip to every
+          # transaction. Broken sockets are still detected on first business I/O
+          # and the existing retry/reconnect path remains fail-closed.
           rep('src/arenyxa/enterprise/runtime_storage.py','            check=self._check_pool_connection,\n','')
+
+          # PostgreSQL atomic fast paths already use clock_timestamp(). Remove the
+          # redundant pre-statement SELECT EXTRACT(EPOCH...) and its bind slots.
           rep('src/arenyxa/enterprise/runtime_storage_sql.py','heartbeat_at=GREATEST(w.heartbeat_at,?,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?','heartbeat_at=GREATEST(w.heartbeat_at,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?',2)
           rep('src/arenyxa/enterprise/runtime_storage_sql.py','lease_token_sha256=? AND lease_expires_at>GREATEST(?,EXTRACT(EPOCH FROM clock_timestamp()))','lease_token_sha256=? AND lease_expires_at>EXTRACT(EPOCH FROM clock_timestamp())',2)
           rep('src/arenyxa/enterprise/distributed_queue.py','                    lease_now = self._lease_now(connection)\n                    expires = lease_now + duration\n                    expiry_parameter = self._storage.fast_lease_expiry_parameter(lease_now, duration)\n','                    expires = 0.0\n                    expiry_parameter = self._storage.fast_lease_expiry_parameter(0.0, duration)\n')
@@ -65,12 +76,8 @@ jobs:
           rep('src/arenyxa/enterprise/distributed_queue.py','                now = self._lease_now(connection)\n                terminal_at = utc_now()\n','                terminal_at = utc_now()\n')
           rep('src/arenyxa/enterprise/distributed_queue.py','                        str(job_id), str(worker_id), token_sha, now,\n                        terminal_at, terminal_at, result_json, result_sha, str(worker_id), token_sha,\n                        now, utc_now(), str(worker_id),\n','                        str(job_id), str(worker_id), token_sha,\n                        terminal_at, terminal_at, result_json, result_sha, str(worker_id), token_sha,\n                        utc_now(), str(worker_id),\n')
 
-          # A-B variable: acquire the worker capacity row non-blockingly before candidate selection.
-          rep('src/arenyxa/enterprise/runtime_storage_sql.py',
-              "                WHERE worker_id=? AND state='active' AND active_leases<max_slots\n            ), candidate AS (",
-              "                WHERE worker_id=? AND state='active' AND active_leases<max_slots\n                FOR UPDATE SKIP LOCKED\n            ), candidate AS (")
-
-          # Adjust existing bind-shape tests only for the already-measured server-clock change.
+          # Existing deterministic bind-shape regressions follow the removed
+          # clock arguments; no behavior threshold is weakened.
           rep('tests/test_v811_long_horizon_invariants.py','    assert sql.count("?") == 18\n','    assert sql.count("?") == 16\n')
           rep('tests/test_v70_distributed_fault_matrix.py','"WHERE state=\'queued\' " + " AND ? IS NOT NULL" * 13 + " RETURNING *"','"WHERE state=\'queued\' " + " AND ? IS NOT NULL" * 12 + " RETURNING *"')
           rep('tests/test_v70_distributed_fault_matrix.py','"WHERE job_id=? AND state=\'leased\' " + " AND ? IS NOT NULL" * 9 + " RETURNING job_id"','"WHERE job_id=? AND state=\'leased\' " + " AND ? IS NOT NULL" * 8 + " RETURNING job_id"')
@@ -79,13 +86,48 @@ jobs:
         run: |
           python - <<'PY'
           from arenyxa.enterprise.runtime_storage_sql import PostgreSQLFastSqlMixin
-          sql = PostgreSQLFastSqlMixin.lease_next_fast_sql(object())
-          assert "active_leases<max_slots\n                FOR UPDATE SKIP LOCKED" in sql
-          assert sql.count("FOR UPDATE") >= 2
-          print("nonblocking worker claim SQL contract: PASS")
+          lease = PostgreSQLFastSqlMixin.lease_next_fast_sql(object())
+          start = PostgreSQLFastSqlMixin.start_job_fast_sql(object())
+          complete = PostgreSQLFastSqlMixin.complete_fast_sql(object())
+          assert 'GREATEST(?,EXTRACT(EPOCH FROM clock_timestamp()))' not in lease + start + complete
+          assert lease.count('?') == 12
+          assert start.count('?') == 9
+          assert complete.count('?') == 16
+          assert 'FOR UPDATE OF j SKIP LOCKED' in lease
+          assert 'active_leases<max_slots\n                FOR UPDATE SKIP LOCKED' not in lease
+          print('isolated clock/pool SQL contract: PASS')
           PY
           python -m pytest -q tests/test_v70_distributed_fault_matrix.py::test_postgresql_fast_path_hooks_short_circuit_portable_fallback tests/test_v70_distributed_fault_matrix.py::test_storage_circuit_breaker_backpressures_then_opens_fail_closed tests/test_v811_long_horizon_invariants.py::test_postgresql_lease_fencing_sql_uses_database_wall_clock tests/test_v811_long_horizon_invariants.py::test_postgresql_completion_fast_path_writes_tombstone_without_extra_binds
           ruff check src/arenyxa/enterprise/runtime_storage.py src/arenyxa/enterprise/runtime_storage_sql.py src/arenyxa/enterprise/distributed_queue.py --select F821,E9
           git diff --check
-      - name: Strict PostgreSQL gate
-        run: python scripts/postgresql_64_worker_128_concurrency_gate.py --dsn "$ARENYXA_POSTGRES_TEST_DSN" --jobs 1024 --p99-ms 500 --report POSTGRES_WORKER_SKIPLOCKED.json
+      - name: Three-run strict PostgreSQL A-B proof
+        shell: bash
+        run: |
+          set -u
+          C="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          failed=0
+          for attempt in 1 2 3; do
+            echo "===== STRICT ATTEMPT $attempt ====="
+            docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "SELECT pg_stat_statements_reset();"
+            set +e
+            python scripts/postgresql_64_worker_128_concurrency_gate.py --dsn "$ARENYXA_POSTGRES_TEST_DSN" --jobs 1024 --p99-ms 500 --report "POSTGRES_CLOCK_POOL_AB_${attempt}.json"
+            rc=$?
+            set -e
+            cat "POSTGRES_CLOCK_POOL_AB_${attempt}.json"
+            python - <<'PY'
+          import os, psycopg
+          dsn=os.environ['ARENYXA_POSTGRES_TEST_DSN']
+          with psycopg.connect(dsn) as c:
+              rows=c.execute('''
+                  SELECT calls,round(total_exec_time::numeric,3),round(mean_exec_time::numeric,3),
+                         round(max_exec_time::numeric,3),rows,left(regexp_replace(query, E'\\s+', ' ', 'g'),220)
+                  FROM pg_stat_statements
+                  WHERE query ILIKE '%distributed_jobs%' OR query ILIKE '%distributed_workers%'
+                  ORDER BY total_exec_time DESC LIMIT 15
+              ''').fetchall()
+          print('PG_STAT_STATEMENTS_TOP')
+          for row in rows: print(row)
+          PY
+            if [ "$rc" -ne 0 ]; then failed=1; fi
+          done
+          exit "$failed"
