@@ -48,41 +48,46 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
+
           def rep(path, old, new, count=1):
-              p=Path(path); t=p.read_text(encoding='utf-8')
-              if t.count(old)!=count: raise SystemExit(f'{path}: anchor count={t.count(old)} expected={count}: {old!r}')
-              p.write_text(t.replace(old,new),encoding='utf-8',newline='\n')
+              p = Path(path)
+              text = p.read_text(encoding="utf-8")
+              actual = text.count(old)
+              if actual != count:
+                  raise SystemExit(f"{path}: anchor count={actual} expected={count}: {old!r}")
+              p.write_text(text.replace(old, new), encoding="utf-8", newline="\n")
 
-          # Keep only previously measured beneficial changes; do not include recovery/semaphore experiments.
-          rep('src/arenyxa/enterprise/runtime_storage.py','            min_size=4,\n            max_size=8,','            min_size=8,\n            max_size=8,')
-          rep('src/arenyxa/enterprise/runtime_storage.py','            check=self._check_pool_connection,\n','')
-          rep('src/arenyxa/enterprise/runtime_storage_sql.py','heartbeat_at=GREATEST(w.heartbeat_at,?,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?','heartbeat_at=GREATEST(w.heartbeat_at,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?',2)
-          rep('src/arenyxa/enterprise/runtime_storage_sql.py','lease_token_sha256=? AND lease_expires_at>GREATEST(?,EXTRACT(EPOCH FROM clock_timestamp()))','lease_token_sha256=? AND lease_expires_at>EXTRACT(EPOCH FROM clock_timestamp())',2)
-          rep('src/arenyxa/enterprise/distributed_queue.py','                    lease_now = self._lease_now(connection)\n                    expires = lease_now + duration\n                    expiry_parameter = self._storage.fast_lease_expiry_parameter(lease_now, duration)\n','                    expires = 0.0\n                    expiry_parameter = self._storage.fast_lease_expiry_parameter(0.0, duration)\n')
-          rep('src/arenyxa/enterprise/distributed_queue.py','                            worker,\n                            lease_now,\n                            now,\n','                            worker,\n                            now,\n')
-          rep('src/arenyxa/enterprise/distributed_queue.py','                now = self._lease_now(connection)\n                updated_at = utc_now()\n','                updated_at = utc_now()\n')
-          rep('src/arenyxa/enterprise/distributed_queue.py','                        str(job_id), str(worker_id), token_sha, now, updated_at,\n','                        str(job_id), str(worker_id), token_sha, updated_at,\n')
-          rep('src/arenyxa/enterprise/distributed_queue.py','                now = self._lease_now(connection)\n                terminal_at = utc_now()\n','                terminal_at = utc_now()\n')
-          rep('src/arenyxa/enterprise/distributed_queue.py','                        str(job_id), str(worker_id), token_sha, now,\n                        terminal_at, terminal_at, result_json, result_sha, str(worker_id), token_sha,\n                        now, utc_now(), str(worker_id),\n','                        str(job_id), str(worker_id), token_sha,\n                        terminal_at, terminal_at, result_json, result_sha, str(worker_id), token_sha,\n                        utc_now(), str(worker_id),\n')
+          # Previously measured beneficial changes; no semaphore/recovery experiments.
+          rep("src/arenyxa/enterprise/runtime_storage.py", "            min_size=4,\n            max_size=8,", "            min_size=8,\n            max_size=8,")
+          rep("src/arenyxa/enterprise/runtime_storage.py", "            check=self._check_pool_connection,\n", "")
+          rep("src/arenyxa/enterprise/runtime_storage_sql.py", "heartbeat_at=GREATEST(w.heartbeat_at,?,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?", "heartbeat_at=GREATEST(w.heartbeat_at,EXTRACT(EPOCH FROM clock_timestamp())),updated_at=?", 2)
+          rep("src/arenyxa/enterprise/runtime_storage_sql.py", "lease_token_sha256=? AND lease_expires_at>GREATEST(?,EXTRACT(EPOCH FROM clock_timestamp()))", "lease_token_sha256=? AND lease_expires_at>EXTRACT(EPOCH FROM clock_timestamp())", 2)
+          rep("src/arenyxa/enterprise/distributed_queue.py", "                    lease_now = self._lease_now(connection)\n                    expires = lease_now + duration\n                    expiry_parameter = self._storage.fast_lease_expiry_parameter(lease_now, duration)\n", "                    expires = 0.0\n                    expiry_parameter = self._storage.fast_lease_expiry_parameter(0.0, duration)\n")
+          rep("src/arenyxa/enterprise/distributed_queue.py", "                            worker,\n                            lease_now,\n                            now,\n", "                            worker,\n                            now,\n")
+          rep("src/arenyxa/enterprise/distributed_queue.py", "                now = self._lease_now(connection)\n                updated_at = utc_now()\n", "                updated_at = utc_now()\n")
+          rep("src/arenyxa/enterprise/distributed_queue.py", "                        str(job_id), str(worker_id), token_sha, now, updated_at,\n", "                        str(job_id), str(worker_id), token_sha, updated_at,\n")
+          rep("src/arenyxa/enterprise/distributed_queue.py", "                now = self._lease_now(connection)\n                terminal_at = utc_now()\n", "                terminal_at = utc_now()\n")
+          rep("src/arenyxa/enterprise/distributed_queue.py", "                        str(job_id), str(worker_id), token_sha, now,\n                        terminal_at, terminal_at, result_json, result_sha, str(worker_id), token_sha,\n                        now, utc_now(), str(worker_id),\n", "                        str(job_id), str(worker_id), token_sha,\n                        terminal_at, terminal_at, result_json, result_sha, str(worker_id), token_sha,\n                        utc_now(), str(worker_id),\n")
 
-          # A-B variable: remove the retention DELETE CTE from the three short lifecycle statements.
-          sql=Path('src/arenyxa/enterprise/runtime_storage_sql.py')
-          text=sql.read_text(encoding='utf-8')
-          block="""            ), trimmed AS (\n                DELETE FROM distributed_job_events\n                WHERE job_id=(SELECT job_id FROM event)\n                  AND event_id NOT IN (\n                      SELECT event_id FROM distributed_job_events\n                      WHERE job_id=(SELECT job_id FROM event)\n                      ORDER BY event_id DESC LIMIT ?\n                  )\n            )\n"""
-          if text.count(block)!=3: raise SystemExit(f'trim CTE count={text.count(block)} expected=3')
-          sql.write_text(text.replace(block,'            )\n'),encoding='utf-8',newline='\n')
+          # A-B variable: remove retention DELETE CTE from the 3 short lifecycle statements.
+          sql = Path("src/arenyxa/enterprise/runtime_storage_sql.py")
+          text = sql.read_text(encoding="utf-8")
+          block = """            ), trimmed AS (\n                DELETE FROM distributed_job_events\n                WHERE job_id=(SELECT job_id FROM event)\n                  AND event_id NOT IN (\n                      SELECT event_id FROM distributed_job_events\n                      WHERE job_id=(SELECT job_id FROM event)\n                      ORDER BY event_id DESC LIMIT ?\n                  )\n            )\n"""
+          if text.count(block) != 3:
+              raise SystemExit(f"trim CTE count={text.count(block)} expected=3")
+          sql.write_text(text.replace(block, "            )\n"), encoding="utf-8", newline="\n")
 
-          # Update only synthetic bind-shape contracts for the experiment.
-          rep('tests/test_v811_long_horizon_invariants.py','    assert sql.count("?") == 18\n','    assert sql.count("?") == 15\n')
-          rep('tests/test_v70_distributed_fault_matrix.py','"WHERE state=\'queued\' " + " AND ? IS NOT NULL" * 13 + " RETURNING *"','"WHERE state=\'queued\' " + " AND ? IS NOT NULL" * 11 + " RETURNING *"')
-          rep('tests/test_v70_distributed_fault_matrix.py','"WHERE job_id=? AND state=\'leased\' " + " AND ? IS NOT NULL" * 9 + " RETURNING job_id"','"WHERE job_id=? AND state=\'leased\' " + " AND ? IS NOT NULL" * 7 + " RETURNING job_id"')
-          rep('tests/test_v70_distributed_fault_matrix.py','"WHERE job_id=? AND state=\'running\' " + " AND ? IS NOT NULL" * 17 + " RETURNING state"','"WHERE job_id=? AND state=\'running\' " + " AND ? IS NOT NULL" * 14 + " RETURNING state"')
-          # Remove the final MAX_JOB_EVENTS_PER_JOB bind from each fast call.
-          q=Path('src/arenyxa/enterprise/distributed_queue.py'); t=q.read_text(encoding='utf-8')
-          t=t.replace('                            MAX_JOB_EVENTS_PER_JOB,\n                        ),\n                    ).fetchone()','                        ),\n                    ).fetchone()',1)
-          t=t.replace('                        MAX_JOB_EVENTS_PER_JOB,\n                    ),\n                ).fetchone()','                    ),\n                ).fetchone()',1)
-          t=t.replace('                        MAX_JOB_EVENTS_PER_JOB,\n                    ),\n                ).fetchone()','                    ),\n                ).fetchone()',1)
-          q.write_text(t,encoding='utf-8',newline='\n')
+          # Synthetic SQL bind-shape contracts after server-clock + retention changes.
+          rep("tests/test_v811_long_horizon_invariants.py", '    assert sql.count("?") == 18\n', '    assert sql.count("?") == 15\n')
+          rep("tests/test_v70_distributed_fault_matrix.py", '"WHERE state=\'queued\' " + " AND ? IS NOT NULL" * 13 + " RETURNING *"', '"WHERE state=\'queued\' " + " AND ? IS NOT NULL" * 11 + " RETURNING *"')
+          rep("tests/test_v70_distributed_fault_matrix.py", '"WHERE job_id=? AND state=\'leased\' " + " AND ? IS NOT NULL" * 9 + " RETURNING job_id"', '"WHERE job_id=? AND state=\'leased\' " + " AND ? IS NOT NULL" * 7 + " RETURNING job_id"')
+          rep("tests/test_v70_distributed_fault_matrix.py", '"WHERE job_id=? AND state=\'running\' " + " AND ? IS NOT NULL" * 17 + " RETURNING state"', '"WHERE job_id=? AND state=\'running\' " + " AND ? IS NOT NULL" * 14 + " RETURNING state"')
+
+          # Remove exactly one retention limit bind from each fast lifecycle call.
+          rep("src/arenyxa/enterprise/distributed_queue.py", "                            duration,\n                            detail_created,\n                            MAX_JOB_EVENTS_PER_JOB - 1,\n", "                            duration,\n                            detail_created,\n")
+          rep("src/arenyxa/enterprise/distributed_queue.py", "                        str(worker_id), \"\", \"{}\", utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,\n", "                        str(worker_id), \"\", \"{}\", utc_now(),\n")
+          rep("src/arenyxa/enterprise/distributed_queue.py", "                        str(worker_id), \"\", details_json, utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,\n", "                        str(worker_id), \"\", details_json, utc_now(),\n")
+
       - name: Correctness proof
         run: |
           python -m pytest -q tests/test_v70_distributed_fault_matrix.py::test_postgresql_fast_path_hooks_short_circuit_portable_fallback tests/test_v70_distributed_fault_matrix.py::test_storage_circuit_breaker_backpressures_then_opens_fail_closed tests/test_v811_long_horizon_invariants.py::test_postgresql_lease_fencing_sql_uses_database_wall_clock tests/test_v811_long_horizon_invariants.py::test_postgresql_completion_fast_path_writes_tombstone_without_extra_binds
