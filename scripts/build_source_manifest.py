@@ -36,6 +36,8 @@ def is_generated_or_ephemeral(relative: Path) -> bool:
         return True
     if relative.name.startswith(".coverage."):
         return True
+    if any(part.startswith(".aider") for part in relative.parts):
+        return True
     if any(part in EXCLUDED_PARTS or part.endswith(".egg-info") for part in relative.parts):
         return True
     return relative.suffix in {".pyc", ".pyo"}
