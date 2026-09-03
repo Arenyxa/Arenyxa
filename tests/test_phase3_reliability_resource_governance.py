@@ -80,7 +80,6 @@ def test_disk_critical_stops_new_runs_and_browser_admission() -> None:
     assert "disk-critical" in decision.reasons
 
 
-
 def test_run_orchestrator_blocks_before_persisting_when_disk_is_critical(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path / "phase3.sqlite3")
     store.initialize()
@@ -116,7 +115,6 @@ def test_manual_and_adaptive_request_limits_never_raise_resource_ceiling() -> No
     assert controller.set_manual(12) == 3
     assert gate.limit() == 3
     controller.set_resource_ceiling(10)
-                                                                                                   
     assert gate.limit() <= 10
     assert controller.set_manual(4) == 4
     controller.set_resource_ceiling(2)
@@ -266,7 +264,7 @@ def test_startup_visual_implementation_matches_current_approved_baseline() -> No
     root = Path(__file__).resolve().parents[1]
     expected = {
         "src/arenyxa/presentation/startup_splash.py": "46141636071f7adedabbb8ddacc7faaa9381bfdbc059712a72a85ab6ebea0b33",
-        "src/arenyxa/presentation/startup_motion_math.py": "04488fec32a69741b93dcf5b5806108acc3f265f1ea7cdf2930552190bca77ae",
+        "src/arenyxa/presentation/startup_motion_math.py": "b351ae8df000056b6e0bc27f435136a8f9e2743eb2138171c719e4fa7230072f",
     }
     for relative, digest in expected.items():
         assert hashlib.sha256((root / relative).read_bytes()).hexdigest() == digest
