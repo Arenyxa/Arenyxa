@@ -1,0 +1,59 @@
+name: v8.2 PostgreSQL pool64 proof
+
+on:
+  push:
+    branches: ["release/v8.2-pg-pool64-proof"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  strict-ab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.11", cache: pip }
+      - run: python -m pip install -e ".[dev,database]"
+      - name: Apply diagnostic-only pool64 variant
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path("src/arenyxa/enterprise/runtime_storage.py")
+          s=p.read_text(encoding="utf-8")
+          old="""            min_size=4,
+            max_size=8,"""
+          if old not in s: raise SystemExit("pool settings not found")
+          s=s.replace(old,"""            min_size=16,
+            max_size=64,""",1)
+          p.write_text(s,encoding="utf-8",newline="\n")
+      - name: Run 3 strict independent gate attempts
+        run: |
+          set +e
+          rc=0
+          for i in 1 2 3; do
+            python scripts/postgresql_64_worker_128_concurrency_gate.py --dsn "$ARENYXA_POSTGRES_TEST_DSN" --jobs 1024 --p99-ms 500 --report "PG_POOL64_${i}.json"
+            r=$?
+            if [ "$r" -ne 0 ]; then rc=1; fi
+          done
+          exit "$rc"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: pg-pool64-proof
+          path: PG_POOL64_*.json
