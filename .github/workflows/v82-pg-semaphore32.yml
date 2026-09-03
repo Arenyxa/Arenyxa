@@ -1,0 +1,72 @@
+name: v8.2 PostgreSQL semaphore 32 A-B
+
+on:
+  push:
+    branches: [release/v8.2-pg-semaphore32]
+    paths:
+      - .github/workflows/v82-pg-semaphore32.yml
+
+permissions:
+  contents: read
+
+jobs:
+  strict-ab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.11", cache: pip }
+      - run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,database]"
+      - name: Apply diagnostic-only semaphore/pool variant
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/arenyxa/enterprise/runtime_storage.py')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('min_size=1,\n                max_size=64,', 'min_size=8,\n                max_size=8,')
+          s = s.replace('_POSTGRES_LEASE_ADMISSION = threading.BoundedSemaphore(64)', '_POSTGRES_LEASE_ADMISSION = threading.BoundedSemaphore(32)')
+          p.write_text(s, encoding='utf-8')
+          print('diagnostic variant applied')
+          PY
+      - name: Run 3 strict independent gate attempts
+        run: |
+          set +e
+          rm -f PG_SEM32_RESULTS.txt
+          for i in 1 2 3; do
+            echo "=== ATTEMPT $i ===" | tee -a PG_SEM32_RESULTS.txt
+            python scripts/postgresql_64_worker_128_concurrency_gate.py --jobs 1024 --report "PG_SEM32_${i}.json" | tee -a PG_SEM32_RESULTS.txt
+            echo "rc=${PIPESTATUS[0]}" | tee -a PG_SEM32_RESULTS.txt
+            sleep 3
+          done
+          set -e
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for p in sorted(Path('.').glob('PG_SEM32_?.json')):
+              d=json.loads(p.read_text())
+              l=d['latency_ms']
+              print(p.name, 'p50=',l['p50'],'p95=',l['p95'],'p99=',l['p99'],'max=',l['max'],'throughput=',d['throughput_jobs_per_second'],'passed=',d['passed'])
+          PY
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: pg-semaphore32-ab
+          path: |
+            PG_SEM32_?.json
+            PG_SEM32_RESULTS.txt
