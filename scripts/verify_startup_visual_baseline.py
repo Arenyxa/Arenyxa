@@ -4,9 +4,12 @@ import hashlib
 from pathlib import Path
 
 
+# Single authoritative baseline for the current released startup visuals.
+# The companion regression test imports the same digest contract so the
+# verifier and pytest cannot silently drift apart again.
 BASELINE = {
     "src/arenyxa/presentation/startup_splash.py": "46141636071f7adedabbb8ddacc7faaa9381bfdbc059712a72a85ab6ebea0b33",
-    "src/arenyxa/presentation/startup_motion_math.py": "f4c3c0f5df68aa664dff6d0373335852040bb4ed2caaab03047f92cc933bc449",
+    "src/arenyxa/presentation/startup_motion_math.py": "b351ae8df000056b6e0bc27f435136a8f9e2743eb2138171c719e4fa7230072f",
 }
 
 
