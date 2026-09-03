@@ -1,0 +1,72 @@
+name: v8.2 PostgreSQL lock elision proof
+
+on:
+  push:
+    branches: ["release/v8.2-pg-lock-elision-proof"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  strict-ab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m pip install -e ".[dev,database]"
+      - name: Configure PostgreSQL stress capacity
+        shell: bash
+        run: |
+          C="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          test -n "$C"
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET max_connections='256';"
+          docker restart "$C"
+          for i in $(seq 1 30); do docker exec "$C" pg_isready -U arenyxa -d arenyxa_ci && break; sleep 2; done
+      - name: Apply diagnostic-only fast-path lock elision
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path("src/arenyxa/enterprise/distributed_queue.py")
+          text = p.read_text(encoding="utf-8")
+          needle = '                with self._lock, self._connection() as connection:\n'
+          if text.count(needle) < 2:
+              raise SystemExit(f"expected fast-path and fallback lock scopes, got {text.count(needle)}")
+          text = text.replace(needle, '                with self._connection() as connection:\n', 1)
+          p.write_text(text, encoding="utf-8", newline="\n")
+      - name: Strict 64W 128C 1024-job gate, three fresh attempts
+        shell: bash
+        run: |
+          set +e
+          rc=0
+          for n in 1 2 3; do
+            python scripts/postgresql_64_worker_128_concurrency_gate.py --dsn "$ARENYXA_POSTGRES_TEST_DSN" --jobs 1024 --p99-ms 500 --report "PG_LOCK_ELISION_${n}.json"
+            r=$?
+            if [ "$r" -ne 0 ]; then rc=1; fi
+          done
+          exit "$rc"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: pg-lock-elision-proof
+          path: PG_LOCK_ELISION_*.json
