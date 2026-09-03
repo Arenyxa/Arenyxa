@@ -1,0 +1,54 @@
+name: v8.2 PostgreSQL WAL diagnostic
+
+on:
+  push:
+    branches: ["release/v8.2-pg-wal-diagnostic"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  strict-ab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -e ".[dev,database]"
+      - name: Configure PostgreSQL diagnostic capacity
+        shell: bash
+        run: |
+          C="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          test -n "$C"
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET max_connections='256';"
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET synchronous_commit='off';"
+          docker restart "$C"
+          for i in $(seq 1 30); do docker exec "$C" pg_isready -U arenyxa -d arenyxa_ci && break; sleep 2; done
+          test "$(docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW synchronous_commit;')" = "off"
+      - name: Diagnostic-only WAL commit probe
+        run: |
+          python scripts/postgresql_64_worker_128_concurrency_gate.py --dsn "$ARENYXA_POSTGRES_TEST_DSN" --jobs 1024 --p99-ms 500 --report PG_WAL_OFF.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: pg-wal-diagnostic
+          path: PG_WAL_OFF.json
