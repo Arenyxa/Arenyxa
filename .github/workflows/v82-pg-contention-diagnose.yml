@@ -1,0 +1,91 @@
+name: v8.2 PostgreSQL contention diagnosis
+
+on:
+  push:
+    branches: [release/v8.2-pg-diagnose]
+    paths:
+      - .github/workflows/v82-pg-contention-diagnose.yml
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+  QT_QPA_PLATFORM: offscreen
+  ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,database]"
+      - name: Configure PostgreSQL diagnostics
+        run: |
+          set -euo pipefail
+          C="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          test -n "$C"
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET max_connections='256';"
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET shared_preload_libraries='pg_stat_statements';"
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET track_io_timing='on';"
+          docker restart "$C"
+          for i in $(seq 1 30); do docker exec "$C" pg_isready -U arenyxa -d arenyxa_ci && break; sleep 2; done
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
+      - name: Run strict gate with wait-event sampler
+        shell: bash
+        run: |
+          set -u
+          C="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          : > pg_wait_samples.csv
+          echo 'ts,pid,state,wait_event_type,wait_event,query' > pg_wait_samples.csv
+          (
+            while kill -0 "$PPID" 2>/dev/null; do
+              docker exec "$C" psql -U arenyxa -d arenyxa_ci -At -F '|' -c "SELECT clock_timestamp(),pid,state,coalesce(wait_event_type,''),coalesce(wait_event,''),regexp_replace(query,E'\\s+',' ','g') FROM pg_stat_activity WHERE datname='arenyxa_ci' AND pid<>pg_backend_pid() AND state<>'idle' ORDER BY pid;" 2>/dev/null | tr '|' ',' >> pg_wait_samples.csv
+              sleep 0.02
+            done
+          ) &
+          SAMPLER=$!
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "SELECT pg_stat_statements_reset();" >/dev/null
+          set +e
+          python scripts/postgresql_64_worker_128_concurrency_gate.py --jobs 1024 --report POSTGRES_DIAGNOSTIC_GATE.json
+          RC=$?
+          set -e
+          kill "$SAMPLER" 2>/dev/null || true
+          wait "$SAMPLER" 2>/dev/null || true
+          echo '=== GATE ==='
+          cat POSTGRES_DIAGNOSTIC_GATE.json
+          echo '=== WAIT EVENTS ==='
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -P pager=off -c "SELECT wait_event_type,wait_event,count(*) FROM pg_stat_activity WHERE datname='arenyxa_ci' GROUP BY 1,2 ORDER BY 3 DESC;"
+          echo '=== STATEMENTS ==='
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -P pager=off -c "SELECT calls,round(total_exec_time::numeric,3) AS total_ms,round(mean_exec_time::numeric,3) AS mean_ms,round(max_exec_time::numeric,3) AS max_ms,rows,left(regexp_replace(query,E'\\s+',' ','g'),300) AS query FROM pg_stat_statements WHERE dbid=(SELECT oid FROM pg_database WHERE datname='arenyxa_ci') ORDER BY total_exec_time DESC LIMIT 30;"
+          echo '=== TABLE STATS ==='
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -P pager=off -c "SELECT relname,n_live_tup,n_dead_tup,last_analyze,last_autoanalyze FROM pg_stat_user_tables WHERE relname IN ('distributed_jobs','distributed_job_events','distributed_workers') ORDER BY relname;"
+          echo '=== INDEXES ==='
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -P pager=off -c "SELECT tablename,indexname,indexdef FROM pg_indexes WHERE tablename IN ('distributed_jobs','distributed_job_events','distributed_workers') ORDER BY tablename,indexname;"
+          test "$RC" -eq 0
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: pg-contention-diagnostics
+          path: |
+            POSTGRES_DIAGNOSTIC_GATE.json
+            pg_wait_samples.csv
