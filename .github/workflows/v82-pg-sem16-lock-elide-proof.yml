@@ -1,0 +1,53 @@
+name: v8.2 PostgreSQL sem16 lock-elide proof
+
+on:
+  push:
+    branches: ["release/v8.2-pg-sem16-lock-elide-proof"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  strict-ab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: arenyxa, POSTGRES_PASSWORD: arenyxa_ci, POSTGRES_DB: arenyxa_ci }
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env: { ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci }
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.11" }
+      - run: python -m pip install -e ".[dev,database]"
+      - name: Apply diagnostic-only sem16 plus lock elision
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path("src/arenyxa/enterprise/distributed_queue.py")
+          s=p.read_text(encoding="utf-8")
+          marker="LOGGER = logging.getLogger(__name__)"
+          if "_POSTGRES_LEASE_ADMISSION = threading.BoundedSemaphore(16)" not in s:
+              s=s.replace(marker,marker+"\n_POSTGRES_LEASE_ADMISSION = threading.BoundedSemaphore(16)",1)
+          old="""            with self._storage.lease_admission_guard():\n                with self._lock, self._connection() as connection:\n"""
+          new="""            with _POSTGRES_LEASE_ADMISSION:\n                with self._storage.lease_admission_guard():\n                    with self._connection() as connection:\n"""
+          if old not in s: raise SystemExit("fast-path scope not found")
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding="utf-8",newline="\n")
+      - name: Run 3 strict independent gate attempts
+        run: |
+          set +e; rc=0
+          for i in 1 2 3; do
+            python scripts/postgresql_64_worker_128_concurrency_gate.py --dsn "$ARENYXA_POSTGRES_TEST_DSN" --jobs 1024 --p99-ms 500 --report "PG_SEM16_LOCK_${i}.json"
+            r=$?; if [ "$r" -ne 0 ]; then rc=1; fi
+          done
+          exit "$rc"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with: { name: pg-sem16-lock-elide-proof, path: PG_SEM16_LOCK_*.json }
