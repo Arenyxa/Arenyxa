@@ -58,14 +58,14 @@ jobs:
         run: |
           POSTGRES_CONTAINER="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
           test -n "$POSTGRES_CONTAINER"
-          docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci <<'SQL'
-          ALTER SYSTEM SET max_connections = '256';
-          ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements';
-          ALTER SYSTEM SET track_io_timing = 'on';
-          ALTER SYSTEM SET track_wal_io_timing = 'on';
-          ALTER SYSTEM SET log_lock_waits = 'on';
-          ALTER SYSTEM SET deadlock_timeout = '50ms';
-          SQL
+
+          docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET max_connections = '256';"
+          docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements';"
+          docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET track_io_timing = 'on';"
+          docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET track_wal_io_timing = 'on';"
+          docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET log_lock_waits = 'on';"
+          docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET deadlock_timeout = '50ms';"
+
           docker restart "$POSTGRES_CONTAINER"
           READY=0
           for i in $(seq 1 30); do
@@ -73,20 +73,34 @@ jobs:
             sleep 2
           done
           test "$READY" -eq 1
+
           docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
-          docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc "SHOW server_version; SHOW max_connections; SHOW shared_preload_libraries; SHOW track_io_timing; SHOW track_wal_io_timing;"
+          VERSION="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW server_version_num;')"
+          MAX_CONN="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW max_connections;')"
+          PRELOAD="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW shared_preload_libraries;')"
+          IO="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW track_io_timing;')"
+          WAL_IO="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW track_wal_io_timing;')"
+          LOCK_LOG="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW log_lock_waits;')"
+          echo "server_version_num=$VERSION max_connections=$MAX_CONN preload=$PRELOAD io=$IO wal_io=$WAL_IO log_lock_waits=$LOCK_LOG"
+          test "${VERSION%%??}" = "1600" || [[ "$VERSION" == 16* ]]
+          test "$MAX_CONN" = "256"
+          test "$PRELOAD" = "pg_stat_statements"
+          test "$IO" = "on"
+          test "$WAL_IO" = "on"
+          test "$LOCK_LOG" = "on"
 
       - name: Interleaved baseline and full-prewarm profiling
         run: |
           mkdir -p p99
-          python scripts/p99_ci_probe.py --variant baseline --output p99/01-baseline.json
-          python scripts/p99_ci_probe.py --variant full_prewarm --output p99/02-full-prewarm.json
-          python scripts/p99_ci_probe.py --variant full_prewarm --output p99/03-full-prewarm.json
-          python scripts/p99_ci_probe.py --variant baseline --output p99/04-baseline.json
-          python scripts/p99_ci_probe.py --variant baseline --output p99/05-baseline.json
-          python scripts/p99_ci_probe.py --variant full_prewarm --output p99/06-full-prewarm.json
+          python -m scripts.p99_ci_probe --variant baseline --output p99/01-baseline.json
+          python -m scripts.p99_ci_probe --variant full_prewarm --output p99/02-full-prewarm.json
+          python -m scripts.p99_ci_probe --variant full_prewarm --output p99/03-full-prewarm.json
+          python -m scripts.p99_ci_probe --variant baseline --output p99/04-baseline.json
+          python -m scripts.p99_ci_probe --variant baseline --output p99/05-baseline.json
+          python -m scripts.p99_ci_probe --variant full_prewarm --output p99/06-full-prewarm.json
 
       - name: Build compact attribution summary
+        if: always()
         run: |
           python - <<'PY'
           import json
@@ -117,6 +131,7 @@ jobs:
                   'locks':q['lock_wait_weighted_samples'],
               })
           out={'schema':'arenyxa.p99-attribution-summary/v1','rows':rows}
+          Path('p99').mkdir(exist_ok=True)
           Path('p99/summary.json').write_text(json.dumps(out,indent=2,sort_keys=True))
           print(json.dumps(out,indent=2,sort_keys=True))
           PY
