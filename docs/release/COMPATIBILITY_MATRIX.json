@@ -1,6 +1,6 @@
 {
   "schema": "arenyxa.compatibility-matrix/v1",
-  "product_release_version": "8.1.1",
+  "product_release_version": "8.2.0",
   "runtime_compatibility_identity": "6.8.0",
   "channels": [
     "stable",
@@ -15,10 +15,10 @@
   },
   "plugin_api": {
     "current": "1",
-    "deprecation_window_months": 12,
     "supported": [
       "1"
-    ]
+    ],
+    "deprecation_window_months": 12
   },
   "workflow_portable": {
     "current": "arenyxa.workflow/v1",
@@ -54,14 +54,14 @@
     }
   },
   "windows_lanes": {
-    "legacy_enterprise": {
-      "browser_recorder": false,
-      "python": "3.8",
-      "qt": "PySide2"
-    },
     "modern": {
       "python": "3.11-3.13",
       "qt": "PySide6"
+    },
+    "legacy_enterprise": {
+      "python": "3.8",
+      "qt": "PySide2",
+      "browser_recorder": false
     }
   }
 }
