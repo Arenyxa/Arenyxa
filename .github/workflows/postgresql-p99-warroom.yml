@@ -12,9 +12,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  profile:
+  blocker-map:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16
@@ -40,7 +40,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev,database]" psutil
-          python -m py_compile scripts/p99_ci_probe_v2.py
+          python -m py_compile scripts/p99_ci_probe_v2.py scripts/p99_blocker_map.py
 
       - name: Verify immutable production baseline
         run: |
@@ -82,46 +82,53 @@ jobs:
           test "$IO" = "on"
           test "$WAL_IO" = "on"
 
-      - name: Instrumentation control — bare vs trace vs full
+      - name: Trace control
         run: |
           mkdir -p p99
-          python -m scripts.p99_ci_probe_v2 --mode bare  --variant baseline --output p99/01-bare.json
-          python -m scripts.p99_ci_probe_v2 --mode trace --variant baseline --output p99/02-trace.json
-          python -m scripts.p99_ci_probe_v2 --mode bare  --variant baseline --output p99/03-bare.json
-          python -m scripts.p99_ci_probe_v2 --mode trace --variant baseline --output p99/04-trace.json
-          python -m scripts.p99_ci_probe_v2 --mode full  --variant baseline --sample-ms 100 --output p99/05-full.json
-          python -m scripts.p99_ci_probe_v2 --mode bare  --variant baseline --output p99/06-bare.json
-          python -m scripts.p99_ci_probe_v2 --mode trace --variant baseline --output p99/07-trace.json
+          python -m scripts.p99_ci_probe_v2 --mode trace --variant baseline --output p99/01-trace.json
 
-      - name: Build compact control summary
+      - name: Map blockers under full observation
+        run: |
+          python -m scripts.p99_blocker_map --mode full --variant baseline --sample-ms 50 --output p99/02-blockers.json
+
+      - name: Print blocker attribution
         if: always()
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          rows=[]
-          for path in sorted(Path('p99').glob('[0-9][0-9]-*.json')):
+          for path in sorted(Path('p99').glob('*.json')):
               d=json.loads(path.read_text())
               r=d['result']; g=r['gate']; p=r['probe']
-              rows.append({
-                  'file':path.name,'mode':r['mode'],'variant':r['variant'],
-                  'cycle_p99':g['latency_ms']['p99'],'cycle_p95':g['latency_ms']['p95'],'cycle_max':g['latency_ms']['max'],
-                  'lease_p99':g['latency_ms']['phases']['lease_next']['p99'],
-                  'start_p99':g['latency_ms']['phases']['start_job']['p99'],
-                  'complete_p99':g['latency_ms']['phases']['complete']['p99'],
-                  'throughput':g['throughput_jobs_per_second'],'completed':g['completed'],'errors':g['errors'],
-                  'fencing':g['fencing_probe']['passed'],'checkout_p99':p['checkout_ms']['p99'],
-                  'health_p99':p['health_check_ms']['p99'],'health_calls':p['health_check_ms']['count'],
-                  'cpu_mean':p['host']['cpu_percent']['mean'],'ctx_switches':p['host']['context_switches_delta'],
-                  'lock_waits':p['lock_wait_weighted_samples'],
-              })
-          out={'schema':'arenyxa.p99-instrumentation-control/v1','rows':rows}
-          Path('p99/summary.json').write_text(json.dumps(out,indent=2,sort_keys=True))
-          print(json.dumps(out,indent=2,sort_keys=True))
+              print('\n###', path.name)
+              print(json.dumps({
+                'cycle_p99':g['latency_ms']['p99'],
+                'lease_p99':g['latency_ms']['phases']['lease_next']['p99'],
+                'start_p99':g['latency_ms']['phases']['start_job']['p99'],
+                'complete_p99':g['latency_ms']['phases']['complete']['p99'],
+                'completed':g['completed'],'errors':g['errors'],'fencing':g['fencing_probe']['passed'],
+                'health':p['health_check_ms'],'checkout':p['checkout_ms'],
+                'lock_waits':p.get('lock_wait_weighted_samples',{}),
+                'blocked_pairs':p.get('blocked_query_pairs',{}),
+                'blocked_waits':p.get('blocked_waits',{}),
+              }, indent=2, sort_keys=True))
           PY
+
+      - name: Capture PostgreSQL service diagnostics
+        if: always()
+        run: |
+          mkdir -p p99
+          docker ps -a > p99/docker-ps.txt 2>&1 || true
+          POSTGRES_CONTAINER="$(docker ps -a --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          if [ -n "$POSTGRES_CONTAINER" ]; then
+            docker inspect "$POSTGRES_CONTAINER" > p99/postgres-inspect.json 2>&1 || true
+            docker logs "$POSTGRES_CONTAINER" > p99/postgres.log 2>&1 || true
+          fi
+          free -m > p99/free.txt 2>&1 || true
+          df -h > p99/df.txt 2>&1 || true
 
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: p99-warroom-control
+          name: p99-warroom-blockers
           path: p99
