@@ -1,0 +1,134 @@
+name: Arenyxa PostgreSQL P99 War Room
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arenyxa-p99-warroom-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  blocker-map:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.11", cache: pip }
+
+      - name: Install diagnostic dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,database]" psutil
+          python -m py_compile scripts/p99_ci_probe_v2.py scripts/p99_blocker_map.py
+
+      - name: Verify immutable production baseline
+        run: |
+          cat > /tmp/p99-production.sha256 <<'EOF'
+          b367da0d7fb2d7c21cbb32e84fb9ca049a06341fe6be41e4bd917392f913b071  src/arenyxa/enterprise/runtime_storage.py
+          a3b695848c2c9648059b01360fa5863913bde692ace9deda955ad356117ce559  src/arenyxa/enterprise/distributed_queue.py
+          1dcb09ea7490abebb8e73546178415530adc852422a0346b8d72de56e5322657  scripts/postgresql_32_worker_gate.py
+          ba766b7e02b0f511c1e721628e8e0d615adada27b24918762a73bc1ef7762588  scripts/postgresql_64_worker_128_concurrency_gate.py
+          EOF
+          sha256sum -c /tmp/p99-production.sha256
+
+      - name: Configure PostgreSQL 16 profiling
+        run: |
+          POSTGRES_CONTAINER="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          test -n "$POSTGRES_CONTAINER"
+          docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET max_connections = '256';"
+          docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements';"
+          docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET track_io_timing = 'on';"
+          docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET track_wal_io_timing = 'on';"
+          docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET log_lock_waits = 'on';"
+          docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET deadlock_timeout = '50ms';"
+          docker restart "$POSTGRES_CONTAINER"
+          READY=0
+          for i in $(seq 1 30); do
+            if docker exec "$POSTGRES_CONTAINER" pg_isready -U arenyxa -d arenyxa_ci; then READY=1; break; fi
+            sleep 2
+          done
+          test "$READY" -eq 1
+          docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
+          VERSION="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW server_version_num;')"
+          MAX_CONN="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW max_connections;')"
+          PRELOAD="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW shared_preload_libraries;')"
+          IO="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW track_io_timing;')"
+          WAL_IO="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW track_wal_io_timing;')"
+          echo "server_version_num=$VERSION max_connections=$MAX_CONN preload=$PRELOAD io=$IO wal_io=$WAL_IO"
+          [[ "$VERSION" == 16* ]]
+          test "$MAX_CONN" = "256"
+          test "$PRELOAD" = "pg_stat_statements"
+          test "$IO" = "on"
+          test "$WAL_IO" = "on"
+
+      - name: Trace control
+        run: |
+          mkdir -p p99
+          python -m scripts.p99_ci_probe_v2 --mode trace --variant baseline --output p99/01-trace.json
+
+      - name: Map blockers under full observation
+        run: |
+          python -m scripts.p99_blocker_map --mode full --variant baseline --sample-ms 50 --output p99/02-blockers.json
+
+      - name: Print blocker attribution
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for path in sorted(Path('p99').glob('*.json')):
+              d=json.loads(path.read_text())
+              r=d['result']; g=r['gate']; p=r['probe']
+              print('\n###', path.name)
+              print(json.dumps({
+                'cycle_p99':g['latency_ms']['p99'],
+                'lease_p99':g['latency_ms']['phases']['lease_next']['p99'],
+                'start_p99':g['latency_ms']['phases']['start_job']['p99'],
+                'complete_p99':g['latency_ms']['phases']['complete']['p99'],
+                'completed':g['completed'],'errors':g['errors'],'fencing':g['fencing_probe']['passed'],
+                'health':p['health_check_ms'],'checkout':p['checkout_ms'],
+                'lock_waits':p.get('lock_wait_weighted_samples',{}),
+                'blocked_pairs':p.get('blocked_query_pairs',{}),
+                'blocked_waits':p.get('blocked_waits',{}),
+              }, indent=2, sort_keys=True))
+          PY
+
+      - name: Capture PostgreSQL service diagnostics
+        if: always()
+        run: |
+          mkdir -p p99
+          docker ps -a > p99/docker-ps.txt 2>&1 || true
+          POSTGRES_CONTAINER="$(docker ps -a --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          if [ -n "$POSTGRES_CONTAINER" ]; then
+            docker inspect "$POSTGRES_CONTAINER" > p99/postgres-inspect.json 2>&1 || true
+            docker logs "$POSTGRES_CONTAINER" > p99/postgres.log 2>&1 || true
+          fi
+          free -m > p99/free.txt 2>&1 || true
+          df -h > p99/df.txt 2>&1 || true
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: p99-warroom-blockers
+          path: p99
