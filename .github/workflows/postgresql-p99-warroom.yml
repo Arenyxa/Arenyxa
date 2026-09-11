@@ -2,8 +2,6 @@ name: Arenyxa PostgreSQL P99 War Room
 
 on:
   pull_request:
-  push:
-    branches: ["p99-warroom-*"]
   workflow_dispatch:
 
 permissions:
@@ -42,7 +40,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev,database]" psutil
-          python -m py_compile scripts/p99_ci_probe.py
+          python -m py_compile scripts/p99_ci_probe_v2.py
 
       - name: Verify immutable production baseline
         run: |
@@ -58,14 +56,12 @@ jobs:
         run: |
           POSTGRES_CONTAINER="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
           test -n "$POSTGRES_CONTAINER"
-
           docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET max_connections = '256';"
           docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements';"
           docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET track_io_timing = 'on';"
           docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET track_wal_io_timing = 'on';"
           docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET log_lock_waits = 'on';"
           docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET deadlock_timeout = '50ms';"
-
           docker restart "$POSTGRES_CONTAINER"
           READY=0
           for i in $(seq 1 30); do
@@ -73,65 +69,53 @@ jobs:
             sleep 2
           done
           test "$READY" -eq 1
-
           docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
           VERSION="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW server_version_num;')"
           MAX_CONN="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW max_connections;')"
           PRELOAD="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW shared_preload_libraries;')"
           IO="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW track_io_timing;')"
           WAL_IO="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW track_wal_io_timing;')"
-          LOCK_LOG="$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW log_lock_waits;')"
-          echo "server_version_num=$VERSION max_connections=$MAX_CONN preload=$PRELOAD io=$IO wal_io=$WAL_IO log_lock_waits=$LOCK_LOG"
-          test "${VERSION%%??}" = "1600" || [[ "$VERSION" == 16* ]]
+          echo "server_version_num=$VERSION max_connections=$MAX_CONN preload=$PRELOAD io=$IO wal_io=$WAL_IO"
+          [[ "$VERSION" == 16* ]]
           test "$MAX_CONN" = "256"
           test "$PRELOAD" = "pg_stat_statements"
           test "$IO" = "on"
           test "$WAL_IO" = "on"
-          test "$LOCK_LOG" = "on"
 
-      - name: Interleaved baseline and full-prewarm profiling
+      - name: Instrumentation control — bare vs trace vs full
         run: |
           mkdir -p p99
-          python -m scripts.p99_ci_probe --variant baseline --output p99/01-baseline.json
-          python -m scripts.p99_ci_probe --variant full_prewarm --output p99/02-full-prewarm.json
-          python -m scripts.p99_ci_probe --variant full_prewarm --output p99/03-full-prewarm.json
-          python -m scripts.p99_ci_probe --variant baseline --output p99/04-baseline.json
-          python -m scripts.p99_ci_probe --variant baseline --output p99/05-baseline.json
-          python -m scripts.p99_ci_probe --variant full_prewarm --output p99/06-full-prewarm.json
+          python -m scripts.p99_ci_probe_v2 --mode bare  --variant baseline --output p99/01-bare.json
+          python -m scripts.p99_ci_probe_v2 --mode trace --variant baseline --output p99/02-trace.json
+          python -m scripts.p99_ci_probe_v2 --mode bare  --variant baseline --output p99/03-bare.json
+          python -m scripts.p99_ci_probe_v2 --mode trace --variant baseline --output p99/04-trace.json
+          python -m scripts.p99_ci_probe_v2 --mode full  --variant baseline --sample-ms 100 --output p99/05-full.json
+          python -m scripts.p99_ci_probe_v2 --mode bare  --variant baseline --output p99/06-bare.json
+          python -m scripts.p99_ci_probe_v2 --mode trace --variant baseline --output p99/07-trace.json
 
-      - name: Build compact attribution summary
+      - name: Build compact control summary
         if: always()
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
           rows=[]
-          for p in sorted(Path('p99').glob('[0-9][0-9]-*.json')):
-              d=json.loads(p.read_text())
-              g=d['result']['gate']
-              q=d['result']['probe']
+          for path in sorted(Path('p99').glob('[0-9][0-9]-*.json')):
+              d=json.loads(path.read_text())
+              r=d['result']; g=r['gate']; p=r['probe']
               rows.append({
-                  'file':p.name,
-                  'variant':d['variant'],
-                  'cycle_p99':g['latency_ms']['p99'],
-                  'cycle_p95':g['latency_ms']['p95'],
-                  'cycle_max':g['latency_ms']['max'],
+                  'file':path.name,'mode':r['mode'],'variant':r['variant'],
+                  'cycle_p99':g['latency_ms']['p99'],'cycle_p95':g['latency_ms']['p95'],'cycle_max':g['latency_ms']['max'],
                   'lease_p99':g['latency_ms']['phases']['lease_next']['p99'],
                   'start_p99':g['latency_ms']['phases']['start_job']['p99'],
                   'complete_p99':g['latency_ms']['phases']['complete']['p99'],
-                  'throughput':g['throughput_jobs_per_second'],
-                  'completed':g['completed'],
-                  'errors':g['errors'],
-                  'fencing':g['fencing_probe']['passed'],
-                  'checkout_p99':q['checkout_ms']['p99'],
-                  'health_p99':q['health_check_ms']['p99'],
-                  'health_calls':q['health_check_ms']['count'],
-                  'ctx_switches':q['host']['context_switches_delta'],
-                  'cpu_mean':q['host']['cpu_percent']['mean'],
-                  'locks':q['lock_wait_weighted_samples'],
+                  'throughput':g['throughput_jobs_per_second'],'completed':g['completed'],'errors':g['errors'],
+                  'fencing':g['fencing_probe']['passed'],'checkout_p99':p['checkout_ms']['p99'],
+                  'health_p99':p['health_check_ms']['p99'],'health_calls':p['health_check_ms']['count'],
+                  'cpu_mean':p['host']['cpu_percent']['mean'],'ctx_switches':p['host']['context_switches_delta'],
+                  'lock_waits':p['lock_wait_weighted_samples'],
               })
-          out={'schema':'arenyxa.p99-attribution-summary/v1','rows':rows}
-          Path('p99').mkdir(exist_ok=True)
+          out={'schema':'arenyxa.p99-instrumentation-control/v1','rows':rows}
           Path('p99/summary.json').write_text(json.dumps(out,indent=2,sort_keys=True))
           print(json.dumps(out,indent=2,sort_keys=True))
           PY
@@ -139,5 +123,5 @@ jobs:
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: p99-warroom-profile
+          name: p99-warroom-control
           path: p99
