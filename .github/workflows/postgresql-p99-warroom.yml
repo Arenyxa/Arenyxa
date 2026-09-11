@@ -1,6 +1,7 @@
 name: Arenyxa PostgreSQL P99 War Room
 
 on:
+  pull_request:
   push:
     branches: ["p99-warroom-*"]
   workflow_dispatch:
