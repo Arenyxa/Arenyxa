@@ -1,5 +1,5 @@
 #define MyAppName "Arenyxa"
-#define MyAppVersion "8.1"
+#define MyAppVersion "8.2"
 #define MyAppPublisher "Arenyxa Contributors"
 #define MyAppExeName "Arenyxa.exe"
 #define ProjectRoot ".."
@@ -15,7 +15,7 @@ DefaultGroupName=Arenyxa
 AllowNoIcons=yes
 LicenseFile={#ProjectRoot}\LICENSE
 OutputDir={#ProjectRoot}\dist\installer
-OutputBaseFilename=Arenyxa_V8.1_Legacy_Win7_x64_Setup
+OutputBaseFilename=Arenyxa_V8.2.0_Legacy_Win7_x64_Setup
 SetupIconFile={#ProjectRoot}\src\arenyxa\resources\icons\arenyxa.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma2/ultra64

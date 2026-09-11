@@ -5,7 +5,7 @@ from pathlib import Path
 
 try:
     import tomllib
-except ImportError:                                                                  
+except ImportError:
     tomllib = None
 
 
@@ -17,7 +17,7 @@ def main() -> int:
     with (root / "pyproject.toml").open("rb") as stream:
         project = tomllib.load(stream)
     assert project["project"]["name"] == "arenyxa"
-    assert project["project"]["version"] == "8.1.1"
+    assert project["project"]["version"] == "8.2.0"
     assert project["project"]["scripts"]["arenyxa"] == "arenyxa.cli:main"
     assert project["project"]["scripts"]["arenyxa-gui"] == "arenyxa.app:main"
     for relative in (
