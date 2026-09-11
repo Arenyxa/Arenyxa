@@ -1,11 +1,8 @@
-# Arenyxa v8.2 version alignment (2026-09-11)
+# Arenyxa v8.2 version alignment
 
-Official identity after this pass:
+Canonical product identity for this tree:
 
-| Field | Value |
-|---|---|
-| `__version__` | `8.2` |
-| `__package_version__` / pyproject `version` / `__display_version__` / `__distribution_version__` | `8.2.0` |
-| `__engineering_build__` | `v8.2.0` |
-| Windows filevers/prodvers | `8.2.0.0` |
-| Plugin/runtime compatibility | `6.8.0` (intentionally unchanged) |
+- display / public version: 8.2
+- package version: 8.2.0
+- compatibility version: 6.8.0
+- release channel: stable
