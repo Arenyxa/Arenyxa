@@ -44,11 +44,6 @@ def get_experience_profile(profile_id: str) -> ExperienceProfile:
 
 
 def apply_experience_profile(settings: AppSettings, profile_id: str) -> ExperienceProfile:
-    
-
-
-
-
     profile = get_experience_profile(profile_id)
     settings.experience_profile = profile.id
     settings.experience_setup_completed = True
@@ -57,8 +52,7 @@ def apply_experience_profile(settings: AppSettings, profile_id: str) -> Experien
         settings.developer_nav_expanded = False
     else:
         settings.advanced_nav_expanded = True
-                                                                                             
-        settings.developer_nav_expanded = bool(settings.developer_mode and profile.id == "developer")
+        # Presentation≠authority: experience profile must not auto-expand developer nav.
     return profile
 
 
