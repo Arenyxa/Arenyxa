@@ -1,0 +1,171 @@
+name: PostgreSQL P99 Server Profile
+
+on:
+  push:
+    branches: ["release/p99-attribution"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  server-profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m pip install --upgrade pip && python -m pip install -e ".[dev,database]"
+
+      - name: Configure PostgreSQL profiling
+        shell: bash
+        run: |
+          set -euo pipefail
+          POSTGRES_CONTAINER="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          test -n "$POSTGRES_CONTAINER"
+          echo "POSTGRES_CONTAINER=$POSTGRES_CONTAINER" >> "$GITHUB_ENV"
+
+          for setting in \
+            "max_connections = '256'" \
+            "shared_preload_libraries = 'pg_stat_statements'" \
+            "track_io_timing = 'on'" \
+            "log_lock_waits = 'on'" \
+            "deadlock_timeout = '50ms'"; do
+            docker exec "$POSTGRES_CONTAINER" \
+              psql -v ON_ERROR_STOP=1 -U arenyxa -d arenyxa_ci \
+              -c "ALTER SYSTEM SET ${setting};"
+          done
+
+          docker restart "$POSTGRES_CONTAINER"
+          READY=0
+          for i in $(seq 1 30); do
+            if docker exec "$POSTGRES_CONTAINER" pg_isready -U arenyxa -d arenyxa_ci; then
+              READY=1
+              break
+            fi
+            sleep 2
+          done
+          test "$READY" -eq 1
+
+          docker exec "$POSTGRES_CONTAINER" \
+            psql -v ON_ERROR_STOP=1 -U arenyxa -d arenyxa_ci \
+            -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
+
+          docker exec "$POSTGRES_CONTAINER" \
+            psql -U arenyxa -d arenyxa_ci -Atc \
+            "SELECT current_setting('max_connections'),current_setting('shared_preload_libraries'),current_setting('track_io_timing'),current_setting('log_lock_waits'),current_setting('deadlock_timeout');"
+          nproc
+          free -h
+
+      - name: Run full-prewarm server-side profile
+        shell: bash
+        run: |
+          set -u
+          mkdir -p dist/p99-server-profile
+
+          reset_db() {
+            docker exec "$POSTGRES_CONTAINER" \
+              psql -v ON_ERROR_STOP=1 -U arenyxa -d arenyxa_ci \
+              -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
+          }
+
+          capture_stats() {
+            round="$1"
+            docker exec "$POSTGRES_CONTAINER" \
+              psql -U arenyxa -d arenyxa_ci -P pager=off -c \
+              "SELECT calls,round(total_exec_time::numeric,3) AS total_exec_ms,round(mean_exec_time::numeric,3) AS mean_exec_ms,round(max_exec_time::numeric,3) AS max_exec_ms,round(stddev_exec_time::numeric,3) AS stddev_exec_ms,rows,shared_blks_hit,shared_blks_read,shared_blks_dirtied,shared_blks_written,temp_blks_read,temp_blks_written,round(blk_read_time::numeric,3) AS blk_read_ms,round(blk_write_time::numeric,3) AS blk_write_ms,wal_records,wal_fpi,wal_bytes,left(regexp_replace(query,E'[\\n\\r\\t ]+',' ','g'),220) AS query FROM pg_stat_statements WHERE dbid=(SELECT oid FROM pg_database WHERE datname=current_database()) ORDER BY max_exec_time DESC LIMIT 40;" \
+              > "dist/p99-server-profile/pg-stat-statements-${round}.txt"
+
+            docker exec "$POSTGRES_CONTAINER" \
+              psql -U arenyxa -d arenyxa_ci -P pager=off -c \
+              "SELECT datname,xact_commit,xact_rollback,blks_read,blks_hit,tup_returned,tup_fetched,tup_inserted,tup_updated,tup_deleted,deadlocks,temp_files,temp_bytes,blk_read_time,blk_write_time FROM pg_stat_database WHERE datname=current_database(); SELECT wal_records,wal_fpi,wal_bytes,wal_buffers_full,wal_write,wal_sync,wal_write_time,wal_sync_time FROM pg_stat_wal;" \
+              > "dist/p99-server-profile/pg-database-wal-${round}.txt"
+          }
+
+          set +e
+          for round in 1 2 3; do
+            reset_db
+            docker exec "$POSTGRES_CONTAINER" \
+              psql -v ON_ERROR_STOP=1 -U arenyxa -d arenyxa_ci \
+              -c "SELECT pg_stat_statements_reset();" >/dev/null
+
+            if command -v vmstat >/dev/null 2>&1; then
+              vmstat 1 > "dist/p99-server-profile/vmstat-${round}.txt" &
+              VMSTAT_PID=$!
+            else
+              VMSTAT_PID=""
+            fi
+
+            python -m scripts.postgresql_p99_attribution_gate \
+              --jobs 1024 --p99-ms 500 \
+              --report "dist/p99-server-profile/gate-${round}.json"
+            GATE_RC=$?
+
+            if [ -n "$VMSTAT_PID" ]; then
+              kill "$VMSTAT_PID" 2>/dev/null || true
+              wait "$VMSTAT_PID" 2>/dev/null || true
+            fi
+
+            capture_stats "$round"
+            echo "round=$round gate_rc=$GATE_RC" | tee "dist/p99-server-profile/result-${round}.txt"
+          done
+          set -e
+
+          docker logs "$POSTGRES_CONTAINER" > dist/p99-server-profile/postgres.log 2>&1 || true
+
+          for expected in gate-1.json gate-2.json gate-3.json pg-stat-statements-1.txt pg-stat-statements-2.txt pg-stat-statements-3.txt; do
+            test -s "dist/p99-server-profile/${expected}" || { echo "::error::Missing ${expected}"; exit 3; }
+          done
+
+          echo "===== Gate summaries ====="
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('dist/p99-server-profile')
+          for path in sorted(root.glob('gate-*.json')):
+              data = json.loads(path.read_text(encoding='utf-8'))
+              phases = data['latency_ms']['phases']
+              print(path.name, json.dumps({
+                  'cycle_p99_ms': data['latency_ms']['p99'],
+                  'lease_p99_ms': phases['lease_next']['p99'],
+                  'start_p99_ms': phases['start_job']['p99'],
+                  'complete_p99_ms': phases['complete']['p99'],
+                  'duration_seconds': data['duration_seconds'],
+                  'throughput': data['throughput_jobs_per_second'],
+                  'passed': data['passed'],
+              }, sort_keys=True))
+          PY
+
+          echo "===== Slowest PostgreSQL statements ====="
+          for f in dist/p99-server-profile/pg-stat-statements-*.txt; do
+            echo "--- $f ---"
+            sed -n '1,55p' "$f"
+          done
+
+          echo "===== PostgreSQL lock waits >=50ms ====="
+          grep -E "still waiting|acquired .*lock|deadlock" dist/p99-server-profile/postgres.log || true
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: postgresql-p99-server-profile
+          path: dist/p99-server-profile
