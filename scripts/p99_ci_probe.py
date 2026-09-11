@@ -65,9 +65,9 @@ class Probe:
         self.thread: threading.Thread | None = None
         self.start_wall = 0.0
         self.stop_wall = 0.0
-        self.orig_check = runtime_storage.PostgreSQLRuntimeStorageBackend._check_pool_connection
-        self.orig_connection = runtime_storage.PostgreSQLRuntimeStorageBackend.connection
-        self.orig_pool_locked = runtime_storage.PostgreSQLRuntimeStorageBackend._connection_pool_locked
+        self.orig_check = runtime_storage.PostgreSQLDistributedRuntimeStorage._check_pool_connection
+        self.orig_connection = runtime_storage.PostgreSQLDistributedRuntimeStorage.connection
+        self.orig_pool_locked = runtime_storage.PostgreSQLDistributedRuntimeStorage._connection_pool_locked
         self.orig_executor = gate.ThreadPoolExecutor
         self.full_prewarm = False
 
@@ -106,9 +106,9 @@ class Probe:
                 setattr(storage_self, "_p99_full_prewarmed", True)
             return pool
 
-        runtime_storage.PostgreSQLRuntimeStorageBackend._check_pool_connection = staticmethod(traced_check)
-        runtime_storage.PostgreSQLRuntimeStorageBackend.connection = traced_connection
-        runtime_storage.PostgreSQLRuntimeStorageBackend._connection_pool_locked = traced_pool_locked
+        runtime_storage.PostgreSQLDistributedRuntimeStorage._check_pool_connection = staticmethod(traced_check)
+        runtime_storage.PostgreSQLDistributedRuntimeStorage.connection = traced_connection
+        runtime_storage.PostgreSQLDistributedRuntimeStorage._connection_pool_locked = traced_pool_locked
 
         orig_executor = self.orig_executor
 
@@ -130,9 +130,9 @@ class Probe:
         gate.ThreadPoolExecutor = WindowExecutor
 
     def uninstall(self) -> None:
-        runtime_storage.PostgreSQLRuntimeStorageBackend._check_pool_connection = staticmethod(self.orig_check)
-        runtime_storage.PostgreSQLRuntimeStorageBackend.connection = self.orig_connection
-        runtime_storage.PostgreSQLRuntimeStorageBackend._connection_pool_locked = self.orig_pool_locked
+        runtime_storage.PostgreSQLDistributedRuntimeStorage._check_pool_connection = staticmethod(self.orig_check)
+        runtime_storage.PostgreSQLDistributedRuntimeStorage.connection = self.orig_connection
+        runtime_storage.PostgreSQLDistributedRuntimeStorage._connection_pool_locked = self.orig_pool_locked
         gate.ThreadPoolExecutor = self.orig_executor
 
     def _db_stats(self, conn: psycopg.Connection[Any]) -> dict[str, Any]:
