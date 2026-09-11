@@ -53,7 +53,7 @@ class JobLifecycle:
                     "JOB_START_FAILED",
                     retryable=True,
                 )
-            except Exception:
+            except (OSError, RuntimeError, ValueError):
                 pass
             raise
         return ClaimedJob(
