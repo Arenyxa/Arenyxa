@@ -46,12 +46,13 @@ jobs:
 
       - name: Verify immutable production baseline
         run: |
-          git rev-parse HEAD
-          git diff --exit-code db1c1213b090e71320143273e9c51e049b861b87 -- \
-            src/arenyxa/enterprise/runtime_storage.py \
-            src/arenyxa/enterprise/distributed_queue.py \
-            scripts/postgresql_32_worker_gate.py \
-            scripts/postgresql_64_worker_128_concurrency_gate.py
+          cat > /tmp/p99-production.sha256 <<'EOF'
+          b367da0d7fb2d7c21cbb32e84fb9ca049a06341fe6be41e4bd917392f913b071  src/arenyxa/enterprise/runtime_storage.py
+          a3b695848c2c9648059b01360fa5863913bde692ace9deda955ad356117ce559  src/arenyxa/enterprise/distributed_queue.py
+          1dcb09ea7490abebb8e73546178415530adc852422a0346b8d72de56e5322657  scripts/postgresql_32_worker_gate.py
+          ba766b7e02b0f511c1e721628e8e0d615adada27b24918762a73bc1ef7762588  scripts/postgresql_64_worker_128_concurrency_gate.py
+          EOF
+          sha256sum -c /tmp/p99-production.sha256
 
       - name: Configure PostgreSQL 16 profiling
         run: |
