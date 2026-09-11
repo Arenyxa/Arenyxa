@@ -43,26 +43,17 @@ class _ExperienceCard(QFrame):
 
 
 class WelcomeCenterDialog(QDialog):
-    
-
-
-
-
-
-
     profileSelected = Signal(str)
     enterpriseRequested = Signal()
     fleetRequested = Signal()
 
     def __init__(self, context, theme, motion, anchor=None) -> None:
-                                                                                               
-                                                                                               
         super().__init__(None)
         self._anchor = anchor
         self.context = context
         self.theme = theme
         self.motion = motion
-        self.setWindowTitle("欢迎使用 Arenyxa")
+        self.setWindowTitle("欢迎使用 Arenyxa V8.2.0")
         self.setModal(True)
         self.setMinimumSize(760, 600)
         self.resize(980, 760)
@@ -73,8 +64,8 @@ class WelcomeCenterDialog(QDialog):
         layout.setContentsMargins(22, 20, 22, 20)
         layout.setSpacing(14)
         layout.addWidget(PageHeader(
-            "欢迎使用 Arenyxa",
-            "选择最符合你的工作方式。这里只调整工作区呈现与默认导航，不是权限等级；企业身份和开发者身份由独立安全流程建立。",
+            "欢迎使用 Arenyxa V8.2.0",
+            "先选择工作方式。这里只调整工作区呈现与默认导航，不是权限等级；企业身份和开发者身份由独立安全流程建立。",
         ))
 
         scroll = QScrollArea()
@@ -123,8 +114,6 @@ class WelcomeCenterDialog(QDialog):
         enterprise.body.addWidget(enterprise_button)
         body.addWidget(enterprise)
 
-        # Do not advertise an operations surface that the live identity cannot open.
-        # This is presentation filtering only; NavigationResolver remains the authority.
         navigation = NavigationContextFactory.from_application(context)
         fleet_target = (
             "server_ops"
