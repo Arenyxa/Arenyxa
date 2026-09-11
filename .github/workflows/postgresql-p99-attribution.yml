@@ -1,0 +1,140 @@
+name: PostgreSQL P99 Attribution
+
+on:
+  push:
+    branches: ["release/p99-attribution"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pool-prewarm-ab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m pip install --upgrade pip && python -m pip install -e ".[dev,database]"
+
+      - name: Verify diagnostic prewarm helper
+        run: python -m pytest -q tests/test_postgresql_gate_pool_prewarm.py
+
+      - name: Configure PostgreSQL stress capacity
+        run: |
+          POSTGRES_CONTAINER="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:/ {print $1; exit}')"
+          test -n "$POSTGRES_CONTAINER"
+          echo "POSTGRES_CONTAINER=$POSTGRES_CONTAINER" >> "$GITHUB_ENV"
+          docker exec "$POSTGRES_CONTAINER" \
+            psql -U arenyxa -d arenyxa_ci \
+            -c "ALTER SYSTEM SET max_connections = '256';"
+          docker restart "$POSTGRES_CONTAINER"
+          for i in $(seq 1 30); do
+            if docker exec "$POSTGRES_CONTAINER" pg_isready -U arenyxa -d arenyxa_ci; then
+              break
+            fi
+            sleep 2
+          done
+          test "$(docker exec "$POSTGRES_CONTAINER" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW max_connections;')" = "256"
+          nproc
+          free -h
+          lscpu | sed -n '1,25p'
+
+      - name: Run controlled baseline vs full-prewarm A/B
+        shell: bash
+        run: |
+          set -u
+          mkdir -p dist/p99-attribution
+
+          reset_db() {
+            docker exec "$POSTGRES_CONTAINER" \
+              psql -v ON_ERROR_STOP=1 -U arenyxa -d arenyxa_ci \
+              -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+          }
+
+          run_one() {
+            mode="$1"
+            round="$2"
+            reset_db
+            echo "===== mode=$mode round=$round ====="
+            if [ "$mode" = "baseline" ]; then
+              python scripts/postgresql_64_worker_128_concurrency_gate.py \
+                --jobs 1024 \
+                --p99-ms 500 \
+                --report "dist/p99-attribution/baseline-${round}.json"
+            else
+              python scripts/postgresql_p99_attribution_gate.py \
+                --jobs 1024 \
+                --p99-ms 500 \
+                --report "dist/p99-attribution/prewarm-${round}.json"
+            fi
+            return 0
+          }
+
+          set +e
+          run_one baseline 1
+          run_one prewarm 1
+          run_one prewarm 2
+          run_one baseline 2
+          run_one baseline 3
+          run_one prewarm 3
+          set -e
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('dist/p99-attribution')
+          summary = {'baseline': [], 'prewarm': []}
+          for mode in summary:
+              for path in sorted(root.glob(f'{mode}-*.json')):
+                  data = json.loads(path.read_text(encoding='utf-8'))
+                  latency = data['latency_ms']
+                  summary[mode].append({
+                      'file': path.name,
+                      'passed': data['passed'],
+                      'duration_seconds': data['duration_seconds'],
+                      'throughput_jobs_per_second': data['throughput_jobs_per_second'],
+                      'cycle_p99_ms': latency['p99'],
+                      'cycle_max_ms': latency['max'],
+                      'lease_p99_ms': latency['phases']['lease_next']['p99'],
+                      'start_p99_ms': latency['phases']['start_job']['p99'],
+                      'complete_p99_ms': latency['phases']['complete']['p99'],
+                      'pool_wait_ms_total': sum(
+                          float(row.get('requests_wait_ms', 0) or 0)
+                          for row in data['pool']['metrics'][1:]
+                      ),
+                      'pool_queued_total': sum(
+                          int(row.get('requests_queued', 0) or 0)
+                          for row in data['pool']['metrics'][1:]
+                      ),
+                      'total_pool_size_observed': data['pool']['total_pool_size_observed'],
+                  })
+          (root / 'summary.json').write_text(json.dumps(summary, indent=2, sort_keys=True), encoding='utf-8')
+          print(json.dumps(summary, indent=2, sort_keys=True))
+          PY
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: postgresql-p99-attribution
+          path: dist/p99-attribution
