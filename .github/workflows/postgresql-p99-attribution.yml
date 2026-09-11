@@ -82,7 +82,7 @@ jobs:
                 --p99-ms 500 \
                 --report "dist/p99-attribution/baseline-${round}.json"
             else
-              python scripts/postgresql_p99_attribution_gate.py \
+              python -m scripts.postgresql_p99_attribution_gate \
                 --jobs 1024 \
                 --p99-ms 500 \
                 --report "dist/p99-attribution/prewarm-${round}.json"
@@ -98,6 +98,15 @@ jobs:
           run_one baseline 3
           run_one prewarm 3
           set -e
+
+          for expected in \
+            baseline-1.json baseline-2.json baseline-3.json \
+            prewarm-1.json prewarm-2.json prewarm-3.json; do
+            if [ ! -s "dist/p99-attribution/${expected}" ]; then
+              echo "::error::Missing diagnostic report: ${expected}"
+              exit 3
+            fi
+          done
 
           python - <<'PY'
           import json
