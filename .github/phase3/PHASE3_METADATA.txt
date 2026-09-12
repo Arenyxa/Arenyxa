@@ -1,0 +1,3 @@
+Phase 3 diagnostic metadata
+Frozen production candidate: reconstructed A+B+G
+No production source modifications in this branch.
