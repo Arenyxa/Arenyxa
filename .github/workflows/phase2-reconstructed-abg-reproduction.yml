@@ -1,0 +1,361 @@
+name: Arenyxa Phase2 Reconstructed ABG Reproduction
+
+on:
+  push:
+    branches:
+      - phase2/reconstructed-abg-repro-20260912
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16.15
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Apply frozen reconstructed A+B+G patch
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/reconstructed-abg.patch" <<'PATCH_EOF'
+diff --git a/src/arenyxa/enterprise/distributed_queue.py b/src/arenyxa/enterprise/distributed_queue.py
+index 45950da..0563188 100644
+--- a/src/arenyxa/enterprise/distributed_queue.py
++++ b/src/arenyxa/enterprise/distributed_queue.py
+@@ -469,7 +469,6 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
+                             "",
+                             duration,
+                             detail_created,
+-                            MAX_JOB_EVENTS_PER_JOB - 1,
+                         ),
+                     ).fetchone()
+             if row is not None:
+@@ -685,7 +684,7 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
+                     fast_sql,
+                     (
+                         str(job_id), str(worker_id), token_sha, now, updated_at,
+-                        str(worker_id), "", "{}", utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,
++                        str(worker_id), "", "{}", utc_now(),
+                     ),
+                 )
+                 if cursor.fetchone() is not None:
+@@ -805,7 +804,7 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
+                         str(job_id), str(worker_id), token_sha, now,
+                         result_json, result_sha, str(worker_id), token_sha, terminal_at, terminal_at,
+                         self._clock.stable_epoch(), utc_now(), str(worker_id),
+-                        str(worker_id), "", details_json, utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,
++                        str(worker_id), "", details_json, utc_now(),
+                     ),
+                 )
+                 if cursor.fetchone() is not None:
+diff --git a/src/arenyxa/enterprise/runtime_storage.py b/src/arenyxa/enterprise/runtime_storage.py
+index 971708d..fb4dbf4 100644
+--- a/src/arenyxa/enterprise/runtime_storage.py
++++ b/src/arenyxa/enterprise/runtime_storage.py
+@@ -2,6 +2,7 @@ from __future__ import annotations
+ 
+ import hashlib
+ import logging
++import select
+ import sqlite3
+ import threading
+ import time
+@@ -528,9 +529,27 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
+         connection.execute("SET lock_timeout = '10s'")
+         connection.execute("SET statement_timeout = '60s'")
+         connection.execute("SET idle_in_transaction_session_timeout = '60s'")
++    _POOL_HEALTH_IDLE_SECONDS = 5.0
++
+     @staticmethod
+-    def _check_pool_connection(connection: Any) -> None:
+-        """Validate a checked-in/out PostgreSQL connection without relying on pool internals."""
++    def _mark_pool_connection_idle(connection: Any) -> None:
++        setattr(connection, "_arenyxa_pool_idle_since", time.monotonic())
++
++    @classmethod
++    def _check_pool_connection(cls, connection: Any) -> None:
++        """Use fd readiness first; probe SQL only after suspicious I/O or 5s idle."""
++        idle_since = getattr(connection, "_arenyxa_pool_idle_since", None)
++        try:
++            readable, _writable, exceptional = select.select((connection,), (), (connection,), 0.0)
++        except (OSError, TypeError, ValueError):
++            probe = True
++        else:
++            probe = bool(
++                readable or exceptional or idle_since is None
++                or time.monotonic() - float(idle_since) >= cls._POOL_HEALTH_IDLE_SECONDS
++            )
++        if not probe:
++            return
+         cursor = connection.execute("SELECT 1 AS arenyxa_pool_health")
+         fetchone = getattr(cursor, "fetchone", None)
+         if callable(fetchone):
+@@ -590,7 +609,7 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
+             # Warm the bounded client pool before high-concurrency work;
+             # lazy connection expansion during the release gate inflates
+             # tail latency even when every database operation succeeds.
+-            min_size=4,
++            min_size=8,
+             max_size=8,
+             timeout=15.0,
+             max_idle=300.0,
+@@ -653,6 +672,8 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
+                     except psycopg.Error as rollback_exc:
+                         LOGGER.warning("PostgreSQL rollback failed after runtime error: %s", rollback_exc)
+                     raise
++                finally:
++                    self._mark_pool_connection_idle(raw)
+         except (psycopg.Error, OSError, TimeoutError, RuntimeError) as exc:
+             with self._pool_metrics_lock:
+                 self._pool_acquisition_failures += 1
+@@ -857,14 +878,6 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
+                        json_build_object('attempt',attempt,'lease_seconds',?)::text,?
+                 FROM leased
+                 RETURNING job_id
+-            ), trimmed AS (
+-                DELETE FROM distributed_job_events
+-                WHERE job_id=(SELECT job_id FROM event)
+-                  AND event_id NOT IN (
+-                      SELECT event_id FROM distributed_job_events
+-                      WHERE job_id=(SELECT job_id FROM event)
+-                      ORDER BY event_id DESC LIMIT ?
+-                  )
+             )
+             SELECT * FROM leased
+         """
+@@ -891,14 +904,6 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
+                 FROM candidate AS c
+                 JOIN updated AS u ON u.job_id=c.job_id
+                 RETURNING job_id
+-            ), trimmed AS (
+-                DELETE FROM distributed_job_events
+-                WHERE job_id=(SELECT job_id FROM event)
+-                  AND event_id NOT IN (
+-                      SELECT event_id FROM distributed_job_events
+-                      WHERE job_id=(SELECT job_id FROM event)
+-                      ORDER BY event_id DESC LIMIT ?
+-                  )
+             )
+             SELECT * FROM updated
+         """
+@@ -935,14 +940,6 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
+                 FROM candidate AS c
+                 JOIN updated AS u ON u.job_id=c.job_id
+                 RETURNING job_id
+-            ), trimmed AS (
+-                DELETE FROM distributed_job_events
+-                WHERE job_id=(SELECT job_id FROM event)
+-                  AND event_id NOT IN (
+-                      SELECT event_id FROM distributed_job_events
+-                      WHERE job_id=(SELECT job_id FROM event)
+-                      ORDER BY event_id DESC LIMIT ?
+-                  )
+             )
+             SELECT c.state AS previous_state
+             FROM candidate AS c
+PATCH_EOF
+          git apply --check "$RUNNER_TEMP/reconstructed-abg.patch"
+          git apply "$RUNNER_TEMP/reconstructed-abg.patch"
+
+      - name: Recheck source identity before execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(sha256sum src/arenyxa/enterprise/runtime_storage.py | awk '{print $1}')" = "5702ee19406e72525c96d848eeb7b909141872e0d8c0ebdb29c149b4d596594a"
+          test "$(sha256sum src/arenyxa/enterprise/distributed_queue.py | awk '{print $1}')" = "8d34fef8df28b3ef7521dd2c465aa2bdf8a6217244635f151c6f752d704c2ccd"
+          test "$(sha256sum scripts/postgresql_32_worker_gate.py | awk '{print $1}')" = "1dcb09ea7490abebb8e73546178415530adc852422a0346b8d72de56e5322657"
+          test "$(sha256sum scripts/postgresql_64_worker_128_concurrency_gate.py | awk '{print $1}')" = "ba766b7e02b0f511c1e721628e8e0d615adada27b24918762a73bc1ef7762588"
+          test -z "$(git diff -- scripts/postgresql_32_worker_gate.py scripts/postgresql_64_worker_128_concurrency_gate.py)"
+          mkdir -p phase2_artifacts
+          git diff db1c1213b090e71320143273e9c51e049b861b87 -- src/arenyxa > phase2_artifacts/executed-source.diff
+          git diff -- scripts/postgresql_32_worker_gate.py scripts/postgresql_64_worker_128_concurrency_gate.py > phase2_artifacts/executed-scripts.diff
+          sha256sum src/arenyxa/enterprise/runtime_storage.py src/arenyxa/enterprise/distributed_queue.py scripts/postgresql_32_worker_gate.py scripts/postgresql_64_worker_128_concurrency_gate.py > phase2_artifacts/source-hashes.sha256
+
+      - name: Install exact project dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,database]" psutil
+
+      - name: Configure and verify PostgreSQL 16.15 durability contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          C="$(docker ps --filter ancestor=postgres:16.15 --format '{{.ID}}' | head -1)"
+          test -n "$C"
+          BEFORE_MAX="$(docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW max_connections')"
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET max_connections = '256';"
+          docker restart "$C"
+          READY=0
+          for i in $(seq 1 45); do
+            if docker exec "$C" pg_isready -U arenyxa -d arenyxa_ci >/dev/null 2>&1; then READY=1; break; fi
+            sleep 2
+          done
+          test "$READY" = 1
+          SERVER_VERSION="$(docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW server_version')"
+          SERVER_NUM="$(docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW server_version_num')"
+          MAX_CONN="$(docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW max_connections')"
+          FSYNC="$(docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW fsync')"
+          SYNC_COMMIT="$(docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW synchronous_commit')"
+          test "$SERVER_NUM" = "160015"
+          test "$MAX_CONN" = "256"
+          test "$FSYNC" = "on"
+          test "$SYNC_COMMIT" = "on"
+          printf 'before_max_connections=%s\nserver_version=%s\nserver_version_num=%s\nmax_connections=%s\nfsync=%s\nsynchronous_commit=%s\n' "$BEFORE_MAX" "$SERVER_VERSION" "$SERVER_NUM" "$MAX_CONN" "$FSYNC" "$SYNC_COMMIT" | tee phase2_artifacts/postgresql-settings.txt
+
+      - name: Capture execution environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "OS=$(cat /etc/os-release | tr '\n' ' ')"
+            echo "KERNEL=$(uname -a)"
+            echo "CPU_COUNT=$(nproc)"
+            grep -E 'Cpus_allowed_list|Mems_allowed_list' /proc/self/status || true
+            echo "CPU_QUOTA=$(cat /sys/fs/cgroup/cpu.max 2>/dev/null || true)"
+            echo "RAM_BYTES=$(awk '/MemTotal/ {print $2*1024}' /proc/meminfo)"
+            echo "PYTHON=$(python --version 2>&1)"
+            python - <<'PYENV'
+import psycopg, psycopg_pool, psutil
+print('PSYCOPG='+psycopg.__version__)
+print('PSYCOPG_POOL='+psycopg_pool.__version__)
+print('PSUTIL='+psutil.__version__)
+PYENV
+            echo 'LSCPU_BEGIN'; lscpu || true; echo 'LSCPU_END'
+            echo 'DF_BEGIN'; df -T . || true; echo 'DF_END'
+            C="$(docker ps --filter ancestor=postgres:16.15 --format '{{.ID}}' | head -1)"
+            echo "POSTGRES_CONTAINER=$C"
+            docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc "SELECT current_setting('server_version'),current_setting('max_connections'),current_setting('fsync'),current_setting('synchronous_commit');"
+            docker stats --no-stream "$C" || true
+          } | tee phase2_artifacts/execution-environment.txt
+
+      - name: Build immutable reproduction runner outside production tree
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/run_reproduction.py" <<'PYRUN'
+import json
+import os
+import time
+from pathlib import Path
+from scripts import postgresql_32_worker_gate as gate
+
+DSN = os.environ['ARENYXA_POSTGRES_TEST_DSN']
+OUT = Path('phase2_artifacts')
+OUT.mkdir(exist_ok=True)
+
+def correctness(result):
+    inv = result.get('state_invariants') or {}
+    return (
+        not result.get('errors')
+        and result.get('completed') == result.get('jobs') == 1024
+        and result.get('non_completed') == 0
+        and bool((result.get('fencing_probe') or {}).get('passed'))
+        and all(int(inv.get(k, 1)) == 0 for k in ('inconsistent_lease_rows','unreceipted_completed_jobs','implausible_future_leases'))
+        and result.get('active_leases_after') == 0
+        and bool((result.get('pool') or {}).get('connection_storm_free'))
+    )
+
+all_summaries = []
+for round_no in range(1, 4):
+    captured = {'cycle': None}
+    original_percentile = gate._percentile
+    first_p99 = {'seen': False}
+    def capturing_percentile(values, percentile):
+        if percentile == 0.99 and not first_p99['seen']:
+            first_p99['seen'] = True
+            captured['cycle'] = list(values)
+        return original_percentile(values, percentile)
+    gate._percentile = capturing_percentile
+    started = time.perf_counter()
+    try:
+        result = gate.run_gate(DSN, workers=64, concurrency=128, jobs=1024, p99_budget_ms=500.0)
+    finally:
+        gate._percentile = original_percentile
+    wall = time.perf_counter() - started
+    values = captured['cycle'] or []
+    p999 = round(original_percentile(values, 0.999), 3) if values else None
+    metrics = list((result.get('pool') or {}).get('metrics') or [])
+    extras = {
+        'round': round_no,
+        'wall_duration_seconds_external': round(wall, 3),
+        'cycle_p99_9_ms': p999,
+        'pool_requests_wait_ms_total': round(sum(float(x.get('requests_wait_ms', 0.0) or 0.0) for x in metrics), 3),
+        'pool_requests_waiting_final': sum(int(x.get('requests_waiting', 0) or 0) for x in metrics),
+        'pool_acquisitions_total': sum(int(x.get('acquisitions', 0) or 0) for x in metrics),
+        'pool_acquisition_failures_total': sum(int(x.get('acquisition_failures', 0) or 0) for x in metrics),
+        'pool_size_total_final': sum(int(x.get('pool_size', 0) or 0) for x in metrics),
+        'pool_available_total_final': sum(int(x.get('pool_available', 0) or 0) for x in metrics),
+        'correctness_pass': correctness(result),
+    }
+    result['reproduction_extras'] = extras
+    (OUT / f'reproduction-run-{round_no}.json').write_text(json.dumps(result, indent=2, sort_keys=True), encoding='utf-8')
+    lat = result['latency_ms']
+    summary = {
+        'round': round_no,
+        'p50': lat['p50'], 'p95': lat['p95'], 'p99': lat['p99'], 'p999': p999, 'max': lat['max'],
+        'duration_seconds': result['duration_seconds'], 'throughput': result['throughput_jobs_per_second'],
+        'lease_p99': lat['phases']['lease_next']['p99'], 'start_p99': lat['phases']['start_job']['p99'], 'complete_p99': lat['phases']['complete']['p99'],
+        'completed': result['completed'], 'non_completed': result['non_completed'], 'errors': result['errors'],
+        'fencing': result['fencing_probe']['passed'], 'state_invariants': result['state_invariants'],
+        'active_leases_after': result['active_leases_after'], 'connection_storm_free': result['pool']['connection_storm_free'],
+        **extras,
+    }
+    all_summaries.append(summary)
+    print(json.dumps(summary, sort_keys=True), flush=True)
+
+payload = {'schema': 'arenyxa.phase2-reproduction/v1', 'rounds': all_summaries}
+(OUT / 'reproduction-summary.json').write_text(json.dumps(payload, indent=2, sort_keys=True), encoding='utf-8')
+if not all(x['correctness_pass'] for x in all_summaries):
+    raise SystemExit('correctness failure in reproduction gate')
+PYRUN
+          python -m py_compile "$RUNNER_TEMP/run_reproduction.py"
+
+      - name: Run fixed 64W 128C 1024J reproduction gate three consecutive rounds
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="$GITHUB_WORKSPACE" python "$RUNNER_TEMP/run_reproduction.py" | tee phase2_artifacts/reproduction-console.txt
+
+      - name: Capture final PostgreSQL state
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p phase2_artifacts
+          C="$(docker ps -a --filter ancestor=postgres:16.15 --format '{{.ID}}' | head -1)"
+          if [ -n "$C" ]; then
+            docker inspect "$C" > phase2_artifacts/postgres-inspect.json 2>&1 || true
+            docker logs "$C" > phase2_artifacts/postgres.log 2>&1 || true
+            docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc "SELECT current_setting('server_version'),current_setting('max_connections'),current_setting('fsync'),current_setting('synchronous_commit');" > phase2_artifacts/postgres-final-settings.txt 2>&1 || true
+          fi
+          git diff db1c1213b090e71320143273e9c51e049b861b87 -- src/arenyxa > phase2_artifacts/executed-source-final.diff || true
+          git diff -- scripts/postgresql_32_worker_gate.py scripts/postgresql_64_worker_128_concurrency_gate.py > phase2_artifacts/executed-scripts-final.diff || true
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: phase2-reconstructed-abg-reproduction
+          path: phase2_artifacts
+          retention-days: 7
