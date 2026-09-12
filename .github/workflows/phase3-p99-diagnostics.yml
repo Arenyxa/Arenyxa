@@ -2,7 +2,7 @@ name: Arenyxa Phase3 P99 Diagnostics
 
 on:
   push:
-    branches: ["phase3/disabled-during-plain-upload"]
+    branches: ["phase3/p99-database-warmtail-20260912"]
   workflow_dispatch:
 
 permissions:
@@ -29,12 +29,24 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with: {fetch-depth: 0}
-      - name: Materialize verified diagnostic harness
+      - name: Verify plain-text diagnostic harness identity
+        shell: bash
         run: |
-          echo "abbbbc32859bfb7da530349cffee854100d7752bcb159bc646d1c1b8ca8cbe5f  .github/phase3/phase3-harness.tar.gz" | sha256sum -c -
-          tar -xzf .github/phase3/phase3-harness.tar.gz -C .github/phase3
+          set -euo pipefail
+          cat > /tmp/phase3.sha256 <<'EOF'
+          ebf18ff7d2ef31431f486acb625ac94ea936bcf3d93d74a411016cf0894ec2d3  .github/phase3/variance_observer.py
+          e6b392be241cbeac24b004aa38fca254e076d4af62c5e841c4f0e45430a0f854  .github/phase3/timed_state_isolation.py
+          f829c6ae29abb076e9de8e1389e6e75789166c22fd814cd9e45ff53dcbe4f4f5  .github/phase3/phase3_db_prep.py
+          640c05e7fb045569db182eae92ddb225b2ae3453f8a3c9dafb41284e8887e619  .github/phase3/phase3_track3a.py
+          d7ba3173cfde84ffbb7eaac0ba88a3f14d00327b633eed68b88c145664ce5d24  .github/phase3/phase3_warm_tail.py
+          e0285ca487814d1b1275484f973e1861275d55d247c621929ecc4c5ad9c7fc88  .github/phase3/experiment_preflight.sh
+          85e4da54ff8261c0b42234731abf11d64078d05d439ad1fc8537518c4ba8e8f6  .github/phase3/configure_pg.sh
+          1989de52f9f8dfa611a4a477545602dd7e9eb03d204ef24ef66b8e69bb8fc4ff  .github/phase3/final_recheck.sh
+          19ae554643c7dfdd11d9af9a34deb0ed244daccd71aa3ab00a4bb8d3fbaca22d  .github/phase3/reconstructed-abg.patch
+          EOF
+          sha256sum -c /tmp/phase3.sha256
       - name: Freeze host and source
-        run: .github/phase3/experiment_preflight.sh phase3_track3a
+        run: bash .github/phase3/experiment_preflight.sh phase3_track3a
       - uses: actions/setup-python@v6
         with: {python-version: "3.11", cache: pip}
       - name: Install fixed dependencies
@@ -49,14 +61,14 @@ jobs:
           print('psycopg', psycopg.__version__, 'pool', psycopg_pool.__version__, 'psutil', psutil.__version__)
           PY
       - name: Configure PostgreSQL contract
-        run: .github/phase3/configure_pg.sh phase3_track3a
+        run: bash .github/phase3/configure_pg.sh phase3_track3a
       - name: Validate diagnostics
         run: python -m py_compile .github/phase3/variance_observer.py .github/phase3/timed_state_isolation.py .github/phase3/phase3_db_prep.py .github/phase3/phase3_track3a.py
       - name: Run paired A0 A1 replication and database-state decomposition
         run: PYTHONPATH="$GITHUB_WORKSPACE" python .github/phase3/phase3_track3a.py --dsn "$ARENYXA_POSTGRES_TEST_DSN" --out phase3_track3a
       - name: Final frozen-state recheck
         if: always()
-        run: .github/phase3/final_recheck.sh phase3_track3a
+        run: bash .github/phase3/final_recheck.sh phase3_track3a
       - uses: actions/upload-artifact@v6
         if: always()
         with:
@@ -81,12 +93,24 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with: {fetch-depth: 0}
-      - name: Materialize verified diagnostic harness
+      - name: Verify plain-text diagnostic harness identity
+        shell: bash
         run: |
-          echo "abbbbc32859bfb7da530349cffee854100d7752bcb159bc646d1c1b8ca8cbe5f  .github/phase3/phase3-harness.tar.gz" | sha256sum -c -
-          tar -xzf .github/phase3/phase3-harness.tar.gz -C .github/phase3
+          set -euo pipefail
+          cat > /tmp/phase3.sha256 <<'EOF'
+          ebf18ff7d2ef31431f486acb625ac94ea936bcf3d93d74a411016cf0894ec2d3  .github/phase3/variance_observer.py
+          e6b392be241cbeac24b004aa38fca254e076d4af62c5e841c4f0e45430a0f854  .github/phase3/timed_state_isolation.py
+          f829c6ae29abb076e9de8e1389e6e75789166c22fd814cd9e45ff53dcbe4f4f5  .github/phase3/phase3_db_prep.py
+          640c05e7fb045569db182eae92ddb225b2ae3453f8a3c9dafb41284e8887e619  .github/phase3/phase3_track3a.py
+          d7ba3173cfde84ffbb7eaac0ba88a3f14d00327b633eed68b88c145664ce5d24  .github/phase3/phase3_warm_tail.py
+          e0285ca487814d1b1275484f973e1861275d55d247c621929ecc4c5ad9c7fc88  .github/phase3/experiment_preflight.sh
+          85e4da54ff8261c0b42234731abf11d64078d05d439ad1fc8537518c4ba8e8f6  .github/phase3/configure_pg.sh
+          1989de52f9f8dfa611a4a477545602dd7e9eb03d204ef24ef66b8e69bb8fc4ff  .github/phase3/final_recheck.sh
+          19ae554643c7dfdd11d9af9a34deb0ed244daccd71aa3ab00a4bb8d3fbaca22d  .github/phase3/reconstructed-abg.patch
+          EOF
+          sha256sum -c /tmp/phase3.sha256
       - name: Freeze host and source
-        run: .github/phase3/experiment_preflight.sh phase3_track3b
+        run: bash .github/phase3/experiment_preflight.sh phase3_track3b
       - uses: actions/setup-python@v6
         with: {python-version: "3.11", cache: pip}
       - name: Install fixed dependencies
@@ -100,14 +124,14 @@ jobs:
           assert psycopg_pool.__version__ == '3.3.1'
           PY
       - name: Configure PostgreSQL contract
-        run: .github/phase3/configure_pg.sh phase3_track3b
+        run: bash .github/phase3/configure_pg.sh phase3_track3b
       - name: Validate diagnostics
         run: python -m py_compile .github/phase3/phase3_warm_tail.py
       - name: Run warm-state profiler calibration and lease-tail attribution
         run: PYTHONPATH="$GITHUB_WORKSPACE" python .github/phase3/phase3_warm_tail.py --dsn "$ARENYXA_POSTGRES_TEST_DSN" --out phase3_track3b --max-runs 30
       - name: Final frozen-state recheck
         if: always()
-        run: .github/phase3/final_recheck.sh phase3_track3b
+        run: bash .github/phase3/final_recheck.sh phase3_track3b
       - uses: actions/upload-artifact@v6
         if: always()
         with:
