@@ -1,1 +1,1 @@
-phase2 timed-window isolation trigger 2026-09-12
+phase2 diagnostics revision 2
