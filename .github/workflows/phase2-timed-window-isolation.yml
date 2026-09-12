@@ -2,7 +2,7 @@ name: Arenyxa Phase2 Timed Window Isolation
 
 on:
   push:
-    branches: ["phase2/timed-window-isolation-20260912"]
+    branches: ["phase2/timed-window-isolation-run-20260912"]
   workflow_dispatch:
 
 permissions:
