@@ -1,0 +1,158 @@
+name: Arenyxa Phase2 Cold Warm Variance
+
+on:
+  push:
+    branches:
+      - phase2/reconstructed-abg-variance-20260912
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  characterize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16.15
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
+      ARENYXA_PHASE2_VARIANCE_ROUNDS: "12"
+      ARENYXA_PHASE2_SAMPLE_INTERVAL_S: "0.25"
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Freeze source and release gate identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git merge-base HEAD db1c1213b090e71320143273e9c51e049b861b87)" = "db1c1213b090e71320143273e9c51e049b861b87"
+          test "$(sha256sum scripts/postgresql_32_worker_gate.py | awk '{print $1}')" = "1dcb09ea7490abebb8e73546178415530adc852422a0346b8d72de56e5322657"
+          test "$(sha256sum scripts/postgresql_64_worker_128_concurrency_gate.py | awk '{print $1}')" = "ba766b7e02b0f511c1e721628e8e0d615adada27b24918762a73bc1ef7762588"
+          git apply --check .github/phase2/reconstructed-abg.patch
+          git apply .github/phase2/reconstructed-abg.patch
+          test "$(sha256sum src/arenyxa/enterprise/runtime_storage.py | awk '{print $1}')" = "5702ee19406e72525c96d848eeb7b909141872e0d8c0ebdb29c149b4d596594a"
+          test "$(sha256sum src/arenyxa/enterprise/distributed_queue.py | awk '{print $1}')" = "8d34fef8df28b3ef7521dd2c465aa2bdf8a6217244635f151c6f752d704c2ccd"
+          test "$(git diff --name-only db1c1213b090e71320143273e9c51e049b861b87 -- src/arenyxa | sort | tr '\n' ' ')" = "src/arenyxa/enterprise/distributed_queue.py src/arenyxa/enterprise/runtime_storage.py "
+          test -z "$(git diff -- scripts/postgresql_32_worker_gate.py scripts/postgresql_64_worker_128_concurrency_gate.py)"
+          mkdir -p phase2_variance_artifacts
+          git diff db1c1213b090e71320143273e9c51e049b861b87 -- src/arenyxa > phase2_variance_artifacts/executed-source.diff
+          git diff -- scripts/postgresql_32_worker_gate.py scripts/postgresql_64_worker_128_concurrency_gate.py > phase2_variance_artifacts/executed-scripts.diff
+          sha256sum src/arenyxa/enterprise/runtime_storage.py src/arenyxa/enterprise/distributed_queue.py scripts/postgresql_32_worker_gate.py scripts/postgresql_64_worker_128_concurrency_gate.py > phase2_variance_artifacts/source-hashes-before.sha256
+
+      - name: Install fixed project dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,database]" psutil
+          python - <<'PY'
+          import psycopg, psycopg_pool, psutil, sys
+          print(sys.version)
+          print('psycopg', psycopg.__version__)
+          print('psycopg_pool', psycopg_pool.__version__)
+          print('psutil', psutil.__version__)
+          assert sys.version_info[:3] == (3, 11, 16)
+          assert psycopg.__version__ == '3.3.5'
+          assert psycopg_pool.__version__ == '3.3.1'
+          PY
+
+      - name: Configure PostgreSQL max_connections only and freeze durability
+        shell: bash
+        run: |
+          set -euo pipefail
+          C="$(docker ps --filter ancestor=postgres:16.15 --format '{{.ID}}' | head -1)"
+          test -n "$C"
+          BEFORE_MAX="$(docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW max_connections')"
+          docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET max_connections = '256';"
+          docker restart "$C"
+          READY=0
+          for i in $(seq 1 45); do
+            if docker exec "$C" pg_isready -U arenyxa -d arenyxa_ci >/dev/null 2>&1; then READY=1; break; fi
+            sleep 2
+          done
+          test "$READY" = 1
+          SERVER_VERSION="$(docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW server_version')"
+          SERVER_NUM="$(docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW server_version_num')"
+          MAX_CONN="$(docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW max_connections')"
+          FSYNC="$(docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW fsync')"
+          SYNC_COMMIT="$(docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW synchronous_commit')"
+          test "$SERVER_NUM" = "160015"
+          test "$MAX_CONN" = "256"
+          test "$FSYNC" = "on"
+          test "$SYNC_COMMIT" = "on"
+          printf 'before_max_connections=%s\nserver_version=%s\nserver_version_num=%s\nmax_connections=%s\nfsync=%s\nsynchronous_commit=%s\n' "$BEFORE_MAX" "$SERVER_VERSION" "$SERVER_NUM" "$MAX_CONN" "$FSYNC" "$SYNC_COMMIT" | tee phase2_variance_artifacts/postgresql-settings.txt
+
+      - name: Freeze 4-CPU execution environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(. /etc/os-release; echo "$VERSION_ID")" = "24.04"
+          test "$(uname -r)" = "6.17.0-1022-azure"
+          test "$(nproc)" = "4"
+          grep -q $'Cpus_allowed_list:\t0-3' /proc/self/status
+          CPU_MODEL="$(lscpu | awk -F: '/Model name/ {gsub(/^[ \t]+/,"",$2); print $2}')"
+          test "$CPU_MODEL" = "INTEL(R) XEON(R) PLATINUM 8573C"
+          FSTYPE="$(df -T . | awk 'NR==2 {print $2}')"
+          test "$FSTYPE" = "ext4"
+          {
+            echo "OS=$(cat /etc/os-release | tr '\n' ' ')"
+            echo "KERNEL=$(uname -a)"
+            echo "CPU_COUNT=$(nproc)"
+            echo "CPU_MODEL=$CPU_MODEL"
+            grep -E 'Cpus_allowed_list|Mems_allowed_list' /proc/self/status || true
+            echo "RAM_BYTES=$(awk '/MemTotal/ {print $2*1024}' /proc/meminfo)"
+            echo "PYTHON=$(python --version 2>&1)"
+            echo "FILESYSTEM=$FSTYPE"
+            lscpu
+          } | tee phase2_variance_artifacts/execution-environment.txt
+
+      - name: Validate diagnostic harness
+        run: |
+          python -m py_compile .github/phase2/variance_observer.py
+
+      - name: Run 12 continuous gates with low-overhead state observation
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="$GITHUB_WORKSPACE" python .github/phase2/variance_observer.py | tee phase2_variance_artifacts/variance-console.txt
+
+      - name: Recheck frozen source and PostgreSQL after all runs
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p phase2_variance_artifacts
+          sha256sum src/arenyxa/enterprise/runtime_storage.py src/arenyxa/enterprise/distributed_queue.py scripts/postgresql_32_worker_gate.py scripts/postgresql_64_worker_128_concurrency_gate.py > phase2_variance_artifacts/source-hashes-after.sha256 || true
+          git diff -- scripts/postgresql_32_worker_gate.py scripts/postgresql_64_worker_128_concurrency_gate.py > phase2_variance_artifacts/executed-scripts-final.diff || true
+          git diff db1c1213b090e71320143273e9c51e049b861b87 -- src/arenyxa > phase2_variance_artifacts/executed-source-final.diff || true
+          C="$(docker ps -a --filter ancestor=postgres:16.15 --format '{{.ID}}' | head -1)"
+          if [ -n "$C" ]; then
+            docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc "SELECT current_setting('server_version'),current_setting('max_connections'),current_setting('fsync'),current_setting('synchronous_commit'),current_setting('track_io_timing'),current_setting('track_wal_io_timing'),current_setting('shared_preload_libraries');" > phase2_variance_artifacts/postgresql-final-settings.txt 2>&1 || true
+            docker inspect "$C" > phase2_variance_artifacts/postgres-inspect.json 2>&1 || true
+            docker logs "$C" > phase2_variance_artifacts/postgres.log 2>&1 || true
+          fi
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: phase2-cold-warm-variance
+          path: phase2_variance_artifacts
+          retention-days: 7
