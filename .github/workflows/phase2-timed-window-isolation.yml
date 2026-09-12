@@ -1,0 +1,152 @@
+name: Arenyxa Phase2 Timed Window Isolation
+
+on:
+  push:
+    branches: ["phase2/timed-window-isolation-20260912"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
+
+jobs:
+  state-isolation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16.15
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v6
+        with: {fetch-depth: 0}
+      - name: Materialize diagnostic harness
+        run: tar -xzf .github/phase2/timed-window-harness.tar.gz -C .github/phase2
+      - name: Freeze host and source
+        run: .github/phase2/experiment_preflight.sh phase2_state_isolation
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.11", cache: pip}
+      - name: Install fixed dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,database]" psutil
+          python - <<'PY'
+          import psycopg, psycopg_pool, psutil, sys
+          assert sys.version_info[:3] == (3,11,16)
+          assert psycopg.__version__ == '3.3.5'
+          assert psycopg_pool.__version__ == '3.3.1'
+          print('psycopg', psycopg.__version__, 'pool', psycopg_pool.__version__, 'psutil', psutil.__version__)
+          PY
+      - name: Configure PostgreSQL contract
+        run: .github/phase2/configure_pg.sh phase2_state_isolation
+      - name: Validate diagnostic harness
+        run: python -m py_compile .github/phase2/timed_state_isolation.py .github/phase2/state_isolation_orchestrator.py
+      - name: Run A0 A1 A2 A3 timed-window state isolation
+        run: PYTHONPATH="$GITHUB_WORKSPACE" python .github/phase2/state_isolation_orchestrator.py --dsn "$ARENYXA_POSTGRES_TEST_DSN" --out phase2_state_isolation
+      - name: Final frozen-state recheck
+        if: always()
+        run: .github/phase2/final_recheck.sh phase2_state_isolation
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: phase2-state-isolation
+          path: phase2_state_isolation
+          retention-days: 7
+
+  a0-replicate:
+    strategy:
+      fail-fast: false
+      matrix: {replicate: [1, 2, 3]}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16.15
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v6
+        with: {fetch-depth: 0}
+      - name: Materialize diagnostic harness
+        run: tar -xzf .github/phase2/timed-window-harness.tar.gz -C .github/phase2
+      - name: Freeze host and source
+        run: .github/phase2/experiment_preflight.sh phase2_a0_${{ matrix.replicate }}
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.11", cache: pip}
+      - name: Install fixed dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,database]" psutil
+      - name: Configure PostgreSQL contract
+        run: .github/phase2/configure_pg.sh phase2_a0_${{ matrix.replicate }}
+      - name: Validate diagnostic harness
+        run: python -m py_compile .github/phase2/timed_state_isolation.py
+      - name: Fresh DB plus fresh runtime control
+        run: PYTHONPATH="$GITHUB_WORKSPACE" python .github/phase2/timed_state_isolation.py --dsn "$ARENYXA_POSTGRES_TEST_DSN" --mode measure-fresh --output phase2_a0_${{ matrix.replicate }}/A0-replicate-${{ matrix.replicate }}.json
+      - name: Final frozen-state recheck
+        if: always()
+        run: .github/phase2/final_recheck.sh phase2_a0_${{ matrix.replicate }}
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: phase2-a0-replicate-${{ matrix.replicate }}
+          path: phase2_a0_${{ matrix.replicate }}
+          retention-days: 7
+
+  maintenance-trace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16.15
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v6
+        with: {fetch-depth: 0}
+      - name: Materialize diagnostic harness
+        run: tar -xzf .github/phase2/timed-window-harness.tar.gz -C .github/phase2
+      - name: Freeze host and source
+        run: .github/phase2/experiment_preflight.sh phase2_maintenance
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.11", cache: pip}
+      - name: Install fixed dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,database]" psutil
+      - name: Configure PostgreSQL contract
+        run: .github/phase2/configure_pg.sh phase2_maintenance
+      - name: Validate diagnostic harness
+        run: python -m py_compile .github/phase2/timed_state_isolation.py .github/phase2/maintenance_trace.py
+      - name: Run 20 continuous gates with cycle and maintenance timeline
+        run: PYTHONPATH="$GITHUB_WORKSPACE" python .github/phase2/maintenance_trace.py --dsn "$ARENYXA_POSTGRES_TEST_DSN" --runs 20 --out phase2_maintenance
+      - name: Final frozen-state recheck
+        if: always()
+        run: .github/phase2/final_recheck.sh phase2_maintenance
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: phase2-maintenance-trace
+          path: phase2_maintenance
+          retention-days: 7
