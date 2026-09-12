@@ -110,8 +110,8 @@ s.initialize_schema(DISTRIBUTED_SCHEMA, CURRENT_PROTOCOL, MIN_COMPATIBLE_PROTOCO
 with s.connection() as c:
     rows = c.execute("""SELECT c.relname,c.relkind,pg_relation_size(c.oid) AS bytes
       FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-      WHERE n.nspname=current_schema() AND c.relname LIKE 'distributed_%' ORDER BY c.relname""").fetchall()
-    c.execute("SELECT indexname,indexdef FROM pg_indexes WHERE schemaname=current_schema() AND tablename LIKE 'distributed_%'").fetchall()
+      WHERE n.nspname=current_schema() AND c.relname LIKE ? ORDER BY c.relname""", ("distributed_%",)).fetchall()
+    c.execute("SELECT indexname,indexdef FROM pg_indexes WHERE schemaname=current_schema() AND tablename LIKE ?", ("distributed_%",)).fetchall()
 s.close()
 open(os.environ["P3_OUT"], "w", encoding="utf-8").write(json.dumps({"relations":[[str(x[0]),str(x[1]),int(x[2])] for x in rows]}, indent=2))
 '''
