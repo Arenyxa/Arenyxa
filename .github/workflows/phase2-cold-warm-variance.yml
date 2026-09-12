@@ -32,6 +32,36 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Freeze exact 4-CPU host before experiment setup
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p phase2_variance_artifacts
+          OS_VERSION="$(. /etc/os-release; echo "$VERSION_ID")"
+          KERNEL="$(uname -r)"
+          CPU_COUNT="$(nproc)"
+          CPU_ALLOWED="$(awk -F: '/Cpus_allowed_list/ {gsub(/[ \t]/,"",$2); print $2}' /proc/self/status)"
+          CPU_MODEL="$(lscpu | awk -F: '/Model name/ {gsub(/^[ \t]+/,"",$2); print $2}')"
+          FSTYPE="$(df -T . | awk 'NR==2 {print $2}')"
+          RAM_BYTES="$(awk '/MemTotal/ {print $2*1024}' /proc/meminfo)"
+          {
+            echo "OS_VERSION=$OS_VERSION"
+            echo "KERNEL=$KERNEL"
+            echo "CPU_COUNT=$CPU_COUNT"
+            echo "CPU_ALLOWED=$CPU_ALLOWED"
+            echo "CPU_MODEL=$CPU_MODEL"
+            echo "RAM_BYTES=$RAM_BYTES"
+            echo "FILESYSTEM=$FSTYPE"
+            lscpu
+          } | tee phase2_variance_artifacts/execution-environment.txt
+          test "$OS_VERSION" = "24.04"
+          test "$KERNEL" = "6.17.0-1022-azure"
+          test "$CPU_COUNT" = "4"
+          test "$CPU_ALLOWED" = "0-3"
+          test "$CPU_MODEL" = "INTEL(R) XEON(R) PLATINUM 8573C"
+          test "$FSTYPE" = "ext4"
+
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
@@ -50,7 +80,6 @@ jobs:
           test "$(sha256sum src/arenyxa/enterprise/distributed_queue.py | awk '{print $1}')" = "8d34fef8df28b3ef7521dd2c465aa2bdf8a6217244635f151c6f752d704c2ccd"
           test "$(git diff --name-only db1c1213b090e71320143273e9c51e049b861b87 -- src/arenyxa | sort | tr '\n' ' ')" = "src/arenyxa/enterprise/distributed_queue.py src/arenyxa/enterprise/runtime_storage.py "
           test -z "$(git diff -- scripts/postgresql_32_worker_gate.py scripts/postgresql_64_worker_128_concurrency_gate.py)"
-          mkdir -p phase2_variance_artifacts
           git diff db1c1213b090e71320143273e9c51e049b861b87 -- src/arenyxa > phase2_variance_artifacts/executed-source.diff
           git diff -- scripts/postgresql_32_worker_gate.py scripts/postgresql_64_worker_128_concurrency_gate.py > phase2_variance_artifacts/executed-scripts.diff
           sha256sum src/arenyxa/enterprise/runtime_storage.py src/arenyxa/enterprise/distributed_queue.py scripts/postgresql_32_worker_gate.py scripts/postgresql_64_worker_128_concurrency_gate.py > phase2_variance_artifacts/source-hashes-before.sha256
@@ -68,6 +97,8 @@ jobs:
           assert sys.version_info[:3] == (3, 11, 16)
           assert psycopg.__version__ == '3.3.5'
           assert psycopg_pool.__version__ == '3.3.1'
+          with open('phase2_variance_artifacts/python-environment.txt','w',encoding='utf-8') as f:
+              f.write(f'python={sys.version}\npsycopg={psycopg.__version__}\npsycopg_pool={psycopg_pool.__version__}\npsutil={psutil.__version__}\n')
           PY
 
       - name: Configure PostgreSQL max_connections only and freeze durability
@@ -79,7 +110,12 @@ jobs:
           BEFORE_MAX="$(docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW max_connections')"
           docker exec "$C" psql -U arenyxa -d arenyxa_ci -c "ALTER SYSTEM SET max_connections = '256';"
           docker restart "$C"
-          for i in $(seq 1 45); do docker exec "$C" pg_isready -U arenyxa -d arenyxa_ci >/dev/null 2>&1 && break; sleep 2; done
+          READY=0
+          for i in $(seq 1 45); do
+            if docker exec "$C" pg_isready -U arenyxa -d arenyxa_ci >/dev/null 2>&1; then READY=1; break; fi
+            sleep 2
+          done
+          test "$READY" = 1
           SERVER_VERSION="$(docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW server_version')"
           SERVER_NUM="$(docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW server_version_num')"
           MAX_CONN="$(docker exec "$C" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW max_connections')"
@@ -90,35 +126,6 @@ jobs:
           test "$MAX_CONN" = "256"
           test "$FSYNC" = "on"
           test "$SYNC_COMMIT" = "on"
-
-      - name: Freeze exact 4-CPU execution environment
-        shell: bash
-        run: |
-          set -euo pipefail
-          OS_VERSION="$(. /etc/os-release; echo "$VERSION_ID")"
-          KERNEL="$(uname -r)"
-          CPU_COUNT="$(nproc)"
-          CPU_ALLOWED="$(awk -F: '/Cpus_allowed_list/ {gsub(/[ \t]/,"",$2); print $2}' /proc/self/status)"
-          CPU_MODEL="$(lscpu | awk -F: '/Model name/ {gsub(/^[ \t]+/,"",$2); print $2}')"
-          FSTYPE="$(df -T . | awk 'NR==2 {print $2}')"
-          RAM_BYTES="$(awk '/MemTotal/ {print $2*1024}' /proc/meminfo)"
-          {
-            echo "OS_VERSION=$OS_VERSION"
-            echo "KERNEL=$KERNEL"
-            echo "CPU_COUNT=$CPU_COUNT"
-            echo "CPU_ALLOWED=$CPU_ALLOWED"
-            echo "CPU_MODEL=$CPU_MODEL"
-            echo "RAM_BYTES=$RAM_BYTES"
-            echo "FILESYSTEM=$FSTYPE"
-            echo "PYTHON=$(python --version 2>&1)"
-            lscpu
-          } | tee phase2_variance_artifacts/execution-environment.txt
-          test "$OS_VERSION" = "24.04"
-          test "$KERNEL" = "6.17.0-1022-azure"
-          test "$CPU_COUNT" = "4"
-          test "$CPU_ALLOWED" = "0-3"
-          test "$CPU_MODEL" = "INTEL(R) XEON(R) PLATINUM 8573C"
-          test "$FSTYPE" = "ext4"
 
       - name: Validate diagnostic harness
         run: python -m py_compile .github/phase2/variance_observer.py
