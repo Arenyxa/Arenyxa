@@ -63,6 +63,7 @@ jobs:
           retention-days: 7
 
   a0-replicate:
+    if: ${{ false }}
     strategy:
       fail-fast: false
       matrix: {replicate: [1, 2, 3]}
@@ -109,6 +110,7 @@ jobs:
           retention-days: 7
 
   maintenance-trace:
+    if: ${{ false }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     services:
