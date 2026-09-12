@@ -45,6 +45,34 @@ jobs:
           19ae554643c7dfdd11d9af9a34deb0ed244daccd71aa3ab00a4bb8d3fbaca22d  .github/phase3/reconstructed-abg.patch
           EOF
           sha256sum -c /tmp/phase3.sha256
+      - name: Apply audited diagnostic-only runtime fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('.github/phase3/phase3_track3a.py')
+          s = p.read_text(encoding='utf-8')
+          assert '"request_offset_ms"' in s and '"complete_offset_ms"' in s
+          s = s.replace('"request_offset_ms"', '"start_offset_ms"').replace('"complete_offset_ms"', '"finish_offset_ms"')
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('.github/phase3/phase3_warm_tail.py')
+          s = p.read_text(encoding='utf-8')
+          patterns = [
+              'arenyxa_pool_health', 'eligible_worker', 'distributed_jobs',
+              'distributed_job_idempotency', 'completed', 'started', 'distributed_workers'
+          ]
+          for pat in patterns:
+              old = f"ILIKE '%{pat}%'"
+              new = f"ILIKE '%%{pat}%%'"
+              assert old in s, old
+              s = s.replace(old, new)
+          p.write_text(s, encoding='utf-8')
+          PY
+          echo "0dce244f1f218821b54c838dbe0a8e2e640bd05707bcc3e93b23175777e53f90  .github/phase3/phase3_track3a.py" | sha256sum -c -
+          echo "c75026487612e4f55dfb7721fec3665c0e02637d25cfef059e1e0f4b20a6a168  .github/phase3/phase3_warm_tail.py" | sha256sum -c -
       - name: Freeze host and source
         run: bash .github/phase3/experiment_preflight.sh phase3_track3a
       - uses: actions/setup-python@v6
@@ -109,6 +137,34 @@ jobs:
           19ae554643c7dfdd11d9af9a34deb0ed244daccd71aa3ab00a4bb8d3fbaca22d  .github/phase3/reconstructed-abg.patch
           EOF
           sha256sum -c /tmp/phase3.sha256
+      - name: Apply audited diagnostic-only runtime fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('.github/phase3/phase3_track3a.py')
+          s = p.read_text(encoding='utf-8')
+          assert '"request_offset_ms"' in s and '"complete_offset_ms"' in s
+          s = s.replace('"request_offset_ms"', '"start_offset_ms"').replace('"complete_offset_ms"', '"finish_offset_ms"')
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('.github/phase3/phase3_warm_tail.py')
+          s = p.read_text(encoding='utf-8')
+          patterns = [
+              'arenyxa_pool_health', 'eligible_worker', 'distributed_jobs',
+              'distributed_job_idempotency', 'completed', 'started', 'distributed_workers'
+          ]
+          for pat in patterns:
+              old = f"ILIKE '%{pat}%'"
+              new = f"ILIKE '%%{pat}%%'"
+              assert old in s, old
+              s = s.replace(old, new)
+          p.write_text(s, encoding='utf-8')
+          PY
+          echo "0dce244f1f218821b54c838dbe0a8e2e640bd05707bcc3e93b23175777e53f90  .github/phase3/phase3_track3a.py" | sha256sum -c -
+          echo "c75026487612e4f55dfb7721fec3665c0e02637d25cfef059e1e0f4b20a6a168  .github/phase3/phase3_warm_tail.py" | sha256sum -c -
       - name: Freeze host and source
         run: bash .github/phase3/experiment_preflight.sh phase3_track3b
       - uses: actions/setup-python@v6
