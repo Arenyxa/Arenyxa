@@ -1,8 +1,8 @@
-name: Arenyxa Phase6 Ordinary Lease Local Only
+name: Arenyxa Phase6 Ordinary Lease Minimal Observer
 
 on:
   push:
-    branches: ["phase6/ordinary-lease-local-only-20260912"]
+    branches: ["phase6/ordinary-lease-minimal-20260912"]
     paths: [".github/phase6/**", ".github/workflows/phase6-ordinary-lease.yml"]
   workflow_dispatch:
 
@@ -63,9 +63,9 @@ jobs:
         run: |
           set -euo pipefail
           PYTHONPATH="$GITHUB_WORKSPACE/.github/phase6:$GITHUB_WORKSPACE" python -m pytest -c /dev/null -p no:cacheprovider -q .github/phase6/test_phase6_math.py | tee phase6/tracer-tests.txt
-      - name: Calibrate local-only observer then capture forty warm gates
+      - name: Calibrate reduced observer then capture forty warm gates
         run: |
-          PYTHONPATH="$GITHUB_WORKSPACE/.github/phase6:$GITHUB_WORKSPACE" python .github/phase6/phase6_local_only.py --dsn "$ARENYXA_POSTGRES_TEST_DSN" --out phase6 --runs 40
+          PYTHONPATH="$GITHUB_WORKSPACE/.github/phase6:$GITHUB_WORKSPACE" python .github/phase6/phase6_minimal.py --dsn "$ARENYXA_POSTGRES_TEST_DSN" --out phase6 --runs 40
       - name: Final source and gate recheck
         if: always()
         run: |
@@ -73,10 +73,10 @@ jobs:
           .github/phase2/final_recheck.sh phase6
           git ls-files src | xargs sha256sum > phase6/all-source-after.sha256
           cmp phase6/all-source-before.sha256 phase6/all-source-after.sha256
-          cp .github/phase6/phase6_trace.py .github/phase6/phase6_math.py .github/phase6/phase6_local_only.py .github/phase6/DESIGN.md phase6/
+          cp .github/phase6/phase6_trace.py .github/phase6/phase6_math.py .github/phase6/phase6_minimal.py .github/phase6/DESIGN.md phase6/
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: phase6-ordinary-lease-local-only
+          name: phase6-ordinary-lease-minimal
           path: phase6
           retention-days: 14
