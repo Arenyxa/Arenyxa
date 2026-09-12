@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   characterize:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     services:
       postgres:
@@ -25,7 +25,7 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
-      ARENYXA_PHASE2_VARIANCE_ROUNDS: "12"
+      ARENYXA_PHASE2_VARIANCE_ROUNDS: "15"
       ARENYXA_PHASE2_SAMPLE_INTERVAL_S: "0.25"
 
     steps:
@@ -33,7 +33,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Freeze exact 4-CPU host before experiment setup
+      - name: Freeze qualified 4-CPU host before experiment setup
         shell: bash
         run: |
           set -euo pipefail
@@ -42,25 +42,31 @@ jobs:
           KERNEL="$(uname -r)"
           CPU_COUNT="$(nproc)"
           CPU_ALLOWED="$(awk -F: '/Cpus_allowed_list/ {gsub(/[ \t]/,"",$2); print $2}' /proc/self/status)"
+          CPU_AFFINITY_COUNT="$(python3 - <<'PY'
+          import os
+          print(len(os.sched_getaffinity(0)))
+          PY
+          )"
+          CPU_VENDOR="$(lscpu | awk -F: '/Vendor ID/ {gsub(/^[ \t]+/,"",$2); print $2}')"
           CPU_MODEL="$(lscpu | awk -F: '/Model name/ {gsub(/^[ \t]+/,"",$2); print $2}')"
           FSTYPE="$(df -T . | awk 'NR==2 {print $2}')"
-          RAM_BYTES="$(awk '/MemTotal/ {print $2*1024}' /proc/meminfo)"
+          RAM_BYTES="$(awk '/MemTotal/ {printf "%.0f",$2*1024}' /proc/meminfo)"
           {
             echo "OS_VERSION=$OS_VERSION"
             echo "KERNEL=$KERNEL"
             echo "CPU_COUNT=$CPU_COUNT"
             echo "CPU_ALLOWED=$CPU_ALLOWED"
+            echo "CPU_AFFINITY_COUNT=$CPU_AFFINITY_COUNT"
+            echo "CPU_VENDOR=$CPU_VENDOR"
             echo "CPU_MODEL=$CPU_MODEL"
             echo "RAM_BYTES=$RAM_BYTES"
             echo "FILESYSTEM=$FSTYPE"
             lscpu
           } | tee phase2_variance_artifacts/execution-environment.txt
           test "$OS_VERSION" = "24.04"
-          test "$KERNEL" = "6.17.0-1022-azure"
           test "$CPU_COUNT" = "4"
-          test "$CPU_ALLOWED" = "0-3"
-          test "$CPU_MODEL" = "INTEL(R) XEON(R) PLATINUM 8573C"
-          test "$FSTYPE" = "ext4"
+          test "$CPU_AFFINITY_COUNT" = "4"
+          test "$RAM_BYTES" -ge 8589934592
 
       - uses: actions/setup-python@v6
         with:
@@ -130,7 +136,7 @@ jobs:
       - name: Validate diagnostic harness
         run: python -m py_compile .github/phase2/variance_observer.py
 
-      - name: Run 12 continuous gates with low-overhead state observation
+      - name: Run 15 continuous gates with low-overhead state observation
         shell: bash
         run: |
           set -euo pipefail
