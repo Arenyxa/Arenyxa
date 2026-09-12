@@ -1,14 +1,27 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
+import os
 import statistics
 from pathlib import Path
 
 import psycopg
 
 from scripts import postgresql_32_worker_gate as gate
-from .github_phase3_import_helper import load_recovery_probe
+
+ROOT = Path(os.environ.get('GITHUB_WORKSPACE', os.getcwd()))
+
+
+def load_recovery_probe():
+    path = ROOT / '.github/phase3/phase3_recovery_probe.py'
+    spec = importlib.util.spec_from_file_location('phase3_recovery_probe', path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f'cannot load {path}')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def main() -> int:
@@ -61,15 +74,18 @@ def main() -> int:
             successful = [x for x in t['lease_calls'] if x['returned']]
             recovery = [x for x in successful if x['recovery_children']]
             ordinary = [x for x in successful if not x['recovery_children']]
+
             def dist(rows):
                 vals = sorted(float(x['client_ms']) for x in rows)
                 if not vals:
                     return {'count': 0, 'median': None, 'p95': None, 'p99': None, 'max': None}
                 pick = lambda q: vals[min(len(vals)-1, max(0, round((len(vals)-1)*q)))]
                 return {'count': len(vals), 'median': statistics.median(vals), 'p95': pick(.95), 'p99': pick(.99), 'max': max(vals)}
+
             top20 = sorted(successful, key=lambda x: float(x['client_ms']), reverse=True)[:20]
             entry = {
-                'run': i, **c,
+                'run': i,
+                **c,
                 'genuine_failure': float(c['p99']) > 500.0,
                 'successful_leases': len(successful),
                 'recovery_calls': len(recovery),
@@ -83,7 +99,7 @@ def main() -> int:
             runs.append(entry)
             all_successful.extend({**x, 'run': i} for x in successful)
             (args.out / f'warm-run-{i:02d}.json').write_text(json.dumps({'summary': entry, 'trace': t}, indent=2, sort_keys=True), encoding='utf-8')
-            print(json.dumps({k:v for k,v in entry.items() if k not in {'top20'}}, sort_keys=True), flush=True)
+            print(json.dumps({k:v for k,v in entry.items() if k != 'top20'}, sort_keys=True), flush=True)
             if i >= 40 and failures >= 5:
                 break
             if i >= args.max_runs:
