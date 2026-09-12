@@ -2,7 +2,7 @@ name: Arenyxa Phase3 P99 Diagnostics
 
 on:
   push:
-    branches: ["phase3/p99-database-warmtail-20260912"]
+    branches: ["phase3/disabled-during-plain-upload"]
   workflow_dispatch:
 
 permissions:
