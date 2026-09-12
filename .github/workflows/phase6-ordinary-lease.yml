@@ -39,7 +39,12 @@ jobs:
           git ls-files src | xargs sha256sum > phase6/all-source-before.sha256
           git rev-parse HEAD > phase6/diagnostic-head.txt
           cat /proc/sys/kernel/random/boot_id > phase6/host-boot-id.txt
-          cat /sys/fs/cgroup/cpu.max > phase6/cpu-quota.txt
+          {
+            cat /proc/self/cgroup
+            for f in /sys/fs/cgroup/cpu.max /sys/fs/cgroup/cpu/cpu.cfs_quota_us /sys/fs/cgroup/cpu/cpu.cfs_period_us /sys/fs/cgroup/cpu,cpuacct/cpu.cfs_quota_us /sys/fs/cgroup/cpu,cpuacct/cpu.cfs_period_us; do
+              if test -r "$f"; then echo "$f"; cat "$f"; fi
+            done
+          } > phase6/cpu-quota.txt
       - uses: actions/setup-python@v6
         with: {python-version: "3.11.16", cache: pip}
       - name: Install experiment dependencies
