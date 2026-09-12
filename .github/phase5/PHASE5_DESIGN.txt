@@ -1,0 +1,8 @@
+Phase 5 diagnostic-only design
+- no production source changes
+- no PostgreSQL polling observer during timed workload
+- OFF -> ON -> OFF -> ON zero-SQL tracer calibration
+- one diagnostic first-run/precondition is excluded from warm-tail statistics only
+- collect at least 40 warm runs; after 40 stop if >=5 genuine P99>500ms failures, otherwise continue to 60
+- bounded in-memory tracing; dump only after each run
+- preserve all run results, top-20 per run, global top-100, recovery timing, task submit/start timing, local process scheduling counters
