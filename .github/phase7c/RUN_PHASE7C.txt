@@ -1,0 +1,5 @@
+campaign=phase7c-host-instance-attribution-v1
+branch=phase7c/host-instance-attribution-20260913
+production_base=3726289355ebe2a253ae8da1b8b4645e01244830
+source_zip_sha256=72360b9e1598fa1c2f3166f9637ab012342c404d6ff38d3269c5f659eb05be0f
+trigger=execute-once
