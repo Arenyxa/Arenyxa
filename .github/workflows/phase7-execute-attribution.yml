@@ -1,0 +1,92 @@
+name: Arenyxa Phase7 Execute Internal Attribution
+
+on:
+  push:
+    branches: ["phase7/execute-internal-attribution-20260913"]
+    paths: [".github/phase7/**", ".github/workflows/phase7-execute-attribution.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa_ci@127.0.0.1:5432/arenyxa_ci
+
+jobs:
+  execute-attribution:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16.15
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa_ci
+          POSTGRES_DB: arenyxa_ci
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v6
+        with: {fetch-depth: 0}
+      - name: Frozen source preflight
+        run: |
+          set -euo pipefail
+          mkdir -p phase7
+          tar -tzf .github/phase2/timed-window-harness.tar.gz >/dev/null
+          tar -xzf .github/phase2/timed-window-harness.tar.gz -C .github/phase2
+          .github/phase2/experiment_preflight.sh phase7
+          git ls-files src | xargs sha256sum > phase7/all-source-before.sha256
+          git rev-parse HEAD > phase7/diagnostic-head.txt
+          cat /proc/sys/kernel/random/boot_id > phase7/host-boot-id.txt
+          { cat /proc/self/cgroup; test -r /sys/fs/cgroup/cpu.max && cat /sys/fs/cgroup/cpu.max || true; } > phase7/cpu-quota.txt
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.11.16", cache: pip}
+      - name: Install exact experiment dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install -e ".[dev,database]" psutil==7.2.2
+          python - <<'PY'
+          import sys, psycopg, psycopg_pool
+          assert sys.version_info[:3] == (3, 11, 16)
+          assert psycopg.__version__ == '3.3.5'
+          assert psycopg_pool.__version__ == '3.3.1'
+          print('PSYCOPG_PQ_IMPL=' + str(psycopg.pq.__impl__))
+          print('LIBPQ_VERSION=' + str(psycopg.pq.version()))
+          PY
+          python -m pip freeze > phase7/dependencies.txt
+      - name: Establish unchanged PostgreSQL 16.15 safety contract
+        run: .github/phase2/configure_pg.sh phase7
+      - name: Unit-test observer semantics before capture
+        run: |
+          set -euo pipefail
+          PYTHONPATH="$GITHUB_WORKSPACE/.github/phase7:$GITHUB_WORKSPACE/.github/phase6:$GITHUB_WORKSPACE" \
+            python -m pytest -c /dev/null -p no:cacheprovider -q .github/phase7/test_phase7_core.py | tee phase7/observer-tests.txt
+      - name: OFF-ON calibration and 80 natural warm captures
+        run: |
+          set -euo pipefail
+          PYTHONPATH="$GITHUB_WORKSPACE/.github/phase7:$GITHUB_WORKSPACE/.github/phase6:$GITHUB_WORKSPACE" \
+            python .github/phase7/phase7_run.py --dsn "$ARENYXA_POSTGRES_TEST_DSN" --out phase7 --runs 80 | tee phase7/capture.log
+      - name: Offline mechanical decomposition
+        if: always()
+        run: |
+          set -euo pipefail
+          if test -f phase7/verdict.json; then
+            PYTHONPATH="$GITHUB_WORKSPACE/.github/phase7" python .github/phase7/phase7_analyze.py --dir phase7 | tee phase7/analysis.log
+          fi
+      - name: Final frozen-source recheck
+        if: always()
+        run: |
+          set -euo pipefail
+          .github/phase2/final_recheck.sh phase7
+          git ls-files src | xargs sha256sum > phase7/all-source-after.sha256
+          cmp phase7/all-source-before.sha256 phase7/all-source-after.sha256
+          cp .github/phase7/phase7_core.py .github/phase7/phase7_observer.py .github/phase7/phase7_run.py \
+             .github/phase7/phase7_analyze.py .github/phase7/test_phase7_core.py .github/phase7/DESIGN.md phase7/
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: phase7-execute-internal-attribution
+          path: phase7
+          retention-days: 14
