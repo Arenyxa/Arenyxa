@@ -1,0 +1,91 @@
+{
+  "analysis": {
+    "host_effect_upgrade_rule": "at least 3 independent hosts and at least 2 fresh instances per host for E3; controlled replicated intervention for E4",
+    "nested_unit": "fresh PostgreSQL instance within host",
+    "predeclared_models": [
+      "mixed effects model",
+      "hierarchical/cluster bootstrap",
+      "ordinal permutation test"
+    ],
+    "primary_experimental_unit": "host",
+    "primary_outcomes": [
+      "continuous P99",
+      "ordinary lease P99",
+      "execute-boundary P99",
+      "failure indicator"
+    ],
+    "repeated_measure": "warm ordinal 1..60 within instance",
+    "variance_components": [
+      "between host",
+      "between instance within host",
+      "ordinal",
+      "host×ordinal",
+      "residual"
+    ]
+  },
+  "authoritative_source": {
+    "git_head": "3726289355ebe2a253ae8da1b8b4645e01244830",
+    "zip_sha256": "72360b9e1598fa1c2f3166f9637ab012342c404d6ff38d3269c5f659eb05be0f"
+  },
+  "campaign_id": "phase7c-host-instance-attribution-v1",
+  "exclusion_policy": {
+    "correctness_failure": "retain raw rows; invalidate the affected instance for performance PASS and classify TOTAL FAIL",
+    "infrastructure_abort_before_complete_sequence": "retain partial evidence, mark incomplete, never substitute a retry silently",
+    "observer_calibration_failure": "retain raw rows but mark attribution inadmissible",
+    "post_hoc_run_exclusion_allowed": false,
+    "selective_host_retention_forbidden": true
+  },
+  "frozen_at_utc": "2026-09-13T05:00:00Z",
+  "frozen_workload": {
+    "clients": 16,
+    "concurrency": 128,
+    "engineering_target_ms_exclusive": 300,
+    "fsync": true,
+    "jobs": 1024,
+    "max_connections": 256,
+    "postgresql": "16.15",
+    "release_budget_ms": 500,
+    "synchronous_commit": true,
+    "workers": 64
+  },
+  "host_slots": [
+    {
+      "execution_order_label": 1,
+      "fresh_postgresql_instances": ["instance-03", "instance-01", "instance-02"],
+      "fresh_runner_required": true,
+      "host_slot": "H04",
+      "runs_per_instance": {"natural_warm": 60, "retained_first_use": 1}
+    },
+    {
+      "execution_order_label": 2,
+      "fresh_postgresql_instances": ["instance-02", "instance-01", "instance-03"],
+      "fresh_runner_required": true,
+      "host_slot": "H02",
+      "runs_per_instance": {"natural_warm": 60, "retained_first_use": 1}
+    },
+    {
+      "execution_order_label": 3,
+      "fresh_postgresql_instances": ["instance-01", "instance-02", "instance-03"],
+      "fresh_runner_required": true,
+      "host_slot": "H01",
+      "runs_per_instance": {"natural_warm": 60, "retained_first_use": 1}
+    },
+    {
+      "execution_order_label": 4,
+      "fresh_postgresql_instances": ["instance-02", "instance-03", "instance-01"],
+      "fresh_runner_required": true,
+      "host_slot": "H03",
+      "runs_per_instance": {"natural_warm": 60, "retained_first_use": 1}
+    }
+  ],
+  "observer": {
+    "calibration_required_per_host": true,
+    "hot_path_sql_added": false,
+    "profile": "Phase8R accepted OS+PG boundary snapshots",
+    "reject_host_if_calibration_fails": true
+  },
+  "schema": "arenyxa.p99.phase7c-randomization/v1",
+  "seed": 362347036,
+  "seed_derivation": "uint32(first 16 hex digits of authoritative source ZIP SHA-256)",
+  "stopping_rule": "This campaign cannot close P99 by itself; results select the next controlled intervention."
+}
