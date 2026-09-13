@@ -1,0 +1,193 @@
+name: Arenyxa Phase7C Host Instance Attribution
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["phase7c/host-instance-attribution-20260913"]
+    paths: [".github/phase7c/RUN_PHASE7C.txt"]
+
+permissions:
+  contents: read
+
+jobs:
+  phase7c-host-instance:
+    name: phase7c-${{ matrix.host_slot }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 85
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        host_slot: [H04, H02, H01, H03]
+    env:
+      PHASE7C_HOST_SLOT: ${{ matrix.host_slot }}
+      PHASE7C_BASE_HEAD: 3726289355ebe2a253ae8da1b8b4645e01244830
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Frozen production-source preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p phase7c
+          test "$(git merge-base "$PHASE7C_BASE_HEAD" HEAD)" = "$PHASE7C_BASE_HEAD"
+          git diff --exit-code "$PHASE7C_BASE_HEAD" -- src scripts/postgresql_64_worker_128_concurrency_gate.py
+          tar -tzf .github/phase2/timed-window-harness.tar.gz >/dev/null
+          tar -xzf .github/phase2/timed-window-harness.tar.gz -C .github/phase2
+          .github/phase2/experiment_preflight.sh phase7c
+          git ls-files src | xargs sha256sum > phase7c/all-source-before.sha256
+          sha256sum \
+            src/arenyxa/enterprise/runtime_storage.py \
+            src/arenyxa/enterprise/distributed_queue.py \
+            scripts/postgresql_64_worker_128_concurrency_gate.py \
+            > phase7c/frozen-key-hashes-before.sha256
+          grep -F "5702ee19406e72525c96d848eeb7b909141872e0d8c0ebdb29c149b4d596594a" phase7c/frozen-key-hashes-before.sha256
+          grep -F "8d34fef8df28b3ef7521dd2c465aa2bdf8a6217244635f151c6f752d704c2ccd" phase7c/frozen-key-hashes-before.sha256
+          grep -F "ba766b7e02b0f511c1e721628e8e0d615adada27b24918762a73bc1ef7762588" phase7c/frozen-key-hashes-before.sha256
+          grep -F "PG_IMAGE='postgres:16.15'" .github/phase8r/phase8r_run.py
+          grep -F "max_connections=256" .github/phase8r/phase8r_run.py
+          grep -F "synchronous_commit" .github/phase8r/phase8r_run.py
+          git rev-parse HEAD > phase7c/diagnostic-head.txt
+          printf '%s\n' "$PHASE7C_BASE_HEAD" > phase7c/production-base-head.txt
+          cp .github/phase7c/PHASE7C_RANDOMIZATION_PLAN.json phase7c/
+          cp .github/phase7c/DESIGN.md phase7c/
+
+      - name: Capture immutable host fingerprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p phase7c/fingerprint-before
+          date -u --iso-8601=ns > phase7c/fingerprint-before/captured-at.txt
+          cat /proc/sys/kernel/random/boot_id > phase7c/fingerprint-before/boot-id.txt
+          uname -a > phase7c/fingerprint-before/uname.txt
+          lscpu > phase7c/fingerprint-before/lscpu.txt
+          lscpu -e=CPU,CORE,SOCKET,NODE,ONLINE,MAXMHZ,MINMHZ > phase7c/fingerprint-before/lscpu-topology.txt || true
+          nproc --all > phase7c/fingerprint-before/nproc-all.txt
+          nproc > phase7c/fingerprint-before/nproc-allowed.txt
+          grep -E '^(Cpus_allowed_list|Mems_allowed_list):' /proc/self/status > phase7c/fingerprint-before/allowed.txt
+          cat /proc/self/cgroup > phase7c/fingerprint-before/cgroup.txt
+          for file in cpu.max cpu.stat memory.max memory.current memory.events io.stat; do
+            test -r "/sys/fs/cgroup/$file" && { echo "### $file"; cat "/sys/fs/cgroup/$file"; }
+          done > phase7c/fingerprint-before/cgroup-resources.txt
+          for resource in cpu io memory; do
+            test -r "/proc/pressure/$resource" && { echo "### $resource"; cat "/proc/pressure/$resource"; }
+          done > phase7c/fingerprint-before/psi.txt
+          cat /proc/meminfo > phase7c/fingerprint-before/meminfo.txt
+          cat /proc/swaps > phase7c/fingerprint-before/swaps.txt
+          df -T > phase7c/fingerprint-before/filesystems.txt
+          mount > phase7c/fingerprint-before/mounts.txt
+          ulimit -a > phase7c/fingerprint-before/ulimit.txt
+          printf 'ImageOS=%s\nImageVersion=%s\nRUNNER_OS=%s\nRUNNER_ARCH=%s\n' \
+            "${ImageOS:-}" "${ImageVersion:-}" "${RUNNER_OS:-}" "${RUNNER_ARCH:-}" \
+            > phase7c/fingerprint-before/runner-image.txt
+          docker version > phase7c/fingerprint-before/docker-version.txt
+          docker info > phase7c/fingerprint-before/docker-info.txt
+          python - <<'PY'
+          import json, os, pathlib, time
+          pathlib.Path('phase7c/host-slot.json').write_text(json.dumps({
+              'host_slot': os.environ['PHASE7C_HOST_SLOT'],
+              'base_head': os.environ['PHASE7C_BASE_HEAD'],
+              'captured_epoch_ns': time.time_ns(),
+          }, indent=2, sort_keys=True) + '\n')
+          PY
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11.16"
+          cache: pip
+
+      - name: Install exact diagnostic dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -e ".[dev,database]" psutil==7.2.2
+          python - <<'PY'
+          import sys, psycopg, psycopg_pool, psutil
+          assert sys.version_info[:3] == (3, 11, 16)
+          assert psycopg.__version__ == '3.3.5'
+          assert psycopg_pool.__version__ == '3.3.1'
+          assert psutil.__version__ == '7.2.2'
+          print('PSYCOPG_PQ_IMPL=' + str(psycopg.pq.__impl__))
+          print('LIBPQ_VERSION=' + str(psycopg.pq.version()))
+          PY
+          python -m pip freeze > phase7c/dependencies.txt
+          docker pull postgres:16.15
+          docker image inspect postgres:16.15 > phase7c/postgres-image-inspect.json
+
+      - name: Verify inherited Phase8R protocol
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="$GITHUB_WORKSPACE/.github/phase8r:$GITHUB_WORKSPACE/.github/phase8:$GITHUB_WORKSPACE/.github/phase6:$GITHUB_WORKSPACE" \
+            python -m pytest -c /dev/null -p no:cacheprovider -q \
+              .github/phase8r/test_phase8r_protocol.py \
+              .github/phase8/test_phase8_core.py \
+              | tee phase7c/protocol-tests.txt
+
+      - name: Execute three fresh PostgreSQL instances on this independent host
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="$GITHUB_WORKSPACE/.github/phase8r:$GITHUB_WORKSPACE/.github/phase8:$GITHUB_WORKSPACE/.github/phase6:$GITHUB_WORKSPACE" \
+            python .github/phase8r/phase8r_run.py \
+              --out phase7c --runs 60 --replicas 3 --port 55432 \
+              | tee phase7c/capture.log
+
+      - name: Run frozen offline per-host analysis
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f phase7c/capture-verdict.json; then
+            PYTHONPATH="$GITHUB_WORKSPACE/.github/phase8r:$GITHUB_WORKSPACE/.github/phase8" \
+              python .github/phase8r/phase8r_analyze.py --dir phase7c \
+              | tee phase7c/analysis.log
+          fi
+
+      - name: Capture post-campaign host state
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p phase7c/fingerprint-after
+          date -u --iso-8601=ns > phase7c/fingerprint-after/captured-at.txt
+          cat /proc/stat > phase7c/fingerprint-after/proc-stat.txt
+          cat /proc/meminfo > phase7c/fingerprint-after/meminfo.txt
+          cat /proc/vmstat > phase7c/fingerprint-after/vmstat.txt
+          for resource in cpu io memory; do
+            test -r "/proc/pressure/$resource" && { echo "### $resource"; cat "/proc/pressure/$resource"; }
+          done > phase7c/fingerprint-after/psi.txt
+          test -r /sys/fs/cgroup/cpu.stat && cat /sys/fs/cgroup/cpu.stat > phase7c/fingerprint-after/cgroup-cpu-stat.txt || true
+          docker ps -a > phase7c/fingerprint-after/docker-ps.txt
+
+      - name: Final source-integrity recheck
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          .github/phase2/final_recheck.sh phase7c
+          git ls-files src | xargs sha256sum > phase7c/all-source-after.sha256
+          cmp phase7c/all-source-before.sha256 phase7c/all-source-after.sha256
+          sha256sum \
+            src/arenyxa/enterprise/runtime_storage.py \
+            src/arenyxa/enterprise/distributed_queue.py \
+            scripts/postgresql_64_worker_128_concurrency_gate.py \
+            > phase7c/frozen-key-hashes-after.sha256
+          cmp phase7c/frozen-key-hashes-before.sha256 phase7c/frozen-key-hashes-after.sha256
+          git diff --exit-code -- src scripts/postgresql_64_worker_128_concurrency_gate.py
+          git diff --exit-code "$PHASE7C_BASE_HEAD" -- src scripts/postgresql_64_worker_128_concurrency_gate.py
+          cp .github/phase8r/phase8r_core.py phase7c/
+          cp .github/phase8r/phase8r_run.py phase7c/
+          cp .github/phase8r/phase8r_analyze.py phase7c/
+          cp .github/phase8r/test_phase8r_protocol.py phase7c/
+          cp .github/phase8r/DESIGN.md phase7c/PHASE8R_INHERITED_DESIGN.md
+          sha256sum phase7c/* 2>/dev/null | sort > phase7c/top-level-sha256.txt || true
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: phase7c-host-${{ matrix.host_slot }}-3x60
+          path: phase7c
+          retention-days: 14
