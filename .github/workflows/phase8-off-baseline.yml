@@ -1,0 +1,131 @@
+name: Arenyxa Phase8 OFF Baseline Temporal Regime
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["phase8/off-baseline-regime-20260913"]
+    paths: [".github/phase8/RUN_PHASE8.txt"]
+
+permissions:
+  contents: read
+
+jobs:
+  same-host-regime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 85
+    steps:
+      - uses: actions/checkout@v6
+        with: {fetch-depth: 0}
+      - name: Frozen source preflight
+        run: |
+          set -euo pipefail
+          mkdir -p phase8
+          tar -tzf .github/phase2/timed-window-harness.tar.gz >/dev/null
+          tar -xzf .github/phase2/timed-window-harness.tar.gz -C .github/phase2
+          .github/phase2/experiment_preflight.sh phase8
+          git ls-files src | xargs sha256sum > phase8/all-source-before.sha256
+          git rev-parse HEAD > phase8/diagnostic-head.txt
+          cat /proc/sys/kernel/random/boot_id > phase8/host-boot-id.txt
+          uname -a > phase8/uname.txt
+          lscpu > phase8/lscpu.txt
+          { cat /proc/self/cgroup; test -r /sys/fs/cgroup/cpu.max && { echo /sys/fs/cgroup/cpu.max; cat /sys/fs/cgroup/cpu.max; } || true; } > phase8/cpu-quota.txt
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.11.16", cache: pip}
+      - name: Install exact diagnostic dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install -e ".[dev,database]" psutil==7.2.2
+          python - <<'PY'
+          import sys, psycopg, psycopg_pool, psutil
+          assert sys.version_info[:3] == (3, 11, 16)
+          assert psycopg.__version__ == '3.3.5'
+          assert psycopg_pool.__version__ == '3.3.1'
+          assert psutil.__version__ == '7.2.2'
+          print('PSYCOPG_PQ_IMPL=' + str(psycopg.pq.__impl__))
+          print('LIBPQ_VERSION=' + str(psycopg.pq.version()))
+          PY
+          python -m pip freeze > phase8/dependencies.txt
+      - name: Verify Phase8 diagnostic arithmetic
+        run: |
+          set -euo pipefail
+          PYTHONPATH="$GITHUB_WORKSPACE/.github/phase8:$GITHUB_WORKSPACE/.github/phase6:$GITHUB_WORKSPACE" \
+            python -m pytest -c /dev/null -p no:cacheprovider -q .github/phase8/test_phase8_core.py | tee phase8/phase8-tests.txt
+      - name: Calibrate boundary snapshots then run 3x80 plus idle counterfactual
+        run: |
+          set -euo pipefail
+          PYTHONPATH="$GITHUB_WORKSPACE/.github/phase8:$GITHUB_WORKSPACE/.github/phase6:$GITHUB_WORKSPACE" \
+            python .github/phase8/phase8_run.py --out phase8 --runs 80 --replicas 3 \
+              --idle-replica --pause-every 10 --pause-seconds 30 --port 55432 | tee phase8/capture.log
+      - name: Offline regime analysis
+        if: always()
+        run: |
+          set -euo pipefail
+          if test -f phase8/capture-verdict.json; then
+            PYTHONPATH="$GITHUB_WORKSPACE/.github/phase8" python .github/phase8/phase8_analyze.py --dir phase8 | tee phase8/analysis.log
+          fi
+      - name: Final frozen-source recheck
+        if: always()
+        run: |
+          set -euo pipefail
+          .github/phase2/final_recheck.sh phase8
+          git ls-files src | xargs sha256sum > phase8/all-source-after.sha256
+          cmp phase8/all-source-before.sha256 phase8/all-source-after.sha256
+          cp .github/phase8/phase8_core.py .github/phase8/phase8_observe.py .github/phase8/phase8_run.py \
+             .github/phase8/phase8_analyze.py .github/phase8/test_phase8_core.py .github/phase8/DESIGN.md phase8/
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: phase8-off-baseline-samehost
+          path: phase8
+          retention-days: 14
+
+  cross-host-regime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with: {fetch-depth: 0}
+      - name: Frozen source preflight
+        run: |
+          set -euo pipefail
+          mkdir -p phase8-crosshost
+          tar -xzf .github/phase2/timed-window-harness.tar.gz -C .github/phase2
+          .github/phase2/experiment_preflight.sh phase8-crosshost
+          git ls-files src | xargs sha256sum > phase8-crosshost/all-source-before.sha256
+          git rev-parse HEAD > phase8-crosshost/diagnostic-head.txt
+          cat /proc/sys/kernel/random/boot_id > phase8-crosshost/host-boot-id.txt
+          uname -a > phase8-crosshost/uname.txt
+          lscpu > phase8-crosshost/lscpu.txt
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.11.16", cache: pip}
+      - name: Install exact diagnostic dependencies
+        run: |
+          python -m pip install -e ".[dev,database]" psutil==7.2.2
+      - name: Verify Phase8 diagnostic arithmetic
+        run: |
+          PYTHONPATH="$GITHUB_WORKSPACE/.github/phase8:$GITHUB_WORKSPACE/.github/phase6:$GITHUB_WORKSPACE" \
+            python -m pytest -c /dev/null -p no:cacheprovider -q .github/phase8/test_phase8_core.py | tee phase8-crosshost/phase8-tests.txt
+      - name: Independent-host snapshot calibration and 1x80 continuous run
+        run: |
+          set -euo pipefail
+          PYTHONPATH="$GITHUB_WORKSPACE/.github/phase8:$GITHUB_WORKSPACE/.github/phase6:$GITHUB_WORKSPACE" \
+            python .github/phase8/phase8_run.py --out phase8-crosshost --runs 80 --replicas 1 --port 55432 | tee phase8-crosshost/capture.log
+      - name: Offline regime analysis
+        if: always()
+        run: |
+          if test -f phase8-crosshost/capture-verdict.json; then
+            PYTHONPATH="$GITHUB_WORKSPACE/.github/phase8" python .github/phase8/phase8_analyze.py --dir phase8-crosshost | tee phase8-crosshost/analysis.log
+          fi
+      - name: Final frozen-source recheck
+        if: always()
+        run: |
+          set -euo pipefail
+          .github/phase2/final_recheck.sh phase8-crosshost
+          git ls-files src | xargs sha256sum > phase8-crosshost/all-source-after.sha256
+          cmp phase8-crosshost/all-source-before.sha256 phase8-crosshost/all-source-after.sha256
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: phase8-off-baseline-crosshost
+          path: phase8-crosshost
+          retention-days: 14
