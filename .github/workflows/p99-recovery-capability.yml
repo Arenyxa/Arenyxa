@@ -1,0 +1,128 @@
+name: P99 Continuation Execution Capability Recovery
+on:
+  push:
+    branches: ["phase7c/p99-continuation-recovery-20260913"]
+    paths: [".github/workflows/p99-recovery-capability.yml"]
+permissions:
+  contents: read
+jobs:
+  recovery:
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [H1, H2]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11.16"
+      - name: Verify frozen source and readable execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p recovery
+          python - <<'PY'
+          import hashlib,json,os,platform,subprocess,sys
+          from pathlib import Path
+          expected={
+          'src/arenyxa/enterprise/runtime_storage.py':'5702ee19406e72525c96d848eeb7b909141872e0d8c0ebdb29c149b4d596594a',
+          'src/arenyxa/enterprise/distributed_queue.py':'8d34fef8df28b3ef7521dd2c465aa2bdf8a6217244635f151c6f752d704c2ccd',
+          'scripts/postgresql_64_worker_128_concurrency_gate.py':'ba766b7e02b0f511c1e721628e8e0d615adada27b24918762a73bc1ef7762588'}
+          hashes={p:hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in expected}
+          assert hashes==expected,hashes
+          cmds=[['git','rev-parse','HEAD'],['git','status','--porcelain'],['uname','-a'],['lscpu'],['docker','version'],['bash','-c','printf STDOUT_OK; printf STDERR_OK >&2; exit 7']]
+          results=[]
+          for cmd in cmds:
+              r=subprocess.run(cmd,capture_output=True,text=True)
+              results.append(dict(argv=cmd,returncode=r.returncode,stdout=r.stdout,stderr=r.stderr))
+          files={}
+          for p in ['/proc/sys/kernel/random/boot_id','/proc/self/cgroup','/proc/meminfo','/sys/fs/cgroup/cpu.max','/sys/fs/cgroup/memory.max']:
+              try: files[p]=Path(p).read_text()
+              except OSError as e: files[p]=str(e)
+          out=dict(purpose='CAPABILITY ONLY: NO PERFORMANCE EXPERIMENT',source_hashes=hashes,python=sys.version,cwd=os.getcwd(),platform=platform.platform(),commands=results,host_files=files,runner_image=os.getenv('ImageVersion'),runner_name=os.getenv('RUNNER_NAME'))
+          Path('recovery/capability.json').write_text(json.dumps(out,indent=2))
+          print(json.dumps(out,indent=2))
+          assert results[-1]['returncode']==7 and results[-1]['stdout']=='STDOUT_OK' and results[-1]['stderr']=='STDERR_OK'
+          PY
+      - name: Exact PostgreSQL query and dependency recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install 'psycopg[binary]==3.3.5' 'psycopg_pool==3.3.1'
+          docker pull postgres:16.15@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
+          docker run -d --name p99-recovery -p 127.0.0.1:55432:5432 -e POSTGRES_USER=arenyxa -e POSTGRES_PASSWORD=arenyxa_ci -e POSTGRES_DB=arenyxa_ci postgres:16.15@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94 -c max_connections=256
+          python - <<'PY'
+          import json,time,subprocess
+          from pathlib import Path
+          import psycopg,psycopg_pool
+          deadline=time.monotonic()+60
+          while True:
+              try:
+                  conn=psycopg.connect('postgresql://arenyxa:arenyxa_ci@127.0.0.1:55432/arenyxa_ci',connect_timeout=2,autocommit=True)
+                  break
+              except psycopg.OperationalError:
+                  if time.monotonic()>deadline: raise
+                  time.sleep(.5)
+          with conn:
+              settings={p:conn.execute('SHOW '+p).fetchone()[0] for p in ['server_version','server_version_num','max_connections','fsync','synchronous_commit']}
+              result=conn.execute('SELECT 40+2, pg_postmaster_start_time()::text').fetchone()
+          assert settings['server_version_num']=='160015' and settings['fsync']=='on' and settings['synchronous_commit']=='on' and settings['max_connections']=='256'
+          assert result[0]==42
+          out=dict(settings=settings,query_result=result,psycopg=psycopg.__version__,psycopg_pool=psycopg_pool.__version__,libpq=psycopg.pq.version(),pq_impl=psycopg.pq.__impl__,image=json.loads(subprocess.check_output(['docker','image','inspect','postgres:16.15@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94','--format','{{json .RepoDigests}}'],text=True)))
+          Path('recovery/postgresql-query.json').write_text(json.dumps(out,indent=2))
+          print(json.dumps(out,indent=2))
+          PY
+      - name: Export offline PostgreSQL engine and non-glibc dependencies
+        if: matrix.host == 'H1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,re,subprocess
+          from pathlib import Path
+          r=subprocess.run(['docker','exec','p99-recovery','bash','-lc','ldd /usr/lib/postgresql/16/bin/* /usr/lib/postgresql/16/lib/*.so 2>/dev/null'],text=True,capture_output=True)
+          Path('recovery/runtime-ldd.txt').write_text(r.stdout+r.stderr)
+          exclude=re.compile(r'^(libc\.|libm\.|libpthread\.|libdl\.|librt\.|libresolv\.|libutil\.|ld-linux)')
+          deps=sorted({p for p in re.findall(r'(/[A-Za-z0-9_./+-]+)',r.stdout) if '.so' in p and not exclude.match(Path(p).name) and not p.startswith('/usr/lib/postgresql/')})
+          members=['usr/lib/postgresql/16','usr/share/postgresql/16']+[p.lstrip('/') for p in deps]
+          subprocess.run(['docker','exec','p99-recovery','tar','-C','/','-chzf','/tmp/postgresql-16.15-runtime.tar.gz',*members],check=True)
+          subprocess.run(['docker','cp','p99-recovery:/tmp/postgresql-16.15-runtime.tar.gz','recovery/postgresql-16.15-runtime.tar.gz'],check=True)
+          Path('recovery/runtime-members.json').write_text(json.dumps(members,indent=2))
+          PY
+      - uses: actions/setup-python@v6
+        if: matrix.host == 'H1'
+        with:
+          python-version: "3.13.5"
+      - name: Download exact offline Python wheels
+        if: matrix.host == 'H1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip download --only-binary=:all: -d recovery/wheels 'psycopg[binary]==3.3.5' 'psycopg_pool==3.3.1'
+      - name: Preserve diagnostics and checksums
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p recovery
+          docker logs p99-recovery > recovery/postgres.log 2>&1 || true
+          git diff --exit-code -- src scripts > recovery/production.diff
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          root=Path('recovery')
+          lines=[hashlib.sha256(p.read_bytes()).hexdigest()+'  '+str(p.relative_to(root)) for p in sorted(root.rglob('*')) if p.is_file() and p.name!='SHA256SUMS.txt']
+          (root/'SHA256SUMS.txt').write_text('\n'.join(lines)+'\n')
+          PY
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: p99-recovery-capability-${{ matrix.host }}
+          path: recovery
+          retention-days: 14
+      - name: Remove temporary PostgreSQL container
+        if: always()
+        run: docker rm -f p99-recovery || true
