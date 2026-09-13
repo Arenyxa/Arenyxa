@@ -8,6 +8,9 @@ generator has returned its PGresult list.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
 import phase6_minimal
 import phase6_trace as p6
 from phase7_lite_core import summarize_lite_call
@@ -26,6 +29,33 @@ def _query_bytes(pgq):
         return bytes(q)
     except Exception:
         return str(q).encode('utf-8', 'replace')
+
+
+def _observe_safely(callback: Callable[[], Any] | None) -> Any:
+    """Run diagnostic bookkeeping without allowing it to alter business behavior."""
+    if callback is None:
+        return None
+    try:
+        return callback()
+    except Exception:
+        return None
+
+
+def _invoke_business_safely(
+    original: Callable[..., Any],
+    cur: Any,
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    *,
+    before: Callable[[], Any] | None = None,
+    after: Callable[[], Any] | None = None,
+) -> Any:
+    """Preserve original arguments/result/exception even if diagnostics fail."""
+    _observe_safely(before)
+    try:
+        return original(cur, *args, **kwargs)
+    finally:
+        _observe_safely(after)
 
 
 class BoundaryLiteRecorder(phase6_minimal.MinimalRecorder):
@@ -57,18 +87,27 @@ class BoundaryLiteRecorder(phase6_minimal.MinimalRecorder):
             original = getattr(cb.BaseCursor, method_name)
 
             def wrapped(cur, *args, **kwargs):
-                row = R.lease_row()
-                pgq = args[pgq_pos] if len(args) > pgq_pos else kwargs.get('query') or kwargs.get('pgq')
-                target = row is not None and pgq is not None and LEASE_TOKEN in _query_bytes(pgq)
-                if not target:
-                    return original(cur, *args, **kwargs)
-                call = R._begin_or_get_call(row)
-                mark = {'kind': kind, 'begin': p6.PC(), 'end': None}
-                call['send_marks'].append(mark)
-                try:
-                    return original(cur, *args, **kwargs)
-                finally:
-                    mark['end'] = p6.PC()
+                state: dict[str, Any] = {}
+
+                def before():
+                    row = R.lease_row()
+                    pgq = args[pgq_pos] if len(args) > pgq_pos else kwargs.get('query') or kwargs.get('pgq')
+                    target = row is not None and pgq is not None and LEASE_TOKEN in _query_bytes(pgq)
+                    if not target:
+                        return
+                    call = R._begin_or_get_call(row)
+                    mark = {'kind': kind, 'begin': p6.PC(), 'end': None}
+                    call['send_marks'].append(mark)
+                    state['mark'] = mark
+
+                def after():
+                    mark = state.get('mark')
+                    if mark is not None and mark.get('end') is None:
+                        mark['end'] = p6.PC()
+
+                return _invoke_business_safely(
+                    original, cur, args, kwargs, before=before, after=after
+                )
 
             R.patch(cb.BaseCursor, method_name, wrapped)
 
@@ -79,12 +118,16 @@ class BoundaryLiteRecorder(phase6_minimal.MinimalRecorder):
         original_check = cb.BaseCursor._check_results
 
         def check_results(cur, results):
-            call = R._active_lite_call()
-            row = R.lease_row()
-            if call is not None and row is not None and call.get('row_identity') == id(row):
-                call['result_ready_marks'].append(p6.PC())
-                R.tls.p7lite_call = None
-            return original_check(cur, results)
+            def before():
+                call = R._active_lite_call()
+                row = R.lease_row()
+                if call is not None and row is not None and call.get('row_identity') == id(row):
+                    call['result_ready_marks'].append(p6.PC())
+                    R.tls.p7lite_call = None
+
+            return _invoke_business_safely(
+                original_check, cur, (results,), {}, before=before
+            )
 
         self.patch(cb.BaseCursor, '_check_results', check_results)
 
@@ -127,5 +170,6 @@ class BoundaryLiteRecorder(phase6_minimal.MinimalRecorder):
             'wait_generator_wrapped': False,
             'schedstat': False,
             'extra_execute_rusage': False,
+            'diagnostic_fail_open': True,
         }
         return result
