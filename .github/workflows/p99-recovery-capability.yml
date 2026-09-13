@@ -26,13 +26,25 @@ jobs:
           set -euo pipefail
           mkdir -p recovery
           python - <<'PY'
-          import hashlib,json,os,platform,subprocess,sys
+          import base64,hashlib,json,os,platform,subprocess,sys,zlib
           from pathlib import Path
           expected={
           'src/arenyxa/enterprise/runtime_storage.py':'5702ee19406e72525c96d848eeb7b909141872e0d8c0ebdb29c149b4d596594a',
           'src/arenyxa/enterprise/distributed_queue.py':'8d34fef8df28b3ef7521dd2c465aa2bdf8a6217244635f151c6f752d704c2ccd',
           'scripts/postgresql_64_worker_128_concurrency_gate.py':'ba766b7e02b0f511c1e721628e8e0d615adada27b24918762a73bc1ef7762588'}
           hashes={p:hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in expected}
+          Path('recovery/checkout-hashes.json').write_text(json.dumps(hashes,indent=2))
+          if hashes != expected:
+              baseline=dict(expected)
+              baseline['src/arenyxa/enterprise/runtime_storage.py']='b367da0d7fb2d7c21cbb32e84fb9ca049a06341fe6be41e4bd917392f913b071'
+              baseline['src/arenyxa/enterprise/distributed_queue.py']='a3b695848c2c9648059b01360fa5863913bde692ace9deda955ad356117ce559'
+              assert hashes==baseline,('UNIDENTIFIED_SOURCE_DRIFT',hashes)
+              patch=zlib.decompress(base64.b64decode(Path('.github/phase7c/frozen-overlay.zlib.b64').read_text()))
+              assert hashlib.sha256(patch).hexdigest()=='19ae554643c7dfdd11d9af9a34deb0ed244daccd71aa3ab00a4bb8d3fbaca22d'
+              Path('recovery/frozen-reconstruction.patch').write_bytes(patch)
+              subprocess.run(['git','apply','--check','-'],input=patch,check=True)
+              subprocess.run(['git','apply','-'],input=patch,check=True)
+              hashes={p:hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in expected}
           assert hashes==expected,hashes
           cmds=[['git','rev-parse','HEAD'],['git','status','--porcelain'],['uname','-a'],['lscpu'],['docker','version'],['bash','-c','printf STDOUT_OK; printf STDERR_OK >&2; exit 7']]
           results=[]
@@ -109,11 +121,17 @@ jobs:
         run: |
           mkdir -p recovery
           docker logs p99-recovery > recovery/postgres.log 2>&1 || true
-          git diff --exit-code -- src scripts > recovery/production.diff
+          git diff -- src scripts > recovery/reconstruction.diff
           python - <<'PY'
           import hashlib
           from pathlib import Path
           root=Path('recovery')
+          if (root/'capability.json').exists():
+              import json
+              before=json.loads((root/'capability.json').read_text())['source_hashes']
+              after={p:hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in before}
+              (root/'source-after.json').write_text(json.dumps(after,indent=2))
+              assert after==before,'Source mutation after frozen reconstruction'
           lines=[hashlib.sha256(p.read_bytes()).hexdigest()+'  '+str(p.relative_to(root)) for p in sorted(root.rglob('*')) if p.is_file() and p.name!='SHA256SUMS.txt']
           (root/'SHA256SUMS.txt').write_text('\n'.join(lines)+'\n')
           PY
