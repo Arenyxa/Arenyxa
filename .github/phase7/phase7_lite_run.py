@@ -70,6 +70,7 @@ def trace_metrics(trace, lite_enabled):
 
 def compact(official, trace, lite_enabled, name, mode):
     base = p6.compact(official, trace)
+    base['p999'] = trace['cycle_distribution']['p999']
     tm, samples = trace_metrics(trace, lite_enabled)
     base.update({'name': name, 'mode': mode, 'trace_metrics': tm})
     return base, samples
@@ -95,6 +96,7 @@ def calibration_verdict(records):
     off_lease = pooled_dist(off, 'lease'); on_lease = pooled_dist(on, 'lease')
     off_exec = pooled_dist(off, 'execute'); on_exec = pooled_dist(on, 'execute')
     tail = {
+        'cycle_p999_ratio': med_ratio(on, off, 'p999'),
         'ordinary_lease_p99_ratio': on_lease['p99'] / off_lease['p99'],
         'ordinary_lease_p999_ratio': on_lease['p999'] / off_lease['p999'],
         'execute_p99_ratio': on_exec['p99'] / off_exec['p99'],
@@ -104,13 +106,15 @@ def calibration_verdict(records):
     coverage_ok = all(x['trace_metrics'].get('phase7_lite_missing', 1) == 0 and x['trace_metrics'].get('phase7_lite_invalid', 1) == 0 for x in on)
     conservation_ok = all((x['trace_metrics'].get('max_abs_conservation_error_ms') or 0.0) <= 1e-5 for x in on)
     primary_gate = max(ratios[k] for k in ('p50','p95','p99')) <= 1.10 and ratios['throughput'] >= .95 and recovery_delta <= 6.
-    tail_gate = all(0.80 <= v <= 1.20 for v in tail.values())
+    tail_gate = all(v is not None and 0.80 <= v <= 1.20 for v in tail.values())
     off_order = [x for x in records if x['mode'] == 'OFF']
     on_order = [x for x in records if x['mode'] == 'ON']
     temporal = {
         'off2_over_off1_p99': off_order[1]['p99'] / off_order[0]['p99'],
+        'off2_over_off1_p999': off_order[1]['p999'] / off_order[0]['p999'],
         'off2_over_off1_throughput': off_order[1]['throughput'] / off_order[0]['throughput'],
         'on2_over_on1_p99': on_order[1]['p99'] / on_order[0]['p99'],
+        'on2_over_on1_p999': on_order[1]['p999'] / on_order[0]['p999'],
         'on2_over_on1_throughput': on_order[1]['throughput'] / on_order[0]['throughput'],
         'note': 'diagnostic temporal-regime evidence only; not used to relax observer gates',
     }
