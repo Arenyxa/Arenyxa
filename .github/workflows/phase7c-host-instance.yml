@@ -115,6 +115,13 @@ jobs:
           python -m pip freeze > phase7c/dependencies.txt
           docker pull postgres:16.15
           docker image inspect postgres:16.15 > phase7c/postgres-image-inspect.json
+          python - <<'PY'
+          import json
+          expected = 'postgres@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94'
+          image = json.load(open('phase7c/postgres-image-inspect.json', encoding='utf-8'))
+          digests = image[0].get('RepoDigests') or []
+          assert expected in digests, f'PostgreSQL image digest drift: {digests}'
+          PY
 
       - name: Verify inherited Phase8R protocol
         shell: bash
