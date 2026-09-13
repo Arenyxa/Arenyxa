@@ -1,0 +1,144 @@
+name: Arenyxa Phase8R Admissible OFF Baseline Regime
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["phase8r/off-baseline-regime-60-20260913"]
+    paths: [".github/phase8r/RUN_PHASE8R.txt"]
+
+permissions:
+  contents: read
+
+jobs:
+  same-host-8r:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with: {fetch-depth: 0}
+      - name: Frozen source preflight
+        run: |
+          set -euo pipefail
+          mkdir -p phase8r
+          tar -tzf .github/phase2/timed-window-harness.tar.gz >/dev/null
+          tar -xzf .github/phase2/timed-window-harness.tar.gz -C .github/phase2
+          .github/phase2/experiment_preflight.sh phase8r
+          git ls-files src | xargs sha256sum > phase8r/all-source-before.sha256
+          sha256sum src/arenyxa/enterprise/runtime_storage.py src/arenyxa/enterprise/distributed_queue.py scripts/postgresql_64_worker_128_concurrency_gate.py > phase8r/frozen-key-hashes-before.sha256
+          git rev-parse HEAD > phase8r/diagnostic-head.txt
+          cat /proc/sys/kernel/random/boot_id > phase8r/host-boot-id.txt
+          uname -a > phase8r/uname.txt
+          lscpu > phase8r/lscpu.txt
+          { cat /proc/self/cgroup; test -r /sys/fs/cgroup/cpu.max && { echo /sys/fs/cgroup/cpu.max; cat /sys/fs/cgroup/cpu.max; } || true; } > phase8r/cpu-quota.txt
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.11.16", cache: pip}
+      - name: Install exact diagnostic dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install -e ".[dev,database]" psutil==7.2.2
+          python - <<'PY'
+          import sys, psycopg, psycopg_pool, psutil
+          assert sys.version_info[:3] == (3,11,16)
+          assert psycopg.__version__ == '3.3.5'
+          assert psycopg_pool.__version__ == '3.3.1'
+          assert psutil.__version__ == '7.2.2'
+          print('PSYCOPG_PQ_IMPL='+str(psycopg.pq.__impl__))
+          print('LIBPQ_VERSION='+str(psycopg.pq.version()))
+          PY
+          python -m pip freeze > phase8r/dependencies.txt
+      - name: Verify Phase8R protocol and frozen change-point arithmetic
+        run: |
+          set -euo pipefail
+          PYTHONPATH="$GITHUB_WORKSPACE/.github/phase8r:$GITHUB_WORKSPACE/.github/phase8:$GITHUB_WORKSPACE/.github/phase6:$GITHUB_WORKSPACE" \
+            python -m pytest -c /dev/null -p no:cacheprovider -q \
+              .github/phase8r/test_phase8r_protocol.py .github/phase8/test_phase8_core.py | tee phase8r/phase8r-tests.txt
+      - name: Calibrate snapshots then execute 3x60 plus idle-pause 60
+        run: |
+          set -euo pipefail
+          PYTHONPATH="$GITHUB_WORKSPACE/.github/phase8r:$GITHUB_WORKSPACE/.github/phase8:$GITHUB_WORKSPACE/.github/phase6:$GITHUB_WORKSPACE" \
+            python .github/phase8r/phase8r_run.py --out phase8r --runs 60 --replicas 3 \
+              --idle-replica --pause-every 10 --pause-seconds 30 --port 55432 | tee phase8r/capture.log
+      - name: Offline Phase8R analysis
+        if: always()
+        run: |
+          set -euo pipefail
+          if test -f phase8r/capture-verdict.json; then
+            PYTHONPATH="$GITHUB_WORKSPACE/.github/phase8r:$GITHUB_WORKSPACE/.github/phase8" \
+              python .github/phase8r/phase8r_analyze.py --dir phase8r | tee phase8r/analysis.log
+          fi
+      - name: Final frozen-source recheck
+        if: always()
+        run: |
+          set -euo pipefail
+          .github/phase2/final_recheck.sh phase8r
+          git ls-files src | xargs sha256sum > phase8r/all-source-after.sha256
+          cmp phase8r/all-source-before.sha256 phase8r/all-source-after.sha256
+          sha256sum src/arenyxa/enterprise/runtime_storage.py src/arenyxa/enterprise/distributed_queue.py scripts/postgresql_64_worker_128_concurrency_gate.py > phase8r/frozen-key-hashes-after.sha256
+          cmp phase8r/frozen-key-hashes-before.sha256 phase8r/frozen-key-hashes-after.sha256
+          cp .github/phase8r/phase8r_core.py .github/phase8r/phase8r_run.py .github/phase8r/phase8r_analyze.py .github/phase8r/test_phase8r_protocol.py .github/phase8r/DESIGN.md phase8r/
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: phase8r-samehost-3x60-idle60
+          path: phase8r
+          retention-days: 14
+
+  cross-host-8r:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v6
+        with: {fetch-depth: 0}
+      - name: Frozen source preflight
+        run: |
+          set -euo pipefail
+          mkdir -p phase8r-cross
+          tar -xzf .github/phase2/timed-window-harness.tar.gz -C .github/phase2
+          .github/phase2/experiment_preflight.sh phase8r-cross
+          git ls-files src | xargs sha256sum > phase8r-cross/all-source-before.sha256
+          sha256sum src/arenyxa/enterprise/runtime_storage.py src/arenyxa/enterprise/distributed_queue.py scripts/postgresql_64_worker_128_concurrency_gate.py > phase8r-cross/frozen-key-hashes-before.sha256
+          git rev-parse HEAD > phase8r-cross/diagnostic-head.txt
+          cat /proc/sys/kernel/random/boot_id > phase8r-cross/host-boot-id.txt
+          uname -a > phase8r-cross/uname.txt
+          lscpu > phase8r-cross/lscpu.txt
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.11.16", cache: pip}
+      - name: Install exact diagnostic dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install -e ".[dev,database]" psutil==7.2.2
+          python -m pip freeze > phase8r-cross/dependencies.txt
+      - name: Verify Phase8R protocol and frozen change-point arithmetic
+        run: |
+          set -euo pipefail
+          PYTHONPATH="$GITHUB_WORKSPACE/.github/phase8r:$GITHUB_WORKSPACE/.github/phase8:$GITHUB_WORKSPACE/.github/phase6:$GITHUB_WORKSPACE" \
+            python -m pytest -c /dev/null -p no:cacheprovider -q \
+              .github/phase8r/test_phase8r_protocol.py .github/phase8/test_phase8_core.py | tee phase8r-cross/phase8r-tests.txt
+      - name: Independent-host calibration and exactly 1x60 continuous OFF
+        run: |
+          set -euo pipefail
+          PYTHONPATH="$GITHUB_WORKSPACE/.github/phase8r:$GITHUB_WORKSPACE/.github/phase8:$GITHUB_WORKSPACE/.github/phase6:$GITHUB_WORKSPACE" \
+            python .github/phase8r/phase8r_run.py --out phase8r-cross --runs 60 --replicas 1 --port 55432 | tee phase8r-cross/capture.log
+      - name: Offline Phase8R analysis
+        if: always()
+        run: |
+          set -euo pipefail
+          if test -f phase8r-cross/capture-verdict.json; then
+            PYTHONPATH="$GITHUB_WORKSPACE/.github/phase8r:$GITHUB_WORKSPACE/.github/phase8" \
+              python .github/phase8r/phase8r_analyze.py --dir phase8r-cross | tee phase8r-cross/analysis.log
+          fi
+      - name: Final frozen-source recheck
+        if: always()
+        run: |
+          set -euo pipefail
+          .github/phase2/final_recheck.sh phase8r-cross
+          git ls-files src | xargs sha256sum > phase8r-cross/all-source-after.sha256
+          cmp phase8r-cross/all-source-before.sha256 phase8r-cross/all-source-after.sha256
+          sha256sum src/arenyxa/enterprise/runtime_storage.py src/arenyxa/enterprise/distributed_queue.py scripts/postgresql_64_worker_128_concurrency_gate.py > phase8r-cross/frozen-key-hashes-after.sha256
+          cmp phase8r-cross/frozen-key-hashes-before.sha256 phase8r-cross/frozen-key-hashes-after.sha256
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: phase8r-crosshost-1x60
+          path: phase8r-cross
+          retention-days: 14
