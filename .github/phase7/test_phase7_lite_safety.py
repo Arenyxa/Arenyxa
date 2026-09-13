@@ -1,3 +1,4 @@
+# RED regression: observer faults must never alter business semantics.
 import pytest
 
 from phase7_lite_observer import _invoke_business_safely
