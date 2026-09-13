@@ -1,0 +1,35 @@
+name: Arenyxa Phase7B Boundary-Lite RED
+
+on:
+  push:
+    branches: ["phase7/execute-boundary-lite-20260913"]
+    paths: [".github/phase7/**", ".github/workflows/phase7b-boundary-lite-red.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  red-safety-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11.16"
+          cache: pip
+      - name: Install exact diagnostic dependencies
+        run: |
+          python -m pip install -e ".[database]" pytest
+          python - <<'PY'
+          import psycopg, psycopg_pool
+          assert psycopg.__version__ == '3.3.5'
+          assert psycopg_pool.__version__ == '3.3.1'
+          PY
+      - name: Run Phase7B RED safety tests
+        run: |
+          PYTHONPATH="$GITHUB_WORKSPACE/.github/phase7:$GITHUB_WORKSPACE/.github/phase6:$GITHUB_WORKSPACE" \
+            python -m pytest -c /dev/null -p no:cacheprovider -q \
+            .github/phase7/test_phase7_lite_core.py \
+            .github/phase7/test_phase7_lite_safety.py
