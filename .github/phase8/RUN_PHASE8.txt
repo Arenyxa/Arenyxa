@@ -1,0 +1,3 @@
+Phase8 OFF-baseline temporal regime characterization trigger.
+Frozen design: 2026-09-13.
+No production patch. No new hot-path observer. Zero extra SQL in timed window.
