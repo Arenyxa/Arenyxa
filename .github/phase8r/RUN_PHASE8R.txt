@@ -1,0 +1,3 @@
+AUTHORITATIVE PHASE8R EXECUTION
+60 warm runs per fresh PostgreSQL instance
+No production patch. No retry-to-pass.
