@@ -1,0 +1,29 @@
+name: Arenyxa Phase7B Boundary-Lite TDD
+
+on:
+  push:
+    branches: ["phase7b/boundary-lite-independent-20260913"]
+    paths:
+      - ".github/phase7b/**"
+      - ".github/workflows/phase7b-boundary-lite-tdd.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  boundary-lite-tdd:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11.16"
+          cache: pip
+      - name: Install exact unit-test dependencies
+        run: python -m pip install pytest==9.1.1 "psycopg[binary]==3.3.5"
+      - name: Run Phase 7B boundary-lite tests
+        run: |
+          PYTHONPATH="$GITHUB_WORKSPACE/.github/phase7b:$GITHUB_WORKSPACE/.github/phase6:$GITHUB_WORKSPACE" \
+            python -m pytest -c /dev/null -p no:cacheprovider -q .github/phase7b/test_boundary_lite.py
