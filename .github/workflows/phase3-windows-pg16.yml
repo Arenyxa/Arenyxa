@@ -1,0 +1,41 @@
+name: Arenyxa Phase 3 Windows PostgreSQL 16.15 Validation
+
+on:
+  push:
+    branches: ["phase3/windows-pg16-20260920"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-pg16:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    env:
+      PYTHONUTF8: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa-ci@127.0.0.1:55432/arenyxa_ci
+      ARENYXA_POSTGRES_TEST_DATABASE: arenyxa_ci
+      PHASE2_ARCHIVE_SHA256: 44b14ee4f36a45c573d9678976253acc7b8d4556d27e2d829a0d4ec2df1a5d61
+      PHASE2_BASE_COMMIT: db1c1213b090e71320143273e9c51e049b861b87
+      PHASE2_RUNTIME_PATCH_SHA256: 53c2c696b26afc97f0ddfad986ccd84c6520cfd924fea5617e9ef009c02bcd40
+      PHASE2_RUNTIME_MANIFEST_SHA256: b9f71a21bcbf8d16902f4e954beadcc5e11aa84eba3355349cc3419441797771
+      PHASE3_CI_BUNDLE_SHA256: 184207caba86964651342d4c1e5e97ad00b9462685908104bf2fb167da4f028a
+      HISTORICAL_GATE_SHA256: ba766b7e02b0f511c1e721628e8e0d615adada27b24918762a73bc1ef7762588
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Reconstruct, provision, verify correctness, and run P99 campaign
+        shell: pwsh
+        run: ./.phase3/run_windows_phase3.ps1
+      - name: Upload Windows CI evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: phase3-windows-pg16-evidence
+          path: evidence
