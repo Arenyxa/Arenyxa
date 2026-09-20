@@ -84,7 +84,9 @@ jobs:
               archive.extractall('.')
           print(f'verified and extracted {len(members)} Phase 3 CI bundle members')
           PY
-          test "$(git rev-parse HEAD^)" = "$PHASE2_BASE_COMMIT"
+          git merge-base --is-ancestor "$PHASE2_BASE_COMMIT" HEAD
+          unexpected="$(git diff --name-only "$PHASE2_BASE_COMMIT" HEAD | grep -Ev '^(\\.phase3/bundle/|\\.github/workflows/phase3-live-pg16\\.yml$)' || true)"
+          test -z "$unexpected" || { echo "unexpected committed paths before Phase 2 reconstruction:"; echo "$unexpected"; exit 1; }
           test "$(sha256sum .phase3/phase2_pg_runtime_from_main.patch | cut -d' ' -f1)" = "$PHASE2_RUNTIME_PATCH_SHA256"
           test "$(sha256sum .phase3/phase2_pg_runtime_file_hashes.json | cut -d' ' -f1)" = "$PHASE2_RUNTIME_MANIFEST_SHA256"
           git apply --check .phase3/phase2_pg_runtime_from_main.patch
@@ -121,7 +123,7 @@ jobs:
             test "$i" -lt 40
             sleep 2
           done
-          test "$(docker exec "$ID" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW server_version;')" = "16.15"
+          test "$(docker exec "$ID" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW server_version_num;')" = "160015"
           test "$(docker exec "$ID" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW max_connections;')" = "256"
           test "$(docker exec "$ID" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW fsync;')" = "on"
           test "$(docker exec "$ID" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW synchronous_commit;')" = "on"
@@ -229,7 +231,10 @@ jobs:
               archive.extractall('.')
           print(f'verified and extracted {len(members)} Phase 3 CI bundle members')
           '@ | python -
-          if ((git rev-parse HEAD^) -ne $env:PHASE2_BASE_COMMIT) { throw 'Phase 2 base commit mismatch' }
+          git merge-base --is-ancestor $env:PHASE2_BASE_COMMIT HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Phase 2 base commit is not an ancestor' }
+          $Unexpected = @(git diff --name-only $env:PHASE2_BASE_COMMIT HEAD | Where-Object { $_ -notmatch '^\\.phase3/bundle/' -and $_ -ne '.github/workflows/phase3-live-pg16.yml' })
+          if ($Unexpected.Count -ne 0) { throw "unexpected committed paths before Phase 2 reconstruction: $($Unexpected -join ', ')" }
           $PatchHash = (Get-FileHash .phase3/phase2_pg_runtime_from_main.patch -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($PatchHash -ne $env:PHASE2_RUNTIME_PATCH_SHA256) { throw "runtime patch hash mismatch: $PatchHash" }
           $ManifestHash = (Get-FileHash .phase3/phase2_pg_runtime_file_hashes.json -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -290,7 +295,7 @@ jobs:
             Start-Sleep -Seconds 2
           }
           if (-not $Ready) { throw 'PostgreSQL restart did not become ready' }
-          if ((& psql -h 127.0.0.1 -p 55432 -U postgres -d arenyxa_ci -Atc 'SHOW server_version;').Trim() -ne '16.15') { throw 'server_version is not 16.15' }
+          if ((& psql -h 127.0.0.1 -p 55432 -U postgres -d arenyxa_ci -Atc 'SHOW server_version_num;').Trim() -ne '160015') { throw 'server_version_num is not 160015 (PostgreSQL 16.15)' }
           if ((& psql -h 127.0.0.1 -p 55432 -U postgres -d arenyxa_ci -Atc 'SHOW max_connections;').Trim() -ne '256') { throw 'max_connections is not 256' }
           if ((& psql -h 127.0.0.1 -p 55432 -U postgres -d arenyxa_ci -Atc 'SHOW fsync;').Trim() -ne 'on') { throw 'fsync is not on' }
           if ((& psql -h 127.0.0.1 -p 55432 -U postgres -d arenyxa_ci -Atc 'SHOW synchronous_commit;').Trim() -ne 'on') { throw 'synchronous_commit is not on' }
