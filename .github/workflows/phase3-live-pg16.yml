@@ -2,7 +2,7 @@ name: Arenyxa Phase 3 Live PostgreSQL 16.15 Validation
 
 on:
   push:
-    branches: ["phase3/live-pg16-20260920b"]
+    branches: ["phase3/live-pg16-20260920c"]
   workflow_dispatch:
 
 permissions:
