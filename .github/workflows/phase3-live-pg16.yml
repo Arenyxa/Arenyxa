@@ -85,7 +85,7 @@ jobs:
           print(f'verified and extracted {len(members)} Phase 3 CI bundle members')
           PY
           git merge-base --is-ancestor "$PHASE2_BASE_COMMIT" HEAD
-          unexpected="$(git diff --name-only "$PHASE2_BASE_COMMIT" HEAD | grep -Ev '^(\\.phase3/bundle/|\\.github/workflows/phase3-live-pg16\\.yml$)' || true)"
+          unexpected="$(git diff --name-only "$PHASE2_BASE_COMMIT" HEAD | grep -Ev '^(\.phase3/bundle/|\.github/workflows/phase3-live-pg16\.yml$)' || true)"
           test -z "$unexpected" || { echo "unexpected committed paths before Phase 2 reconstruction:"; echo "$unexpected"; exit 1; }
           test "$(sha256sum .phase3/phase2_pg_runtime_from_main.patch | cut -d' ' -f1)" = "$PHASE2_RUNTIME_PATCH_SHA256"
           test "$(sha256sum .phase3/phase2_pg_runtime_file_hashes.json | cut -d' ' -f1)" = "$PHASE2_RUNTIME_MANIFEST_SHA256"
@@ -233,7 +233,7 @@ jobs:
           '@ | python -
           git merge-base --is-ancestor $env:PHASE2_BASE_COMMIT HEAD
           if ($LASTEXITCODE -ne 0) { throw 'Phase 2 base commit is not an ancestor' }
-          $Unexpected = @(git diff --name-only $env:PHASE2_BASE_COMMIT HEAD | Where-Object { $_ -notmatch '^\\.phase3/bundle/' -and $_ -ne '.github/workflows/phase3-live-pg16.yml' })
+          $Unexpected = @(git diff --name-only $env:PHASE2_BASE_COMMIT HEAD | Where-Object { $_ -notmatch '^\.phase3/bundle/' -and $_ -ne '.github/workflows/phase3-live-pg16.yml' })
           if ($Unexpected.Count -ne 0) { throw "unexpected committed paths before Phase 2 reconstruction: $($Unexpected -join ', ')" }
           $PatchHash = (Get-FileHash .phase3/phase2_pg_runtime_from_main.patch -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($PatchHash -ne $env:PHASE2_RUNTIME_PATCH_SHA256) { throw "runtime patch hash mismatch: $PatchHash" }
