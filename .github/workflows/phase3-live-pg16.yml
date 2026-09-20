@@ -1,0 +1,332 @@
+name: Arenyxa Phase 3 Live PostgreSQL 16.15 Validation
+
+on:
+  push:
+    branches: ["phase3/live-pg16-20260920"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arenyxa-phase3-live-pg16-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  cross-platform-pg16:
+    name: Cross-platform PG16 correctness and P99 evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    services:
+      postgres:
+        image: postgres:16.15
+        env:
+          POSTGRES_USER: arenyxa
+          POSTGRES_PASSWORD: arenyxa-ci
+          POSTGRES_DB: arenyxa_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arenyxa -d arenyxa_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PYTHONUTF8: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa-ci@127.0.0.1:5432/arenyxa_ci
+      ARENYXA_POSTGRES_TEST_DATABASE: arenyxa_ci
+      PHASE2_ARCHIVE_SHA256: 44b14ee4f36a45c573d9678976253acc7b8d4556d27e2d829a0d4ec2df1a5d61
+      PHASE2_BASE_COMMIT: db1c1213b090e71320143273e9c51e049b861b87
+      PHASE2_RUNTIME_PATCH_SHA256: 53c2c696b26afc97f0ddfad986ccd84c6520cfd924fea5617e9ef009c02bcd40
+      PHASE2_RUNTIME_MANIFEST_SHA256: b9f71a21bcbf8d16902f4e954beadcc5e11aa84eba3355349cc3419441797771
+      PHASE3_CI_BUNDLE_SHA256: 184207caba86964651342d4c1e5e97ad00b9462685908104bf2fb167da4f028a
+      HISTORICAL_GATE_SHA256: ba766b7e02b0f511c1e721628e8e0d615adada27b24918762a73bc1ef7762588
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install Phase 3 runtime dependencies
+        run: >-
+          python -m pip install --upgrade pip &&
+          python -m pip install
+          "tzdata>=2025.2"
+          "cryptography>=50,<51"
+          "httpx>=0.28,<1"
+          "psycopg[binary]>=3.2,<4"
+          "psycopg-pool>=3.2,<4"
+          "opentelemetry-api>=1.30,<2"
+      - name: Reconstruct and verify exact Phase 2 PostgreSQL runtime closure
+        shell: bash
+        run: |
+          mkdir -p evidence
+          python - <<'PY'
+          import base64, hashlib, os, tarfile
+          from pathlib import Path
+          parts = sorted(Path('.phase3/bundle').glob('part-*.b64'))
+          if not parts:
+              raise SystemExit('Phase 3 CI bundle chunks are missing')
+          bundle = Path('phase3_ci_bundle.tar.xz')
+          bundle.write_bytes(base64.b64decode(''.join(p.read_text('ascii').strip() for p in parts), validate=True))
+          actual = hashlib.sha256(bundle.read_bytes()).hexdigest()
+          if actual != os.environ['PHASE3_CI_BUNDLE_SHA256']:
+              raise SystemExit(f'Phase 3 CI bundle hash mismatch: {actual}')
+          with tarfile.open(bundle, 'r:xz') as archive:
+              members = archive.getmembers()
+              for member in members:
+                  path = Path(member.name)
+                  if path.is_absolute() or '..' in path.parts or not member.isfile():
+                      raise SystemExit(f'unsafe Phase 3 CI bundle member: {member.name}')
+              archive.extractall('.')
+          print(f'verified and extracted {len(members)} Phase 3 CI bundle members')
+          PY
+          test "$(git rev-parse HEAD^)" = "$PHASE2_BASE_COMMIT"
+          test "$(sha256sum .phase3/phase2_pg_runtime_from_main.patch | cut -d' ' -f1)" = "$PHASE2_RUNTIME_PATCH_SHA256"
+          test "$(sha256sum .phase3/phase2_pg_runtime_file_hashes.json | cut -d' ' -f1)" = "$PHASE2_RUNTIME_MANIFEST_SHA256"
+          git apply --check .phase3/phase2_pg_runtime_from_main.patch
+          git apply .phase3/phase2_pg_runtime_from_main.patch
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          manifest_path = Path('.phase3/phase2_pg_runtime_file_hashes.json')
+          manifest = json.loads(manifest_path.read_text('utf-8'))
+          if manifest['phase2_source_archive_sha256'] != os.environ['PHASE2_ARCHIVE_SHA256']:
+              raise SystemExit('Phase 2 archive identity mismatch')
+          failures = []
+          for relative, expected in manifest['files'].items():
+              path = Path(relative)
+              actual = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+              if actual != expected:
+                  failures.append({'path': relative, 'expected': expected, 'actual': actual})
+          if failures:
+              raise SystemExit(f'Phase 2 runtime closure mismatch: {failures[:5]}')
+          print(f"verified {len(manifest['files'])} exact Phase 2 runtime files")
+          PY
+          test "$(sha256sum .phase3/tools/postgresql_64_worker_128_concurrency_gate.py | cut -d' ' -f1)" = "$HISTORICAL_GATE_SHA256"
+          echo "PYTHONPATH=$GITHUB_WORKSPACE/src:$GITHUB_WORKSPACE/.phase3/tools" >> "$GITHUB_ENV"
+      - name: Configure PostgreSQL 16.15 durability and stress capacity
+        shell: bash
+        run: |
+          ID="${{ job.services.postgres.id }}"
+          docker exec "$ID" psql -U arenyxa -d arenyxa_ci -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET max_connections = '256';"
+          docker exec "$ID" psql -U arenyxa -d arenyxa_ci -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET fsync = 'on';"
+          docker exec "$ID" psql -U arenyxa -d arenyxa_ci -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET synchronous_commit = 'on';"
+          docker restart "$ID"
+          for i in $(seq 1 40); do
+            docker exec "$ID" pg_isready -U arenyxa -d arenyxa_ci && break
+            test "$i" -lt 40
+            sleep 2
+          done
+          test "$(docker exec "$ID" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW server_version;')" = "16.15"
+          test "$(docker exec "$ID" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW max_connections;')" = "256"
+          test "$(docker exec "$ID" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW fsync;')" = "on"
+          test "$(docker exec "$ID" psql -U arenyxa -d arenyxa_ci -Atc 'SHOW synchronous_commit;')" = "on"
+      - name: Capture cross-platform environment identity
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, platform
+          from pathlib import Path
+          import psycopg
+          dsn = os.environ['ARENYXA_POSTGRES_TEST_DSN']
+          with psycopg.connect(dsn) as connection:
+              row = connection.execute("SELECT version(), current_database(), current_setting('server_version'), current_setting('max_connections'), current_setting('fsync'), current_setting('synchronous_commit')").fetchone()
+          data = {
+              'evidence_class': 'CROSS-PLATFORM PG16 EVIDENCE',
+              'runner_os': platform.platform(),
+              'python': platform.python_version(),
+              'cpu_count': os.cpu_count(),
+              'postgresql': {
+                  'version': row[0], 'database': row[1], 'server_version': row[2],
+                  'max_connections': row[3], 'fsync': row[4], 'synchronous_commit': row[5],
+              },
+              'phase2_source_archive_sha256': os.environ['PHASE2_ARCHIVE_SHA256'],
+              'phase2_base_commit': os.environ['PHASE2_BASE_COMMIT'],
+              'phase2_runtime_patch_sha256': os.environ['PHASE2_RUNTIME_PATCH_SHA256'],
+              'phase2_runtime_manifest_sha256': os.environ['PHASE2_RUNTIME_MANIFEST_SHA256'],
+              'historical_gate_sha256': os.environ['HISTORICAL_GATE_SHA256'],
+          }
+          Path('evidence/ENVIRONMENT.json').write_text(json.dumps(data, indent=2, sort_keys=True) + '\n')
+          PY
+      - name: Live PostgreSQL correctness gate
+        run: >-
+          python .phase3/tools/phase3_postgresql_correctness_gate.py
+          --race-iterations 50 --reconcile-jobs 256
+          --reset-database arenyxa_ci
+          --report evidence/CORRECTNESS.json
+      - name: Authoritative 64W 128C 1024-job release gate
+        run: >-
+          python .phase3/tools/postgresql_64_worker_128_concurrency_gate.py
+          --jobs 1024 --p99-ms 500
+          --report evidence/AUTHORITATIVE_64W_128C_GATE.json
+      - name: Repeated natural-warm campaign
+        run: >-
+          python .phase3/tools/phase3_postgresql_p99_campaign.py
+          --runs 10 --jobs 1024 --hard-p99-ms 500 --preferred-p99-ms 300
+          --correctness-race-iterations 50 --correctness-reconcile-jobs 256
+          --reset-database arenyxa_ci
+          --report evidence/P99_CAMPAIGN.json
+      - name: Upload cross-platform evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: phase3-cross-platform-pg16-evidence
+          path: evidence
+
+  windows-pg16:
+    name: Windows Server PG16 correctness and P99 evidence
+    runs-on: windows-2022
+    timeout-minutes: 120
+    env:
+      PYTHONUTF8: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      ARENYXA_POSTGRES_TEST_DSN: postgresql://arenyxa:arenyxa-ci@127.0.0.1:55432/arenyxa_ci
+      ARENYXA_POSTGRES_TEST_DATABASE: arenyxa_ci
+      PHASE2_ARCHIVE_SHA256: 44b14ee4f36a45c573d9678976253acc7b8d4556d27e2d829a0d4ec2df1a5d61
+      PHASE2_BASE_COMMIT: db1c1213b090e71320143273e9c51e049b861b87
+      PHASE2_RUNTIME_PATCH_SHA256: 53c2c696b26afc97f0ddfad986ccd84c6520cfd924fea5617e9ef009c02bcd40
+      PHASE2_RUNTIME_MANIFEST_SHA256: b9f71a21bcbf8d16902f4e954beadcc5e11aa84eba3355349cc3419441797771
+      PHASE3_CI_BUNDLE_SHA256: 184207caba86964651342d4c1e5e97ad00b9462685908104bf2fb167da4f028a
+      HISTORICAL_GATE_SHA256: ba766b7e02b0f511c1e721628e8e0d615adada27b24918762a73bc1ef7762588
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install Phase 3 runtime dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "tzdata>=2025.2" "cryptography>=50,<51" "httpx>=0.28,<1" "psycopg[binary]>=3.2,<4" "psycopg-pool>=3.2,<4" "opentelemetry-api>=1.30,<2"
+      - name: Reconstruct and verify exact Phase 2 PostgreSQL runtime closure
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force evidence | Out-Null
+          @'
+          import base64, hashlib, os, tarfile
+          from pathlib import Path
+          parts = sorted(Path('.phase3/bundle').glob('part-*.b64'))
+          if not parts:
+              raise SystemExit('Phase 3 CI bundle chunks are missing')
+          bundle = Path('phase3_ci_bundle.tar.xz')
+          bundle.write_bytes(base64.b64decode(''.join(p.read_text('ascii').strip() for p in parts), validate=True))
+          actual = hashlib.sha256(bundle.read_bytes()).hexdigest()
+          if actual != os.environ['PHASE3_CI_BUNDLE_SHA256']:
+              raise SystemExit(f'Phase 3 CI bundle hash mismatch: {actual}')
+          with tarfile.open(bundle, 'r:xz') as archive:
+              members = archive.getmembers()
+              for member in members:
+                  path = Path(member.name)
+                  if path.is_absolute() or '..' in path.parts or not member.isfile():
+                      raise SystemExit(f'unsafe Phase 3 CI bundle member: {member.name}')
+              archive.extractall('.')
+          print(f'verified and extracted {len(members)} Phase 3 CI bundle members')
+          '@ | python -
+          if ((git rev-parse HEAD^) -ne $env:PHASE2_BASE_COMMIT) { throw 'Phase 2 base commit mismatch' }
+          $PatchHash = (Get-FileHash .phase3/phase2_pg_runtime_from_main.patch -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($PatchHash -ne $env:PHASE2_RUNTIME_PATCH_SHA256) { throw "runtime patch hash mismatch: $PatchHash" }
+          $ManifestHash = (Get-FileHash .phase3/phase2_pg_runtime_file_hashes.json -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($ManifestHash -ne $env:PHASE2_RUNTIME_MANIFEST_SHA256) { throw "runtime manifest hash mismatch: $ManifestHash" }
+          git apply --check .phase3/phase2_pg_runtime_from_main.patch
+          if ($LASTEXITCODE -ne 0) { throw 'Phase 2 runtime patch preflight failed' }
+          git apply .phase3/phase2_pg_runtime_from_main.patch
+          if ($LASTEXITCODE -ne 0) { throw 'Phase 2 runtime patch failed' }
+          @'
+          import hashlib, json, os
+          from pathlib import Path
+          manifest = json.loads(Path('.phase3/phase2_pg_runtime_file_hashes.json').read_text('utf-8'))
+          if manifest['phase2_source_archive_sha256'] != os.environ['PHASE2_ARCHIVE_SHA256']:
+              raise SystemExit('Phase 2 archive identity mismatch')
+          failures = []
+          for relative, expected in manifest['files'].items():
+              path = Path(relative)
+              actual = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+              if actual != expected:
+                  failures.append({'path': relative, 'expected': expected, 'actual': actual})
+          if failures:
+              raise SystemExit(f'Phase 2 runtime closure mismatch: {failures[:5]}')
+          print(f"verified {len(manifest['files'])} exact Phase 2 runtime files")
+          '@ | python -
+          $GateHash = (Get-FileHash .phase3/tools/postgresql_64_worker_128_concurrency_gate.py -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($GateHash -ne $env:HISTORICAL_GATE_SHA256) { throw "historical gate hash mismatch: $GateHash" }
+          "PYTHONPATH=$env:GITHUB_WORKSPACE/src;$env:GITHUB_WORKSPACE/.phase3/tools" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Install PostgreSQL 16.15
+        shell: pwsh
+        run: |
+          choco install postgresql16 --version=16.15.0 --yes --no-progress --params "/Password:arenyxa-ci /Port:55432"
+          if ($LASTEXITCODE -notin @(0, 1641, 3010)) { throw "Chocolatey PostgreSQL install failed: $LASTEXITCODE" }
+          $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
+          "PATH=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $env:PGPASSWORD = 'arenyxa-ci'
+          $Ready = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            & pg_isready -h 127.0.0.1 -p 55432 -U postgres
+            if ($LASTEXITCODE -eq 0) { $Ready = $true; break }
+            Start-Sleep -Seconds 2
+          }
+          if (-not $Ready) { throw 'PostgreSQL 16.15 did not become ready' }
+          & psql -h 127.0.0.1 -p 55432 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE arenyxa LOGIN PASSWORD 'arenyxa-ci';"
+          if ($LASTEXITCODE -ne 0) { throw 'CREATE ROLE failed' }
+          & createdb -h 127.0.0.1 -p 55432 -U postgres -O arenyxa arenyxa_ci
+          if ($LASTEXITCODE -ne 0) { throw 'CREATE DATABASE failed' }
+          & psql -h 127.0.0.1 -p 55432 -U postgres -d arenyxa_ci -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET max_connections = '256';"
+          & psql -h 127.0.0.1 -p 55432 -U postgres -d arenyxa_ci -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET fsync = 'on';"
+          & psql -h 127.0.0.1 -p 55432 -U postgres -d arenyxa_ci -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET synchronous_commit = 'on';"
+          if ($LASTEXITCODE -ne 0) { throw 'ALTER SYSTEM failed' }
+          $Service = Get-Service | Where-Object { $_.Name -like 'postgresql*' } | Select-Object -First 1
+          if (-not $Service) { throw 'PostgreSQL service not found' }
+          Restart-Service -Name $Service.Name
+          $Ready = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            & pg_isready -h 127.0.0.1 -p 55432 -U postgres
+            if ($LASTEXITCODE -eq 0) { $Ready = $true; break }
+            Start-Sleep -Seconds 2
+          }
+          if (-not $Ready) { throw 'PostgreSQL restart did not become ready' }
+          if ((& psql -h 127.0.0.1 -p 55432 -U postgres -d arenyxa_ci -Atc 'SHOW server_version;').Trim() -ne '16.15') { throw 'server_version is not 16.15' }
+          if ((& psql -h 127.0.0.1 -p 55432 -U postgres -d arenyxa_ci -Atc 'SHOW max_connections;').Trim() -ne '256') { throw 'max_connections is not 256' }
+          if ((& psql -h 127.0.0.1 -p 55432 -U postgres -d arenyxa_ci -Atc 'SHOW fsync;').Trim() -ne 'on') { throw 'fsync is not on' }
+          if ((& psql -h 127.0.0.1 -p 55432 -U postgres -d arenyxa_ci -Atc 'SHOW synchronous_commit;').Trim() -ne 'on') { throw 'synchronous_commit is not on' }
+      - name: Capture Windows CI environment identity
+        shell: pwsh
+        run: |
+          @'
+          import json, os, platform
+          from pathlib import Path
+          import psycopg
+          with psycopg.connect(os.environ['ARENYXA_POSTGRES_TEST_DSN']) as connection:
+              row = connection.execute("SELECT version(), current_database(), current_setting('server_version'), current_setting('max_connections'), current_setting('fsync'), current_setting('synchronous_commit')").fetchone()
+          data = {
+              'evidence_class': 'WINDOWS CI PG16 EVIDENCE — NOT USER WINDOWS 11 SIGN-OFF',
+              'runner_os': platform.platform(), 'python': platform.python_version(), 'cpu_count': os.cpu_count(),
+              'postgresql': {'version': row[0], 'database': row[1], 'server_version': row[2], 'max_connections': row[3], 'fsync': row[4], 'synchronous_commit': row[5]},
+              'phase2_source_archive_sha256': os.environ['PHASE2_ARCHIVE_SHA256'],
+              'phase2_base_commit': os.environ['PHASE2_BASE_COMMIT'],
+              'phase2_runtime_patch_sha256': os.environ['PHASE2_RUNTIME_PATCH_SHA256'],
+              'phase2_runtime_manifest_sha256': os.environ['PHASE2_RUNTIME_MANIFEST_SHA256'],
+              'historical_gate_sha256': os.environ['HISTORICAL_GATE_SHA256'],
+          }
+          Path('evidence/ENVIRONMENT.json').write_text(json.dumps(data, indent=2, sort_keys=True) + '\n')
+          '@ | python -
+      - name: Live PostgreSQL correctness gate
+        shell: pwsh
+        run: python .phase3/tools/phase3_postgresql_correctness_gate.py --race-iterations 50 --reconcile-jobs 256 --reset-database arenyxa_ci --report evidence/CORRECTNESS.json
+      - name: Authoritative 64W 128C 1024-job release gate
+        shell: pwsh
+        run: python .phase3/tools/postgresql_64_worker_128_concurrency_gate.py --jobs 1024 --p99-ms 500 --report evidence/AUTHORITATIVE_64W_128C_GATE.json
+      - name: Repeated natural-warm campaign
+        shell: pwsh
+        run: python .phase3/tools/phase3_postgresql_p99_campaign.py --runs 10 --jobs 1024 --hard-p99-ms 500 --preferred-p99-ms 300 --correctness-race-iterations 50 --correctness-reconcile-jobs 256 --reset-database arenyxa_ci --report evidence/P99_CAMPAIGN.json
+      - name: Upload Windows CI evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: phase3-windows-pg16-evidence
+          path: evidence
