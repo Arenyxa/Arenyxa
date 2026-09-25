@@ -10,31 +10,43 @@ Final local engineering acceptance is evidence-driven. Native Windows/Npcap/ETW/
 
 ## Download, source, and official websites
 
-- Download Arenyxa (latest formal release): [https://github.com/Arenyxa/Arenyxa/releases/latest](https://github.com/Arenyxa/Arenyxa/releases/latest)
-- Source code and repository: [https://github.com/Arenyxa/Arenyxa](https://github.com/Arenyxa/Arenyxa)
-- Flagship experience: [https://arenyxa.pages.dev/](https://arenyxa.pages.dev/)
-- Official introduction: [https://arenyxa.github.io/](https://arenyxa.github.io/)
+Download Arenyxa (latest formal release): [https://github.com/Arenyxa/Arenyxa/releases/latest](https://github.com/Arenyxa/Arenyxa/releases/latest)
+
+Source code and repository: [https://github.com/Arenyxa/Arenyxa](https://github.com/Arenyxa/Arenyxa)
+
+Flagship experience: [https://arenyxa.pages.dev/](https://arenyxa.pages.dev/)
+
+Official introduction: [https://arenyxa.github.io/](https://arenyxa.github.io/)
 
 Release downloads contain the published installer assets. GitHub's automatically generated source archives are source code, not Windows installers.
 
 ## V8.0 platform hardening carried forward
 
+`SurvivabilityManager` provides explicit `normal`, `degraded`, `resource_pressure`, `read_only`, `recovering`, and `safe_mode` states instead of silent partial failure. Transitions are bounded, persisted for diagnostics, and expose an admission policy that keeps read/diagnostic/audit paths available while suppressing unsafe heavy work or noncritical writes.
 
-- `SurvivabilityManager` provides explicit `normal`, `degraded`, `resource_pressure`, `read_only`, `recovering`, and `safe_mode` states instead of silent partial failure. Transitions are bounded, persisted for diagnostics, and expose an admission policy that keeps read/diagnostic/audit paths available while suppressing unsafe heavy work or noncritical writes.
-- CPU, memory, disk, browser, and worker pressure are sampled through the existing `SystemResourceProbe` / `ResourceGovernor`; critical disk pressure enters read-only mode, CPU/memory pressure reduces adaptive ceilings, and recovery is gradual rather than an immediate concurrency spike.
-- `PerformanceTelemetry` records bounded latency samples, counters, and gauges with p50/p95/p99 summaries. Metric names and samples are budgeted so telemetry cannot become an unbounded memory sink.
-- Runtime-supervisor incidents can feed the survivability state machine. A detected component/event-loop stall remains isolated, keeps diagnostics available, and records the component and diagnostic path instead of collapsing the process-wide health view into an unexplained failure.
-- The shared `PlatformControlPlane` exposes survivability and performance snapshots and runs the extended Phase 6 failure drills through the persistent Job System. Diagnostic ZIPs now include `survivability.json` and `performance-telemetry.json`.
-- CLI parity is provided through `arenyxa resilience status`, `resilience refresh`, `resilience performance`, and `resilience drills`. GUI Diagnostics and Performance workbenches consume the same control-plane services rather than duplicating business logic.
-- The original four periodic resilience drills are preserved for compatibility. Phase 6 adds an extended seven-drill campaign covering worker lease recovery, synthetic 50% network loss with bounded retries, delayed-disk checkpoint integrity, runtime recovery audit, SQLite lock backpressure, corrupt-settings fallback, and resource-pressure degradation/recovery.
-- Existing bounded queues, async HTTP connection reuse, SQLite contention controls, PostgreSQL pooling, capture/drop accounting, proxy persistence hardening, parser budgets, Job System cancellation/timeout, Safe Mode, Recovery UI, and startup recovery remain preserved and are validated as regression dependencies of this phase.
+CPU, memory, disk, browser, and worker pressure are sampled through the existing `SystemResourceProbe` / `ResourceGovernor`; critical disk pressure enters read-only mode, CPU/memory pressure reduces adaptive ceilings, and recovery is gradual rather than an immediate concurrency spike.
+
+`PerformanceTelemetry` records bounded latency samples, counters, and gauges with p50/p95/p99 summaries. Metric names and samples are budgeted so telemetry cannot become an unbounded memory sink.
+
+Runtime-supervisor incidents can feed the survivability state machine. A detected component/event-loop stall remains isolated, keeps diagnostics available, and records the component and diagnostic path instead of collapsing the process-wide health view into an unexplained failure.
+
+The shared `PlatformControlPlane` exposes survivability and performance snapshots and runs the extended Phase 6 failure drills through the persistent Job System. Diagnostic ZIPs now include `survivability.json` and `performance-telemetry.json`.
+
+CLI parity is provided through `arenyxa resilience status`, `resilience refresh`, `resilience performance`, and `resilience drills`. GUI Diagnostics and Performance workbenches consume the same control-plane services rather than duplicating business logic.
+
+The original four periodic resilience drills are preserved for compatibility. Phase 6 adds an extended seven-drill campaign covering worker lease recovery, synthetic 50% network loss with bounded retries, delayed-disk checkpoint integrity, runtime recovery audit, SQLite lock backpressure, corrupt-settings fallback, and resource-pressure degradation/recovery.
+
+Existing bounded queues, async HTTP connection reuse, SQLite contention controls, PostgreSQL pooling, capture/drop accounting, proxy persistence hardening, parser budgets, Job System cancellation/timeout, Safe Mode, Recovery UI, and startup recovery remain preserved and are validated as regression dependencies of this phase.
 
 ### Phase 1-5 capabilities retained
 
-- Modern Desktop and Headless Server task runs use `AsyncRunOrchestrator`; HTTPX transports reuse bounded TCP/TLS connection pools while the synchronous transport remains the explicit compatibility fallback.
-- `PlatformControlPlane`, `TrafficControlPlane`, and `EnterpriseControlPlane` remain the shared application-service boundaries for GUI, CLI, Server, Worker, and automation surfaces.
-- Network Capture, Protocol Intelligence, Proxy Suite, MITM, API Security Lab, Traffic Forensics, Enterprise identity/governance, Server/Worker lease execution, Windows runtime/service controls, signed plugin trust, Security Kernel, Audit, Job System, Storage, Recovery, and Diagnostics remain connected.
-- Base installation stays modular; optional desktop, capture, browser, analysis, server, database, and telemetry extras remain available.
+Modern Desktop and Headless Server task runs use `AsyncRunOrchestrator`; HTTPX transports reuse bounded TCP/TLS connection pools while the synchronous transport remains the explicit compatibility fallback.
+
+`PlatformControlPlane`, `TrafficControlPlane`, and `EnterpriseControlPlane` remain the shared application-service boundaries for GUI, CLI, Server, Worker, and automation surfaces.
+
+Network Capture, Protocol Intelligence, Proxy Suite, MITM, API Security Lab, Traffic Forensics, Enterprise identity/governance, Server/Worker lease execution, Windows runtime/service controls, signed plugin trust, Security Kernel, Audit, Job System, Storage, Recovery, and Diagnostics remain connected.
+
+Base installation stays modular; optional desktop, capture, browser, analysis, server, database, and telemetry extras remain available.
 
 ### Professional CLI examples
 
@@ -57,39 +69,67 @@ Network interception, replay, and packet capture must only be used on systems th
 
 ## Product invariants
 
-- Data and storage remain under the user's control. Core workflows use local deterministic processing and do not require an official cloud account.
-- `Task` definitions and immutable `Run` facts are separate. Past results retain the configuration snapshot that produced them.
-- Network, parsing, cleaning, database, capture, export, and plugin work never runs on the GUI event loop.
-- Cookie, Authorization, tokens, request bodies, and private paths are redacted at log, diagnostic, export, and plugin boundaries by default.
-- The six visual presets share one information architecture and one set of page objects. Theme changes only update semantic tokens and rendering.
-- Liquid Glass is an enhancement layer. Solid fallback, Reduce Motion, and adaptive-quality modes preserve every business function.
+Data and storage remain under the user's control. Core workflows use local deterministic processing and do not require an official cloud account.
+
+`Task` definitions and immutable `Run` facts are separate. Past results retain the configuration snapshot that produced them.
+
+Network, parsing, cleaning, database, capture, export, and plugin work never runs on the GUI event loop.
+
+Cookie, Authorization, tokens, request bodies, and private paths are redacted at log, diagnostic, export, and plugin boundaries by default.
+
+The six visual presets share one information architecture and one set of page objects. Theme changes only update semantic tokens and rendering.
+
+Liquid Glass is an enhancement layer. Solid fallback, Reduce Motion, and adaptive-quality modes preserve every business function.
 
 ## Implemented workspaces
 
-- Dashboard with local metrics, recent runs, schedules, and health indicators
-- Capture Tasks with HTTP configuration, bounded multi-URL async fetching on the modern runtime with a bounded thread compatibility fallback, global/per-host concurrency limits, adaptive low-end budgets, HTML/JSON/XML parsing, CSS/XPath/JSON-path fields, cleaning, validation, preview, pause/resume/cancellation, run queue, and history
-- Search Center with SQLite FTS5
-- Data Management with virtualized paging, lineage, CSV/JSON/JSONL/XLSX streaming export, and Dataset Revision creation
-- Network Analysis with Browser Capture, tshark/dumpcap packet capture, process attribution, ring-buffer backpressure, dropped-event accounting, HAR analytics, Waterfall, Request Replay, TLS Inspector, DNS Analyzer, streaming PCAP/PCAPNG ingestion, native capture fallback, bounded TCP stream reassembly, flow-quality signals, and a native 87-protocol structured metadata catalog backed by dynamic external protocol/field discovery when the optional dissector runtime is present
-- Professional Suite with Packet Intelligence, Intercept & Debug, MITM Proxy, Extraction Lab, an independent Traffic Forensics workbench for passive host/error/latency/large-transfer/sensitive-plaintext triage, and bounded forensic JSON export that does not copy credential values into findings
-- V6.1 Unified Network Core with Project/Source ownership, deterministic Flow and HTTP request/response identities, DNS/TLS/WebSocket projections, and atomic dual-write compatibility with legacy capture events
-- V6.2 Network Capture Enrichment with bounded content-addressed Body References, HAR request/response body persistence, browser WebSocket frame capture, richer TLS/server metadata, and tshark DNS/TLS/endpoint normalization
-- V6.2.1 Autopilot Learning integration with a bounded local ExperienceStore, deterministic strategy priors, selector recovery ranking, failure classification, explicit feedback, and redacted JSONL export; the feature remains advisory and does not replace deterministic execution.
-- V6.3 Replay + API Map with normalized HTTP Exchange inventory, deterministic endpoint signatures, bounded JSON schema inference, verified Body Ref reconstruction, Secret-safe replay drafts, side-effect confirmation, structural response diff, replay history, and atomic API Map snapshots.
-- V6.4 Dataset + Data Lineage with first-class Dataset registry, immutable revisions, hidden build states, streaming Run materialization, stable logical record identity, bounded online schema inference, lineage graph persistence, and crash-safe revision recovery.
-- V6.5 Workflow Engine integration with Dataset Revision → Workflow → Dataset Revision execution, durable checkpoints, deterministic/idempotent output identities, node-level execution metrics, cancellation/resume, semantic workflow-definition guards, and end-to-end lineage.
-- Workflow / Visual Data Pipeline 2.0 with normal and failure edges
-- Automation with timezone-aware interval/daily/weekly scheduling
-- Advanced Platform with Smart Execution Planner, Website Intelligence Map, API Map, Compatibility, Performance, Security Center, and Universal Database Adapter diagnostics
-- Intelligence Studio with SmartPath 2.0/data-source discovery, Explainable Web Intelligence Blueprint (decision trace, cost/stability estimates, fallback chain), **Autopilot deterministic learning** (local privacy-preserving ExperienceStore, strategy priors, selector recovery ranking, failure classification, redacted future-training JSONL), Selector Studio/self-healing, zero-copy Network → HTTP → Workflow Context Bridge, HTTP Request Builder + assertions/code generation, GraphQL/WebSocket/SSE inspection, Browser Recorder 2.0, Data Quality/Schema Studio, Workflow Debugger + scoped variables, `arenyxa.workflow/v1` compatibility workflow schema (retained in v6.7), offline Compatibility Lab, Secrets Vault, project Python environments, Browser Profiles, checksum-verified Workflow Marketplace, opt-in distributed Headless Workers, and Live Run/Activity Center
-- Data Visualization Studio with line, bar, pie, heatmap, timeline, and offline coordinate-map rendering
-- Data Version Control with record/field/schema diff and non-destructive rollback service
-- Plugin discovery and subprocess sandbox with permissions, timeout, output, and Windows Job Object memory budgets
-- X-inspired minimal startup transition using the Arenyxa icon: instant first paint, no progress-bar theater, initialization continues behind the clean launch surface, and a paint-only in-window handoff continuously enlarges the centered mark while a center-origin circular mask reveals one prepared MainWindow frame; the diagonal-derived mask, shared launch geometry, OS/user Reduce Motion path, adaptive small-logical-screen minimums, and safe/legacy/reduced-visual bypasses cover portrait, ultrawide, multi-monitor, maximized, and high-DPI launches
-- Hardened project-scoped Developer Terminal with Arenyxa/Direct/PowerShell/CMD/Python modes, real-time streaming, cancellation, bounded output, session cwd/env/history, read-only SQL, structured logs, diagnostics, DNS/TCP/TLS/interface/socket probes, service/protocol lookup, offline packet summary/frame/statistics commands, native hex-frame protocol decoding, personalization, ten locales/RTL, and About/build information
-- Windows shell integration with live top-bar run/capture/advanced-operation progress, taskbar progress states, system-tray Blueprint/Autopilot/Compatibility quick actions, Intelligence Studio shortcuts, and command-palette actions
-- Startup self-healing health check and automatic Repair Center with crash/settings/database/plugin/file-integrity recovery and a local recovery payload
-- `.arenyxa` portable project package with legacy `.arenyxa` open compatibility, Browser Profiles, Regression Lab, Workflow Marketplace client, and Headless Server with token auth/RBAC
+Dashboard with local metrics, recent runs, schedules, and health indicators
+
+Capture Tasks with HTTP configuration, bounded multi-URL async fetching on the modern runtime with a bounded thread compatibility fallback, global/per-host concurrency limits, adaptive low-end budgets, HTML/JSON/XML parsing, CSS/XPath/JSON-path fields, cleaning, validation, preview, pause/resume/cancellation, run queue, and history
+
+Search Center with SQLite FTS5
+
+Data Management with virtualized paging, lineage, CSV/JSON/JSONL/XLSX streaming export, and Dataset Revision creation
+
+Network Analysis with Browser Capture, tshark/dumpcap packet capture, process attribution, ring-buffer backpressure, dropped-event accounting, HAR analytics, Waterfall, Request Replay, TLS Inspector, DNS Analyzer, streaming PCAP/PCAPNG ingestion, native capture fallback, bounded TCP stream reassembly, flow-quality signals, and a native 87-protocol structured metadata catalog backed by dynamic external protocol/field discovery when the optional dissector runtime is present
+
+Professional Suite with Packet Intelligence, Intercept & Debug, MITM Proxy, Extraction Lab, an independent Traffic Forensics workbench for passive host/error/latency/large-transfer/sensitive-plaintext triage, and bounded forensic JSON export that does not copy credential values into findings
+
+V6.1 Unified Network Core with Project/Source ownership, deterministic Flow and HTTP request/response identities, DNS/TLS/WebSocket projections, and atomic dual-write compatibility with legacy capture events
+
+V6.2 Network Capture Enrichment with bounded content-addressed Body References, HAR request/response body persistence, browser WebSocket frame capture, richer TLS/server metadata, and tshark DNS/TLS/endpoint normalization
+
+V6.2.1 Autopilot Learning integration with a bounded local ExperienceStore, deterministic strategy priors, selector recovery ranking, failure classification, explicit feedback, and redacted JSONL export; the feature remains advisory and does not replace deterministic execution.
+
+V6.3 Replay + API Map with normalized HTTP Exchange inventory, deterministic endpoint signatures, bounded JSON schema inference, verified Body Ref reconstruction, Secret-safe replay drafts, side-effect confirmation, structural response diff, replay history, and atomic API Map snapshots.
+
+V6.4 Dataset + Data Lineage with first-class Dataset registry, immutable revisions, hidden build states, streaming Run materialization, stable logical record identity, bounded online schema inference, lineage graph persistence, and crash-safe revision recovery.
+
+V6.5 Workflow Engine integration with Dataset Revision → Workflow → Dataset Revision execution, durable checkpoints, deterministic/idempotent output identities, node-level execution metrics, cancellation/resume, semantic workflow-definition guards, and end-to-end lineage.
+
+Workflow / Visual Data Pipeline 2.0 with normal and failure edges
+
+Automation with timezone-aware interval/daily/weekly scheduling
+
+Advanced Platform with Smart Execution Planner, Website Intelligence Map, API Map, Compatibility, Performance, Security Center, and Universal Database Adapter diagnostics
+
+Intelligence Studio with SmartPath 2.0/data-source discovery, Explainable Web Intelligence Blueprint (decision trace, cost/stability estimates, fallback chain), **Autopilot deterministic learning** (local privacy-preserving ExperienceStore, strategy priors, selector recovery ranking, failure classification, redacted future-training JSONL), Selector Studio/self-healing, zero-copy Network → HTTP → Workflow Context Bridge, HTTP Request Builder + assertions/code generation, GraphQL/WebSocket/SSE inspection, Browser Recorder 2.0, Data Quality/Schema Studio, Workflow Debugger + scoped variables, `arenyxa.workflow/v1` compatibility workflow schema (retained in v6.7), offline Compatibility Lab, Secrets Vault, project Python environments, Browser Profiles, checksum-verified Workflow Marketplace, opt-in distributed Headless Workers, and Live Run/Activity Center
+
+Data Visualization Studio with line, bar, pie, heatmap, timeline, and offline coordinate-map rendering
+
+Data Version Control with record/field/schema diff and non-destructive rollback service
+
+Plugin discovery and subprocess sandbox with permissions, timeout, output, and Windows Job Object memory budgets
+
+X-inspired minimal startup transition using the Arenyxa icon: instant first paint, no progress-bar theater, initialization continues behind the clean launch surface, and a paint-only in-window handoff continuously enlarges the centered mark while a center-origin circular mask reveals one prepared MainWindow frame; the diagonal-derived mask, shared launch geometry, OS/user Reduce Motion path, adaptive small-logical-screen minimums, and safe/legacy/reduced-visual bypasses cover portrait, ultrawide, multi-monitor, maximized, and high-DPI launches
+
+Hardened project-scoped Developer Terminal with Arenyxa/Direct/PowerShell/CMD/Python modes, real-time streaming, cancellation, bounded output, session cwd/env/history, read-only SQL, structured logs, diagnostics, DNS/TCP/TLS/interface/socket probes, service/protocol lookup, offline packet summary/frame/statistics commands, native hex-frame protocol decoding, personalization, ten locales/RTL, and About/build information
+
+Windows shell integration with live top-bar run/capture/advanced-operation progress, taskbar progress states, system-tray Blueprint/Autopilot/Compatibility quick actions, Intelligence Studio shortcuts, and command-palette actions
+
+Startup self-healing health check and automatic Repair Center with crash/settings/database/plugin/file-integrity recovery and a local recovery payload
+
+`.arenyxa` portable project package with legacy `.arenyxa` open compatibility, Browser Profiles, Regression Lab, Workflow Marketplace client, and Headless Server with token auth/RBAC
 
 ## Protocol intelligence and deep capture
 
@@ -151,13 +191,13 @@ Optional capabilities:
 
 System packet capture requires a compatible packet-analysis runtime and packet-capture driver. Arenyxa requests the driver capability only for system capture; Browser Capture, HAR, and normal data collection do not require administrator privileges. HTTPS system packets remain encrypted unless metadata is visible through the protocol handshake.
 
-
 ### Developer validation commands
 
 The built-in Developer Terminal provides two protected validation commands. They are available only after Developer Mode is enabled and the current risk agreement plus test waiver are accepted.
 
-- `test-all` runs isolated local validation across the major data, workflow, scheduler, capture, export, HTTP loopback, runner, terminal-boundary, and Studio service paths.
-- `stress-test quick|standard|extreme` performs the bounded `local-persistence-mixed-v2` concurrency ramp in temporary local data and reports the highest observed stable worker level plus the first detected instability. Its memory probe runs before the timed ramp so Python allocation tracing cannot manufacture multi-thread contention inside the score; an already-active external tracer is rejected instead of silently corrupting the measurement. This lane represents SQLite/FTS, atomic-file, JSON, and selector work rather than public-network HTTP throughput. It does not intentionally exhaust system memory, fill the disk, or access public targets.
+`test-all` runs isolated local validation across the major data, workflow, scheduler, capture, export, HTTP loopback, runner, terminal-boundary, and Studio service paths.
+
+`stress-test quick|standard|extreme` performs the bounded `local-persistence-mixed-v2` concurrency ramp in temporary local data and reports the highest observed stable worker level plus the first detected instability. Its memory probe runs before the timed ramp so Python allocation tracing cannot manufacture multi-thread contention inside the score; an already-active external tracer is rejected instead of silently corrupting the measurement. This lane represents SQLite/FTS, atomic-file, JSON, and selector work rather than public-network HTTP throughput. It does not intentionally exhaust system memory, fill the disk, or access public targets.
 
 ## Tests and release build
 
@@ -180,7 +220,6 @@ The original Windows 7 compatibility design is documented in [V6.6.1_WINDOWS7_LE
 PDF 基线解析、完整需求注册表、架构、模块/UI 树、追踪和验证证据分别位于 `docs/BASELINE_ANALYSIS.md`、`docs/SOFTWARE_REQUIREMENTS_SPECIFICATION.md`、`docs/ARCHITECTURE.md`、`docs/FUNCTION_MODULE_TREE.md`、`docs/UI_COMPONENT_TREE.md`、`docs/REQUIREMENTS_TRACEABILITY.md` 与 `docs/QA_VERIFICATION_REPORT.md`。
 
 ## Repository map
-
 
 `src/arenyxa/` is the public v8.2 application package. `src/arenyxa/` is intentionally retained as the internal compatibility implementation namespace so plugins, repair payloads and existing integrations are not broken by the brand migration.
 
