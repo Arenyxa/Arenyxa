@@ -1,26 +1,39 @@
-# Arenyxa v8.1 — Current Capability Manifest
+# Arenyxa v0.1 — Current Capability Manifest
 
 ## Release identity
 
-- Display version: `8.1`
-- Package version: `8.1.0`
-- Windows file/product version: `8.1.0.0`
-- Completed engineering phase: **Phase 6**
+- Public display version: `v0.1`
+- Package/distribution version: `0.1.0`
+- Windows file/product version: `0.1.0.0`
+- Internal engineering baseline: `v8.2.0`
+- Completed internal engineering phase: **Phase 8**
 - Compatibility identity: `6.8.0` (intentionally preserved)
 - Primary runtime lane: Windows-first Python 3.11–3.13 / PySide6
 - Frozen compatibility lane: Windows 7 SP1 x64 / Python 3.8 / PySide2
 
+The v6/v7/v8 identifiers referenced below are internal engineering milestones retained for technical provenance. GitHub public release numbering starts at v0.1.
+
 ## Preserved platform capabilities
 
-The phase6 candidate tree retains the existing Desktop GUI, complete developer CLI, Application Control Plane, Traffic Control Plane, Enterprise Control Plane, Capture Engine, Protocol Intelligence, Proxy Suite, MITM, API analysis, Traffic Forensics, automation/workflows, local search/data lineage, Security Kernel, Zero Trust, TPM/Root authority, Enterprise identity/enrollment/governance, Server/Worker execution, SQLite/PostgreSQL boundaries, Job System, Audit, Recovery Center, Windows runtime/service integration, signed plugin trust, source repair, packaging and legacy runtime lane.
+The v0.1 public tree carries forward the internally validated v8.2 engineering baseline, including:
 
-No valid user-facing capability was intentionally deleted or bypassed in Phase 6.
+- Desktop GUI and complete developer CLI
+- Application, Traffic, and Enterprise control planes
+- HTTP/Browser/packet capture and protocol intelligence
+- Proxy Suite, authorized MITM, replay, API analysis, and Traffic Forensics
+- Extraction, crawler, workflow, automation, data lineage, search, and visualization
+- Security Kernel, Zero Trust, Root/Developer authority, audit, and release provenance
+- Enterprise identity, enrollment, governance, Server/Worker runtime, and durable jobs
+- SQLite/PostgreSQL storage boundaries and distributed lease/fencing behavior
+- Recovery Center, Safe Mode, source repair, runtime supervision, and diagnostics
+- Windows desktop/service integration, packaging, and the isolated Win7 compatibility lane
+- Semantic i18n catalogs plus the compatibility translation path
 
-## Phase 6 capabilities added
+No valid user-facing capability is intentionally removed by the public-version reset.
 
-### Survivability state machine
+## Reliability and survivability
 
-`src/arenyxa/application/survivability.py` adds a bounded process-local survivability coordinator with explicit states:
+Arenyxa includes bounded survivability states:
 
 - `normal`
 - `degraded`
@@ -29,39 +42,25 @@ No valid user-facing capability was intentionally deleted or bypassed in Phase 6
 - `recovering`
 - `safe_mode`
 
-The manager samples the existing resource probe/governor, persists a bounded transition history, exposes admission decisions, keeps diagnostics/audit/read paths available during pressure, enters read-only mode for critical free-disk pressure, and recovers gradually with the existing governor hysteresis.
+Resource pressure, runtime supervision, telemetry, queue admission, logging fallback, and recovery remain bounded and observable. Critical disk pressure can enter read-only behavior; diagnostics and audit paths remain available according to their existing safety contracts.
 
-### Bounded performance telemetry
+## Compatibility boundary
 
-`src/arenyxa/application/performance_telemetry.py` adds bounded latency/counter/gauge telemetry with fixed metric and sample budgets and p50/p95/p99 summaries. It is explicitly designed so telemetry labels and histories cannot grow without bound.
+The following are deliberately **not** reset to 0.1:
 
-### Failure isolation and drills
+- Runtime/plugin compatibility: `6.8.0`
+- Enterprise protocol: current `2`, minimum `1`
+- Workflow schema: `arenyxa.workflow/v1`
+- Settings and persisted-data schema versions
+- Database migration identifiers
+- Security/audit event identifiers
 
-The preserved four-drill periodic scheduler contract remains unchanged. An extended Phase 6 campaign adds SQLite lock-backpressure, corrupt-configuration fallback, and resource-pressure degradation/recovery to the existing worker-lease, synthetic network-loss, delayed-disk, and runtime-recovery drills.
+These are interoperability or persistence contracts rather than product marketing versions.
 
-### Runtime supervision and logging survivability
+## Validation boundary
 
-Runtime-supervisor incidents can now notify bounded listeners and feed component degradation into the survivability state. Structured logging now falls back to a structured stderr sink if the primary log path cannot be created/opened, preventing a log-storage fault from turning into a global boot failure.
+CI covers static quality, architecture, workflow contracts, unit/integration regressions, Windows desktop contracts, dependency/SBOM checks, and PostgreSQL stress gates where configured.
 
-### Unified control surfaces
+External/native claims remain evidence-driven. Native Windows drivers, TPM/CNG, DPAPI, SCM behavior, optional TShark parity, and real multi-host environments are reported as `NOT EXECUTED` when their prerequisites are unavailable.
 
-The shared `PlatformControlPlane` now exposes survivability status, bounded performance telemetry, and extended resilience drills as persistent Job System work. Diagnostic bundles include survivability and performance telemetry snapshots. CLI and GUI workbench adapters call those same services; no duplicate GUI-only business logic was introduced.
-
-## Phase 6 CLI surface
-
-- `arenyxa resilience status`
-- `arenyxa resilience refresh`
-- `arenyxa resilience performance`
-- `arenyxa resilience drills [--timeout SECONDS] [--no-wait]`
-
-The existing developer-mode and Security Kernel authorization requirements remain in force.
-
-## Current acceptance boundary
-
-Phase 1–6 source implementation is complete for this staged artifact. Phase 7 final-system certification, native Windows hardware/service/installer execution, physical TPM/CNG ceremonies, TShark parity where unavailable, and real multi-host PostgreSQL soak/chaos remain outside this artifact's completion claim and are explicitly `NOT EXECUTED` where the current host cannot perform them.
-
-## Phase 6 completion addendum
-
-The final phase6 candidate tree additionally contains bounded ordered proxy persistence (`proxy_persistence.py`) and its separated resilience/telemetry integration (`proxy_resilience.py`), survivability-aware Job System admission, bounded crawler robots-cache pressure handling, repair-seed regeneration, and a Phase 6 current-host performance gate. `proxy.py` remains below the 1,000-line module ceiling after the resilience split.
-
-Executed cumulative regression: **1,251 passed / 19 skipped / 0 failed**. Windows-native and external-backend certification remains explicitly `NOT EXECUTED` where the current host cannot exercise it.
+See [VERSIONING.md](VERSIONING.md) for the version policy and [docs/RELEASE_HISTORY.md](docs/RELEASE_HISTORY.md) for preserved internal engineering history.

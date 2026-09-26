@@ -30,5 +30,9 @@
   "notes": [
     "Conditional skips require POSIX /proc or an installed TShark parity backend and are accepted by the release gate.",
     "Full Ruff and Mypy inventories remain advisory under the existing v7.8 release policy; critical Ruff is release-blocking and passed."
-  ]
+  ],
+  "version_scope": "internal_engineering_milestone",
+  "github_public_release": false,
+  "public_release_mapping": "v0.1",
+  "versioning_note": "The v6/v7/v8 number in this historical evidence is an internal engineering milestone, not a GitHub public release."
 }

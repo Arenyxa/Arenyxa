@@ -842,6 +842,10 @@ class LanguageManager(QObject):
 
             if isinstance(widget, QComboBox):
                 for index in range(widget.count()):
+                    semantic_key = widget.property(f"i18n_item_key_{index}")
+                    if semantic_key:
+                        widget.setItemText(index, self.text(str(semantic_key)))
+                        continue
                     source_key = f"i18n_item_{index}"
                     source = widget.property(source_key)
                     current = widget.itemText(index)
@@ -959,6 +963,14 @@ class LanguageManager(QObject):
         current = getter()
         source_key = f"i18n_source_{name}"
         rendered_key = f"i18n_rendered_{name}"
+        semantic_key = widget.property(f"i18n_key_{name}")
+        if semantic_key:
+            prefix = str(widget.property(f"i18n_prefix_{name}") or "")
+            suffix = str(widget.property(f"i18n_suffix_{name}") or "")
+            translated = f"{prefix}{self.text(str(semantic_key))}{suffix}"
+            setter(translated)
+            widget.setProperty(rendered_key, translated)
+            return
         source = widget.property(source_key)
         rendered = widget.property(rendered_key)
         if rendered is not None and current != str(rendered):

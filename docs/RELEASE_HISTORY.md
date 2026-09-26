@@ -1,8 +1,10 @@
-# Arenyxa Release History
+# Arenyxa Engineering Release History
 
-This document consolidates historical release notes, release checklists, version-alignment records, and release audits that were previously stored as many separate version-specific files.
+> **Version interpretation:** GitHub public release numbering starts at **v0.1**. The v6.x, v7.x, and v8.x labels preserved below are **internal engineering milestones**, not prior GitHub public releases. Historical text is intentionally retained for provenance, even where the original internal document used words such as "Public", "Stable", or "Official". Those words describe the internal promotion state that existed at the time.
+>
+> Current public product identity is defined by `README.md`, `VERSIONING.md`, `RELEASE_IDENTITY.json`, and the active source/package metadata.
 
-> Historical record: sections below preserve the original source filename and content. Current product truth is defined by the repository's current README, source, release metadata, and active release policies.
+This document consolidates historical release notes, release checklists, version-alignment records, and release audits. The original milestone text remains below as engineering evidence.
 
 
 ---

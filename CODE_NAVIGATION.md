@@ -1,6 +1,6 @@
-# Arenyxa v8.0 Code Navigation
+# Arenyxa v0.1 Code Navigation
 
-This document is the operational map for changing Arenyxa without creating architecture drift.
+This document is the operational map for changing Arenyxa without creating architecture drift. Public release identity is v0.1; the retained internal engineering baseline is v8.2.0.
 The rule of thumb is: **enter through the application/service boundary, keep domain contracts
 stable, and push platform-specific effects into infrastructure adapters.**
 

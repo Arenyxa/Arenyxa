@@ -8,7 +8,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $Python = Join-Path $ProjectRoot '.venv\Scripts\python.exe'
 if (-not (Test-Path -LiteralPath $Python)) { throw 'Run scripts\bootstrap.ps1 first.' }
 
-& $Python (Join-Path $ProjectRoot 'scripts\verify_v82_release_identity.py')
+& $Python (Join-Path $ProjectRoot 'scripts\verify_release_identity.py')
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 & $Python (Join-Path $ProjectRoot 'scripts\build_source_repair_seed.py')
@@ -43,7 +43,7 @@ try {
     if ($VersionRaw -match '"(.*)"') {
         $ProjectVersion = $Matches[1]
     } else {
-    $ProjectVersion = '8.2.0'
+    $ProjectVersion = '0.1.0'
     }
 
     if ($ReleaseChannel -eq 'official' -and -not $SigningKey) {

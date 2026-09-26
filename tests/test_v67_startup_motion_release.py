@@ -7,22 +7,22 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_v67_public_and_packaging_identity_are_aligned() -> None:
-    assert arenyxa.__version__ == "8.1"
-    assert arenyxa.__package_version__ == "8.1.0"
+    assert arenyxa.__version__ == "0.1"
+    assert arenyxa.__package_version__ == "0.1.0"
     assert arenyxa.__compat_version__ == "6.8.0"
-    assert 'version = "8.1.1"' in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert 'version = "0.1.0"' in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
     version_info = (ROOT / "packaging" / "version_info.txt").read_text(encoding="utf-8")
-    assert "filevers=(8,1,1,0)" in version_info
-    assert "FileDescription', 'Arenyxa V8.1.1'" in version_info
-    assert "ProductVersion', '8.1.1'" in version_info
+    assert "filevers=(0,1,0,0)" in version_info
+    assert "FileDescription', 'Arenyxa v0.1'" in version_info
+    assert "ProductVersion', '0.1.0'" in version_info
 
     installer = (ROOT / "packaging" / "installer.iss").read_text(encoding="utf-8")
     legacy = (ROOT / "packaging" / "installer_win7.iss").read_text(encoding="utf-8")
-    assert '#define MyAppVersion "8.1.1"' in installer
-    assert "OutputBaseFilename=Arenyxa_V8.1.1_Setup_x64" in installer
-    assert '#define MyAppVersion "8.1"' in legacy
-    assert "OutputBaseFilename=Arenyxa_V8.1_Legacy_Win7_x64_Setup" in legacy
+    assert '#define MyAppVersion "0.1.0"' in installer
+    assert "OutputBaseFilename=Arenyxa_v0.1_Setup_x64" in installer
+    assert '#define MyAppVersion "0.1.0"' in legacy
+    assert "OutputBaseFilename=Arenyxa_v0.1_Legacy_Win7_x64_Setup" in legacy
 
 
 def test_v67_splash_never_uses_blocking_cosmetic_waits() -> None:

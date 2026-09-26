@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_v80_stable_release_identity() -> None:
-    assert __version__ == "8.1"
-    assert __package_version__ == "8.1.0"
+    assert __version__ == "0.1"
+    assert __package_version__ == "0.1.0"
 
 
 def test_windows_native_deep_probe_is_honest_off_windows() -> None:

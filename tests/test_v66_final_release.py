@@ -7,10 +7,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_v66_final_public_and_package_identity() -> None:
-    assert arenyxa.__version__ == "8.2"
-    assert arenyxa.__package_version__ == "8.2.0"
+    assert arenyxa.__version__ == "0.1"
+    assert arenyxa.__package_version__ == "0.1.0"
     assert arenyxa.__compat_version__ == "6.8.0"
-    assert 'version = "8.2.0"' in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert 'version = "0.1.0"' in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
 
 def test_release_test_gate_scopes_qt_offscreen_environment() -> None:

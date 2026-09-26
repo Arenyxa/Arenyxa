@@ -1,6 +1,6 @@
 {
   "schema": "arenyxa.compatibility-matrix/v1",
-  "product_release_version": "8.2.0",
+  "product_release_version": "0.1.0",
   "runtime_compatibility_identity": "6.8.0",
   "channels": [
     "stable",
@@ -63,5 +63,7 @@
       "qt": "PySide2",
       "browser_recorder": false
     }
-  }
+  },
+  "engineering_baseline": "v8.2.0",
+  "versioning_note": "Public GitHub release numbering starts at v0.1. Historical v6/v7/v8 labels are internal engineering milestones, not prior GitHub releases."
 }

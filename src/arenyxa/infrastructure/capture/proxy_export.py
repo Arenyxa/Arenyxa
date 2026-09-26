@@ -1,4 +1,5 @@
 from __future__ import annotations
+from arenyxa import __package_version__
 
 import base64
 import json
@@ -140,7 +141,7 @@ def export_proxy_har(
     payload = {
         "log": {
             "version": "1.2",
-            "creator": {"name": "Arenyxa Proxy", "version": "8.2.0"},
+            "creator": {"name": "Arenyxa Proxy", "version": __package_version__},
             "entries": entries,
         }
     }

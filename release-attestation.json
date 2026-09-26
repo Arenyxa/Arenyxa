@@ -1,6 +1,6 @@
 {
-  "version": "8.1",
-  "stage": "v8.1 Official Source Release",
+  "version": "0.1.0",
+  "stage": "v0.1 Formal Public Release",
   "release_channel": "stable",
   "completed_phase": 8,
   "enterprise_hardening": true,
@@ -15,5 +15,9 @@
   "bounded_proxy_persistence": true,
   "job_admission_control": true,
   "official_release_identity": true,
-  "physical_qa_required_for_external_certification": true
+  "physical_qa_required_for_external_certification": true,
+  "public_release": true,
+  "engineering_baseline": "v8.2.0",
+  "compatibility_identity": "6.8.0",
+  "versioning_note": "Public GitHub release numbering starts at v0.1; v8.2.0 remains the internal engineering baseline."
 }

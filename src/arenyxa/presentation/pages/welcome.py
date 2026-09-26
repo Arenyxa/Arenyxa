@@ -9,6 +9,7 @@ from arenyxa.qt_compat.QtWidgets import (
 from arenyxa.application.experience import EXPERIENCE_PROFILES
 from arenyxa.navigation import NavigationContextFactory, NavigationResolver, RuntimeMode
 from arenyxa.navigation.manifest import DEFAULT_PAGE_MANIFESTS
+from arenyxa.presentation.i18n_runtime import source_text
 from arenyxa.presentation.widgets import PageHeader, SectionCard
 
 
@@ -24,20 +25,26 @@ class _ExperienceCard(QFrame):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 16, 18, 16)
         layout.setSpacing(8)
-        title = QLabel(profile.title)
+        title = QLabel(source_text(f"welcome.profile.{profile.id}.title"))
+        title.setProperty("i18n_key_text", f"welcome.profile.{profile.id}.title")
         title.setProperty("section", True)
         title.setStyleSheet("font-size: 18px; font-weight: 700;")
-        summary = QLabel(profile.summary)
+        summary = QLabel(source_text(f"welcome.profile.{profile.id}.summary"))
+        summary.setProperty("i18n_key_text", f"welcome.profile.{profile.id}.summary")
         summary.setWordWrap(True)
         summary.setProperty("muted", True)
         layout.addWidget(title)
         layout.addWidget(summary)
-        for item in profile.detail:
-            label = QLabel("• " + item)
+        for detail_index, _item in enumerate(profile.detail):
+            detail_key = f"welcome.profile.{profile.id}.detail.{detail_index}"
+            label = QLabel("• " + source_text(detail_key))
+            label.setProperty("i18n_key_text", detail_key)
+            label.setProperty("i18n_prefix_text", "• ")
             label.setWordWrap(True)
             layout.addWidget(label)
         layout.addStretch(1)
-        button = QPushButton("使用此模式")
+        button = QPushButton(source_text("welcome.use_mode"))
+        button.setProperty("i18n_key_text", "welcome.use_mode")
         button.clicked.connect(lambda: self.selected.emit(profile.id))
         layout.addWidget(button)
 
@@ -53,7 +60,8 @@ class WelcomeCenterDialog(QDialog):
         self.context = context
         self.theme = theme
         self.motion = motion
-        self.setWindowTitle("欢迎使用 Arenyxa V8.2.0")
+        self.setWindowTitle(source_text("welcome.title"))
+        self.setProperty("i18n_key_window_title", "welcome.title")
         self.setModal(True)
         self.setMinimumSize(760, 600)
         self.resize(980, 760)
@@ -64,8 +72,10 @@ class WelcomeCenterDialog(QDialog):
         layout.setContentsMargins(22, 20, 22, 20)
         layout.setSpacing(14)
         layout.addWidget(PageHeader(
-            "欢迎使用 Arenyxa V8.2.0",
-            "先选择工作方式。这里只调整工作区呈现与默认导航，不是权限等级；企业身份和开发者身份由独立安全流程建立。",
+            source_text("welcome.title"),
+            source_text("welcome.subtitle"),
+            title_key="welcome.title",
+            subtitle_key="welcome.subtitle",
         ))
 
         scroll = QScrollArea()
@@ -76,16 +86,22 @@ class WelcomeCenterDialog(QDialog):
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(14)
 
-        scenario = SectionCard(theme, "Personal 首页场景")
-        scenario_hint = QLabel("选择 Personal Mode 时，Arenyxa 会用该场景配置首次进入的首页；之后仍可访问全部个人功能。")
+        scenario = SectionCard(theme, source_text("welcome.scenario.title"), title_key="welcome.scenario.title")
+        scenario_hint = QLabel(source_text("welcome.scenario.hint"))
+        scenario_hint.setProperty("i18n_key_text", "welcome.scenario.hint")
         scenario_hint.setWordWrap(True)
         scenario_hint.setProperty("muted", True)
         self.personal_scenario = QComboBox()
-        self.personal_scenario.addItem("网站分析", "website_analysis")
-        self.personal_scenario.addItem("API 调试", "api_debugging")
-        self.personal_scenario.addItem("网络诊断", "network_diagnostics")
-        self.personal_scenario.addItem("数据采集", "data_collection")
-        self.personal_scenario.addItem("网络安全学习", "security_learning")
+        self.personal_scenario.addItem(source_text("welcome.scenario.website_analysis"), "website_analysis")
+        self.personal_scenario.setProperty("i18n_item_key_0", "welcome.scenario.website_analysis")
+        self.personal_scenario.addItem(source_text("welcome.scenario.api_debugging"), "api_debugging")
+        self.personal_scenario.setProperty("i18n_item_key_1", "welcome.scenario.api_debugging")
+        self.personal_scenario.addItem(source_text("welcome.scenario.network_diagnostics"), "network_diagnostics")
+        self.personal_scenario.setProperty("i18n_item_key_2", "welcome.scenario.network_diagnostics")
+        self.personal_scenario.addItem(source_text("welcome.scenario.data_collection"), "data_collection")
+        self.personal_scenario.setProperty("i18n_item_key_3", "welcome.scenario.data_collection")
+        self.personal_scenario.addItem(source_text("welcome.scenario.security_learning"), "security_learning")
+        self.personal_scenario.setProperty("i18n_item_key_4", "welcome.scenario.security_learning")
         scenario.body.addWidget(scenario_hint)
         scenario.body.addWidget(self.personal_scenario)
         body.addWidget(scenario)
@@ -101,15 +117,14 @@ class WelcomeCenterDialog(QDialog):
         grid.setColumnStretch(1, 1)
         body.addLayout(grid)
 
-        enterprise = SectionCard(theme, "Enterprise & Operations")
-        enterprise_text = QLabel(
-            "企业工作模式提供本地企业身份、设备加入与信任、局域网协调器以及工作区治理。"
-            "创建企业会建立独立的企业身份；加入现有企业需要管理员提供的一次性设备加入凭据。"
-        )
+        enterprise = SectionCard(theme, source_text("welcome.enterprise.title"), title_key="welcome.enterprise.title")
+        enterprise_text = QLabel(source_text("welcome.enterprise.description"))
+        enterprise_text.setProperty("i18n_key_text", "welcome.enterprise.description")
         enterprise_text.setWordWrap(True)
         enterprise_text.setProperty("muted", True)
         enterprise.body.addWidget(enterprise_text)
-        enterprise_button = QPushButton("进入企业工作模式")
+        enterprise_button = QPushButton(source_text("welcome.enterprise.open"))
+        enterprise_button.setProperty("i18n_key_text", "welcome.enterprise.open")
         enterprise_button.clicked.connect(lambda: self.profileSelected.emit("enterprise"))
         enterprise.body.addWidget(enterprise_button)
         body.addWidget(enterprise)
@@ -124,22 +139,20 @@ class WelcomeCenterDialog(QDialog):
             fleet_target, navigation
         )
         if fleet_allowed:
-            server = SectionCard(theme, "Fleet Control")
-            server_text = QLabel(
-                "集中查看 Enterprise Server、Distributed Worker、并行 Slots、Jobs、Leases、存储拓扑与健康状态。"
-                "Fleet Control 只提供已授权的运行与运维视图，不改变 Enterprise 权限边界。"
-            )
+            server = SectionCard(theme, source_text("welcome.fleet.title"), title_key="welcome.fleet.title")
+            server_text = QLabel(source_text("welcome.fleet.description"))
+            server_text.setProperty("i18n_key_text", "welcome.fleet.description")
             server_text.setWordWrap(True)
             server_text.setProperty("muted", True)
             server.body.addWidget(server_text)
-            server_button = QPushButton("打开 Fleet Control")
+            server_button = QPushButton(source_text("welcome.fleet.open"))
+            server_button.setProperty("i18n_key_text", "welcome.fleet.open")
             server_button.clicked.connect(self.fleetRequested.emit)
             server.body.addWidget(server_button)
             body.addWidget(server)
 
-        note = QLabel(
-            "之后可在 设置 → 使用模式 重新打开此独立窗口。主题、字体、缩放与动效继续放在独立“个性化”页面。"
-        )
+        note = QLabel(source_text("welcome.note"))
+        note.setProperty("i18n_key_text", "welcome.note")
         note.setWordWrap(True)
         note.setProperty("muted", True)
         body.addWidget(note)

@@ -4,7 +4,7 @@ $ProjectRoot = Split-Path -Parent $ScriptRoot
 $Python = Join-Path $ProjectRoot '.venv-win7\Scripts\python.exe'
 if (-not (Test-Path -LiteralPath $Python)) { throw 'Run scripts\bootstrap-win7.ps1 first.' }
 
-& $Python (Join-Path $ProjectRoot 'scripts\verify_v73_release_identity.py')
+& $Python (Join-Path $ProjectRoot 'scripts\verify_release_identity.py')
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 & $Python (Join-Path $ProjectRoot 'scripts\build_source_repair_seed.py') --win7
