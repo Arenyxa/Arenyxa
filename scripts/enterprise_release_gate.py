@@ -1,4 +1,4 @@
-"""Aggregate release-critical Arenyxa v8.1.1 gates without placeholder success states."""
+"""Aggregate release-critical Arenyxa v0.1 gates without placeholder success states."""
 from __future__ import annotations
 
 import json
@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 GATES = (
-    ("release_identity", "scripts/verify_v81_release_identity.py", 120),
+    ("release_identity", "scripts/verify_release_identity.py", 120),
     ("runtime_diagnostic", "scripts/runtime_diagnostic.py", 120),
     ("production_config", "scripts/production_config_gate.py", 120),
     ("recovery", "scripts/final_recovery_validation.py", 360),
@@ -61,7 +61,8 @@ def main() -> int:
     release_ready = len(results) == len(GATES) and all(bool(item["ok"]) for item in results)
     payload = {
         "schema": "arenyxa.enterprise-release-gate/v2",
-        "version": "8.1.1",
+        "version": "0.1.0",
+        "engineering_baseline": "v8.2.0",
         "release_ready": release_ready,
         "checks_completed": len(results),
         "checks_expected": len(GATES),
