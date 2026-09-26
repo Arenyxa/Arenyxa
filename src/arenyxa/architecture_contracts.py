@@ -150,12 +150,12 @@ FAILURE_RULES: tuple[FailureRule, ...] = (
 
 
 COMPATIBILITY_CONTRACTS: tuple[CompatibilityContract, ...] = (
-    CompatibilityContract("arenyxa", "python-package", "Public facade remains importable and re-exports version metadata.", "8.2"),
-    CompatibilityContract("arenyxa", "legacy-python-package", "Historical implementation namespace remains importable through v8.2.", "8.2"),
-    CompatibilityContract("arenyxa", "cli", "arenyxa -> arenyxa.cli:main unified professional control plane", "8.2"),
-    CompatibilityContract("arenyxa-gui", "desktop-cli", "arenyxa-gui -> arenyxa.app:main desktop launcher", "8.2"),
-    CompatibilityContract("python -m arenyxa", "legacy-desktop-cli", "Historical desktop launch remains available", "8.2"),
-    CompatibilityContract("arenyxa-server", "cli", "arenyxa-server -> arenyxa.infrastructure.server:main", "8.2"),
+    CompatibilityContract("arenyxa", "python-package", "Public facade remains importable and re-exports public v0.1 version metadata.", "0.1"),
+    CompatibilityContract("arenyxa", "legacy-python-package", "Legacy runtime remains importable in public v0.1; internal engineering baseline is v8.2.", "0.1"),
+    CompatibilityContract("arenyxa", "cli", "arenyxa -> arenyxa.cli:main unified professional control plane", "0.1"),
+    CompatibilityContract("arenyxa-gui", "desktop-cli", "arenyxa-gui -> arenyxa.app:main desktop launcher", "0.1"),
+    CompatibilityContract("python -m arenyxa", "legacy-desktop-cli", "Historical desktop launch remains available", "0.1"),
+    CompatibilityContract("arenyxa-server", "cli", "arenyxa-server -> arenyxa.infrastructure.server:main", "0.1"),
     CompatibilityContract("plugin-api", "plugin", "Existing manifest/API compatibility comparator remains at 6.8.0 unless explicitly migrated.", "6.8.0"),
 )
 
