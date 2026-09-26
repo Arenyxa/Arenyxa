@@ -244,15 +244,27 @@ class ResponsiveActionBar(QWidget):
 
 
 class PageHeader(QWidget):
-    def __init__(self, title: str, subtitle: str = "", parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        title: str,
+        subtitle: str = "",
+        parent: QWidget | None = None,
+        *,
+        title_key: str = "",
+        subtitle_key: str = "",
+    ) -> None:
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 8)
         layout.setSpacing(3)
         self.title_label = QLabel(title)
         self.title_label.setProperty("title", True)
+        if title_key:
+            self.title_label.setProperty("i18n_key_text", title_key)
         self.subtitle_label = QLabel(subtitle)
         self.subtitle_label.setProperty("muted", True)
+        if subtitle_key:
+            self.subtitle_label.setProperty("i18n_key_text", subtitle_key)
         self.subtitle_label.setWordWrap(True)
         layout.addWidget(self.title_label)
         if subtitle:
@@ -309,7 +321,14 @@ class MetricCard(GlassPanel):
 
 class SectionCard(GlassPanel):
     def __init__(
-        self, theme: ThemeManager, title: str, action: str = "", parent: QWidget | None = None
+        self,
+        theme: ThemeManager,
+        title: str,
+        action: str = "",
+        parent: QWidget | None = None,
+        *,
+        title_key: str = "",
+        action_key: str = "",
     ) -> None:
         super().__init__(theme, parent=parent)
         self.outer = QVBoxLayout(self)
@@ -318,10 +337,14 @@ class SectionCard(GlassPanel):
         header = QHBoxLayout()
         label = QLabel(title)
         label.setProperty("section", True)
+        if title_key:
+            label.setProperty("i18n_key_text", title_key)
         header.addWidget(label)
         header.addStretch()
         self.action = QPushButton(action) if action else None
         if self.action:
+            if action_key:
+                self.action.setProperty("i18n_key_text", action_key)
             self.action.setFlat(True)
             header.addWidget(self.action)
         self.outer.addLayout(header)
