@@ -978,7 +978,9 @@ class LanguageManager(QObject):
         rendered_key = f"i18n_rendered_{name}"
         semantic_key = widget.property(f"i18n_key_{name}")
         if semantic_key:
-            translated = self.text(str(semantic_key))
+            prefix = str(widget.property(f"i18n_prefix_{name}") or "")
+            suffix = str(widget.property(f"i18n_suffix_{name}") or "")
+            translated = f"{prefix}{self.text(str(semantic_key))}{suffix}"
             setter(translated)
             widget.setProperty(rendered_key, translated)
             return
