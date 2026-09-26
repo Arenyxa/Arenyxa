@@ -234,5 +234,9 @@
       ],
       "return_code": null
     }
-  ]
+  ],
+  "version_scope": "internal_engineering_milestone",
+  "github_public_release": false,
+  "public_release_mapping": "v0.1",
+  "versioning_note": "The v6/v7/v8 number in this historical evidence is an internal engineering milestone, not a GitHub public release."
 }
