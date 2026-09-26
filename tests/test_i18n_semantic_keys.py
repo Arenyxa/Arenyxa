@@ -31,7 +31,7 @@ SEMANTIC_KEY_FILES = (
 )
 CATALOG_LOCALES = ("en_US", "zh_CN", "fr_FR", "de_DE", "ja_JP")
 CJK = re.compile(r"[\u3400-\u9fff]")
-KEY = re.compile(r'(?:"|\')((?:welcome|personalization)\.[A-Za-z0-9_.]+)(?:"|\')')
+KEY = re.compile(r'(?:"|\')((?:welcome|personalization|settings|about|shell)\.[A-Za-z0-9_.]+)(?:"|\')')
 
 
 def _referenced_keys() -> set[str]:
