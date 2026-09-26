@@ -22,7 +22,7 @@ The repository contains historical labels such as `v6.x`, `v7.x`, `v8.0`, `v8.1`
 
 These labels are **internal engineering milestones** used while the architecture, compatibility boundaries, performance gates, security model, UI, packaging, and enterprise runtime were being developed. They are retained because they are useful provenance for tests, audit reports, migration records, and design history.
 
-They are **not prior GitHub public releases** and must not be published as GitHub release tags or advertised as public product versions.
+They are **internal engineering identifiers**, not the public version sequence. Historical GitHub Release entries created before this policy are legacy development snapshots; new formal public releases must use the public `v0.x` line.
 
 The current internal engineering baseline is **v8.2.0**.
 
