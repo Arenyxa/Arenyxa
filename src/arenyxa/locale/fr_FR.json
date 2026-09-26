@@ -143,5 +143,8 @@
   "shell.expand_sidebar": "Développer la barre latérale",
   "shell.local_service": "●  Service local · 127.0.0.1:8787",
   "shell.local_service_tooltip": "Headless Server écoute uniquement sur loopback par défaut",
-  "shell.inspector_title": "Inspecteur de contexte"
+  "shell.inspector_title": "Inspecteur de contexte",
+  "settings.direct_shell_confirm.title": "Activer Direct Shell",
+  "settings.direct_shell_confirm.body": "PowerShell / CMD / Persistent Shell s’exécutera avec les autorisations de l’utilisateur Windows actuel.",
+  "settings.direct_shell_confirm.detail": "Ce n’est pas un bac à sable de sécurité. Arenyxa conserve l’arrêt de l’arborescence de processus, les budgets de sortie, la suppression des données sensibles et les avertissements pour commandes à haut risque, mais ne peut pas limiter les autorisations déjà détenues par l’utilisateur actuel."
 }
