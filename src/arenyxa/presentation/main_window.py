@@ -115,7 +115,7 @@ class MainWindow(MainWindowNavigationMixin, MainWindowOperationsMixin, MainWindo
         self.context = context
         self.project_path = project_path
         self._launch_geometry = launch_geometry
-        self.setWindowTitle(f"Arenyxa V{__display_version__}")
+        self.setWindowTitle(f"Arenyxa v{__display_version__}")
         minimum_width = 1120
         minimum_height = 720
         if launch_geometry is not None and launch_geometry.rect.isValid():
