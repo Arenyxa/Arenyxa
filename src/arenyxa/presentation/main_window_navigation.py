@@ -46,6 +46,7 @@ from arenyxa.presentation.language import LanguageManager
 from arenyxa.presentation.launch_geometry import LaunchGeometryPlan
 from arenyxa.presentation.motion import MotionOrchestrator
 from arenyxa.presentation.pages.base import WorkspacePage
+from arenyxa.presentation.i18n_runtime import current_text
 from arenyxa.presentation.pages.task_center import TaskCenterPage
 from arenyxa.presentation.pages.dashboard import DashboardPage
 from arenyxa.presentation.pages.data import DataPage, SearchPage, VersionPage
@@ -598,7 +599,9 @@ class MainWindowNavigationMixin:
         self.brand_icon.setVisible(not collapsed)
         self.brand_text.setVisible(not collapsed)
         self.service_label.setVisible(not collapsed)
-        self.collapse_nav.setToolTip("展开侧边栏" if collapsed else "折叠侧边栏")
+        tooltip_key = "shell.expand_sidebar" if collapsed else "shell.collapse_sidebar"
+        self.collapse_nav.setToolTip(current_text(tooltip_key))
+        self.collapse_nav.setProperty("i18n_key_tooltip", tooltip_key)
         self.collapse_nav.setText("›" if collapsed else "‹")
         for page_id, button in self.nav_buttons.items():
             button.setProperty("navCompact", collapsed)
