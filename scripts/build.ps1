@@ -43,7 +43,7 @@ try {
     if ($VersionRaw -match '"(.*)"') {
         $ProjectVersion = $Matches[1]
     } else {
-    $ProjectVersion = '8.2.0'
+    $ProjectVersion = '0.1.0'
     }
 
     if ($ReleaseChannel -eq 'official' -and -not $SigningKey) {
