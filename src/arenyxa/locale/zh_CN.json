@@ -143,5 +143,8 @@
   "shell.expand_sidebar": "展开侧边栏",
   "shell.local_service": "●  本地服务 · 127.0.0.1:8787",
   "shell.local_service_tooltip": "Headless Server 默认仅绑定 loopback",
-  "shell.inspector_title": "上下文检查器"
+  "shell.inspector_title": "上下文检查器",
+  "settings.direct_shell_confirm.title": "启用 Direct Shell",
+  "settings.direct_shell_confirm.body": "PowerShell / CMD / Persistent Shell 将以当前 Windows 用户权限执行。",
+  "settings.direct_shell_confirm.detail": "这不是安全沙箱。Arenyxa 会保留进程树终止、输出预算、敏感信息脱敏与高风险命令提示，但无法限制当前用户本身拥有的系统权限。"
 }
