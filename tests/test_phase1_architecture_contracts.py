@@ -50,12 +50,12 @@ def test_phase1_dependency_direction_gate_passes_current_core() -> None:
 
 
 def test_phase1_compatibility_contract_freezes_legacy_surface() -> None:
-    assert __version__ == "8.2"
-    assert __package_version__ == "8.2.0"
+    assert __version__ == "0.1"
+    assert __package_version__ == "0.1.0"
     assert __compat_version__ == "6.8.0"
     names = {(item.name, item.kind, item.compatibility_level) for item in COMPATIBILITY_CONTRACTS}
-    assert ("arenyxa", "python-package", "8.2") in names
-    assert ("arenyxa", "legacy-python-package", "8.2") in names
+    assert ("arenyxa", "python-package", "0.1") in names
+    assert ("arenyxa", "legacy-python-package", "0.1") in names
     assert ("plugin-api", "plugin", "6.8.0") in names
     pyproject = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")
     assert 'arenyxa = "arenyxa.cli:main"' in pyproject
