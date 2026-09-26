@@ -114,19 +114,6 @@ for _locale in NATIVE_OVERRIDES:
 TRANSLATIONS = {"zh_CN": ZH_CN, **NATIVE_OVERRIDES, "en_US": EN}
 
 
-def source_text(key: str) -> str:
-    """Return the canonical English source text for an i18n key."""
-    return EN.get(key, key)
-
-
-def current_text(key: str) -> str:
-    """Return an i18n value for the locale currently applied to QApplication."""
-    app = QApplication.instance()
-    locale = str(app.property("arenyxa_locale") or "en_US") if app is not None else "en_US"
-    table = TRANSLATIONS.get(locale, EN)
-    return table.get(key, EN.get(key, key))
-
-
 def _load_locale_catalogs() -> None:
     """Merge packaged JSON catalogs over the compatibility dictionaries."""
 
