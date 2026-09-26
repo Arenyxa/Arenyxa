@@ -114,6 +114,11 @@ for _locale in NATIVE_OVERRIDES:
 TRANSLATIONS = {"zh_CN": ZH_CN, **NATIVE_OVERRIDES, "en_US": EN}
 
 
+def source_text(key: str) -> str:
+    """Return the canonical English source text for an i18n key."""
+    return EN.get(key, key)
+
+
 def _load_locale_catalogs() -> None:
     """Merge packaged JSON catalogs over the compatibility dictionaries."""
 
@@ -842,6 +847,10 @@ class LanguageManager(QObject):
 
             if isinstance(widget, QComboBox):
                 for index in range(widget.count()):
+                    semantic_key = widget.property(f"i18n_item_key_{index}")
+                    if semantic_key:
+                        widget.setItemText(index, self.text(str(semantic_key)))
+                        continue
                     source_key = f"i18n_item_{index}"
                     source = widget.property(source_key)
                     current = widget.itemText(index)
@@ -959,6 +968,12 @@ class LanguageManager(QObject):
         current = getter()
         source_key = f"i18n_source_{name}"
         rendered_key = f"i18n_rendered_{name}"
+        semantic_key = widget.property(f"i18n_key_{name}")
+        if semantic_key:
+            translated = self.text(str(semantic_key))
+            setter(translated)
+            widget.setProperty(rendered_key, translated)
+            return
         source = widget.property(source_key)
         rendered = widget.property(rendered_key)
         if rendered is not None and current != str(rendered):
