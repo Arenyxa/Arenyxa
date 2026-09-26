@@ -143,5 +143,8 @@
   "shell.expand_sidebar": "Seitenleiste ausklappen",
   "shell.local_service": "●  Lokaler Dienst · 127.0.0.1:8787",
   "shell.local_service_tooltip": "Headless Server bindet standardmäßig nur an loopback",
-  "shell.inspector_title": "Kontextinspektor"
+  "shell.inspector_title": "Kontextinspektor",
+  "settings.direct_shell_confirm.title": "Direct Shell aktivieren",
+  "settings.direct_shell_confirm.body": "PowerShell / CMD / Persistent Shell wird mit den Berechtigungen des aktuellen Windows-Benutzers ausgeführt.",
+  "settings.direct_shell_confirm.detail": "Dies ist keine Sicherheits-Sandbox. Arenyxa behält Prozessbaum-Beendigung, Ausgabebudgets, Redaction sensibler Daten und Warnungen für Hochrisikobefehle bei, kann aber bereits vorhandene Benutzerberechtigungen nicht einschränken."
 }
