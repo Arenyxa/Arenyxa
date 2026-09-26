@@ -17,6 +17,12 @@ from arenyxa.presentation.themes import THEMES
 from arenyxa.presentation.widgets import PageHeader, SectionCard, ScrollSafeComboBox, ScrollSafeSlider, ScrollSafeSpinBox
 
 
+def _i18n_label(key: str) -> QLabel:
+    label = QLabel(source_text(key))
+    label.setProperty("i18n_key_text", key)
+    return label
+
+
 class PersonalizationPage(WorkspacePage):
     themeRequested = Signal(str)
     motionRequested = Signal(object)
@@ -34,7 +40,12 @@ class PersonalizationPage(WorkspacePage):
         if app is not None:
             app.aboutToQuit.connect(self._flush_settings_save)
 
-        layout.addWidget(PageHeader("个性化", "主题、界面材质、动效与缩放；系统和企业配置请前往“设置”"))
+        layout.addWidget(PageHeader(
+            source_text("personalization.title"),
+            source_text("personalization.subtitle"),
+            title_key="personalization.title",
+            subtitle_key="personalization.subtitle",
+        ))
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QScrollArea.Shape.NoFrame)
@@ -45,8 +56,9 @@ class PersonalizationPage(WorkspacePage):
         scroll.setWidget(container)
         layout.addWidget(scroll, 1)
 
-        themes_card = SectionCard(theme, "视觉预设")
-        theme_hint = QLabel("Arenyxa 视觉预设只影响外观，不改变运行、权限、存储或企业策略。")
+        themes_card = SectionCard(theme, source_text("personalization.themes.title"), title_key="personalization.themes.title")
+        theme_hint = QLabel(source_text("personalization.themes.hint"))
+        theme_hint.setProperty("i18n_key_text", "personalization.themes.hint")
         theme_hint.setProperty("muted", True)
         theme_hint.setWordWrap(True)
         themes_card.body.addWidget(theme_hint)
@@ -65,7 +77,7 @@ class PersonalizationPage(WorkspacePage):
         themes_card.body.addLayout(themes_grid)
         body.addWidget(themes_card)
 
-        motion_card = SectionCard(theme, "材质与动效")
+        motion_card = SectionCard(theme, source_text("personalization.motion.title"), title_key="personalization.motion.title")
         form = QFormLayout()
         self.glass = ScrollSafeSlider(Qt.Orientation.Horizontal)
         self.glass.setRange(0, 100)
@@ -74,40 +86,46 @@ class PersonalizationPage(WorkspacePage):
         self.blur = ScrollSafeSlider(Qt.Orientation.Horizontal)
         self.blur.setRange(12, 36)
         self.animation_mode = ScrollSafeComboBox()
-        self.animation_mode.addItem("自动（根据性能动态调整）", "auto")
-        self.animation_mode.addItem("始终开启", "always")
-        self.animation_mode.addItem("最小动效 / 省电", "minimal")
-        self.reduce_motion = QCheckBox("减少大幅位移、折射、粒子和连续光效")
-        self.live_motion = QCheckBox("启用实时数据流动态")
-        self.high_contrast = QCheckBox("高对比度玻璃回退")
-        form.addRow("材质强度", self.glass)
-        form.addRow("背景模糊", self.blur)
-        form.addRow("动态强度", self.motion_slider)
-        form.addRow("动画模式", self.animation_mode)
+        self.animation_mode.addItem(source_text("personalization.animation.auto"), "auto")
+        self.animation_mode.setProperty("i18n_item_key_0", "personalization.animation.auto")
+        self.animation_mode.addItem(source_text("personalization.animation.always"), "always")
+        self.animation_mode.setProperty("i18n_item_key_1", "personalization.animation.always")
+        self.animation_mode.addItem(source_text("personalization.animation.minimal"), "minimal")
+        self.animation_mode.setProperty("i18n_item_key_2", "personalization.animation.minimal")
+        self.reduce_motion = QCheckBox(source_text("personalization.reduce_motion"))
+        self.reduce_motion.setProperty("i18n_key_text", "personalization.reduce_motion")
+        self.live_motion = QCheckBox(source_text("personalization.live_motion"))
+        self.live_motion.setProperty("i18n_key_text", "personalization.live_motion")
+        self.high_contrast = QCheckBox(source_text("personalization.high_contrast"))
+        self.high_contrast.setProperty("i18n_key_text", "personalization.high_contrast")
+        form.addRow(_i18n_label("personalization.material_strength"), self.glass)
+        form.addRow(_i18n_label("personalization.background_blur"), self.blur)
+        form.addRow(_i18n_label("personalization.motion_strength"), self.motion_slider)
+        form.addRow(_i18n_label("personalization.animation_mode"), self.animation_mode)
         form.addRow(self.reduce_motion)
         form.addRow(self.live_motion)
         form.addRow(self.high_contrast)
         motion_card.body.addLayout(form)
         body.addWidget(motion_card)
 
-        scale_card = SectionCard(theme, "界面缩放与字体")
+        scale_card = SectionCard(theme, source_text("personalization.scale.title"), title_key="personalization.scale.title")
         scale_form = QFormLayout()
         self.ui_scale_mode = ScrollSafeComboBox()
-        self.ui_scale_mode.addItem("自动（随窗口大小）", "auto")
-        self.ui_scale_mode.addItem("手动", "manual")
+        self.ui_scale_mode.addItem(source_text("personalization.scale.auto"), "auto")
+        self.ui_scale_mode.setProperty("i18n_item_key_0", "personalization.scale.auto")
+        self.ui_scale_mode.addItem(source_text("personalization.scale.manual"), "manual")
+        self.ui_scale_mode.setProperty("i18n_item_key_1", "personalization.scale.manual")
         self.ui_scale_percent = ScrollSafeSpinBox()
         self.ui_scale_percent.setRange(85, 160)
         self.ui_scale_percent.setSingleStep(5)
         self.ui_scale_percent.setSuffix("%")
-        scale_hint = QLabel(
-            "自动模式会根据 Arenyxa 窗口可用面积调整文字与常用控件尺寸，同时保留 Qt/Windows DPI 缩放；"
-            "手动模式可固定 85%–160%。"
-        )
+        scale_hint = QLabel(source_text("personalization.scale.hint"))
+        scale_hint.setProperty("i18n_key_text", "personalization.scale.hint")
         scale_hint.setProperty("muted", True)
         scale_hint.setWordWrap(True)
-        scale_form.addRow("缩放模式", self.ui_scale_mode)
-        scale_form.addRow("手动缩放", self.ui_scale_percent)
-        scale_form.addRow("说明", scale_hint)
+        scale_form.addRow(_i18n_label("personalization.scale.mode"), self.ui_scale_mode)
+        scale_form.addRow(_i18n_label("personalization.scale.manual_percent"), self.ui_scale_percent)
+        scale_form.addRow(_i18n_label("personalization.scale.explanation"), scale_hint)
         scale_card.body.addLayout(scale_form)
         body.addWidget(scale_card)
         body.addStretch()
@@ -213,10 +231,13 @@ class PersonalizationPage(WorkspacePage):
         settings.ui_scale_percent = percent
         self._schedule_settings_save()
         self.uiScaleRequested.emit((settings.ui_scale_mode, settings.ui_scale_percent))
-        self.statusMessage.emit(
-            "界面缩放已更新：自动随窗口调整" if settings.ui_scale_mode == "auto"
-            else f"界面缩放已固定为 {settings.ui_scale_percent}%"
-        )
+        if settings.ui_scale_mode == "auto":
+            message = current_text("personalization.scale.status_auto")
+        else:
+            message = current_text("personalization.scale.status_manual").format(
+                percent=settings.ui_scale_percent
+            )
+        self.statusMessage.emit(message)
 
     def _schedule_settings_save(self) -> None:
         self._settings_save_dirty = True
