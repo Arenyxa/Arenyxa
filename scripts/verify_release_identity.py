@@ -2,26 +2,9 @@ from __future__ import annotations
 
 import json
 import re
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
-
-from arenyxa import (
-    __compat_version__,
-    __display_version__,
-    __distribution_version__,
-    __engineering_build__,
-    __internal_version__,
-    __package_version__,
-    __public_package_version__,
-    __public_version__,
-    __version__,
-)
-from arenyxa.release_hardening import compatibility_matrix
 
 PUBLIC_DISPLAY_VERSION = "0.1"
 PUBLIC_PACKAGE_VERSION = "0.1.0"
@@ -39,6 +22,28 @@ def _require(path: str, needle: str) -> None:
         raise RuntimeError(f"{path}: missing release identity token {needle!r}")
 
 
+def _constant(path: str, name: str) -> str:
+    text = (ROOT / path).read_text(encoding="utf-8")
+    match = re.search(
+        rf'(?m)^\s*{re.escape(name)}\s*=\s*["\']([^"\']+)["\']\s*$',
+        text,
+    )
+    if match is None:
+        raise RuntimeError(f"{path}: unable to read {name}")
+    return match.group(1)
+
+
+def _project_version() -> str:
+    text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    match = re.search(
+        r'(?ms)^\[project\]\s*$.*?^version\s*=\s*["\']([^"\']+)["\']',
+        text,
+    )
+    if match is None:
+        raise RuntimeError("pyproject.toml: unable to read [project] version")
+    return match.group(1)
+
+
 def _require_pascal_code_comments(path: str) -> None:
     text = (ROOT / path).read_text(encoding="utf-8")
     marker = "[Code]"
@@ -52,37 +57,28 @@ def _require_pascal_code_comments(path: str) -> None:
         )
 
 
+def _verify_namespace(path: str) -> None:
+    expected = {
+        "__version__": PUBLIC_DISPLAY_VERSION,
+        "__display_version__": PUBLIC_DISPLAY_VERSION,
+        "__distribution_version__": PUBLIC_PACKAGE_VERSION,
+        "__package_version__": PUBLIC_PACKAGE_VERSION,
+        "__public_version__": PUBLIC_DISPLAY_VERSION,
+        "__public_package_version__": PUBLIC_PACKAGE_VERSION,
+        "__engineering_build__": ENGINEERING_BASELINE,
+        "__internal_version__": INTERNAL_VERSION,
+        "__compat_version__": COMPAT_VERSION,
+    }
+    observed = {name: _constant(path, name) for name in expected}
+    if observed != expected:
+        raise RuntimeError(f"{path}: release identity mismatch: {observed!r}")
+
+
 def main() -> int:
-    public = (
-        __version__,
-        __display_version__,
-        __distribution_version__,
-        __package_version__,
-        __public_version__,
-        __public_package_version__,
-    )
-    expected_public = (
-        PUBLIC_DISPLAY_VERSION,
-        PUBLIC_DISPLAY_VERSION,
-        PUBLIC_PACKAGE_VERSION,
-        PUBLIC_PACKAGE_VERSION,
-        PUBLIC_DISPLAY_VERSION,
-        PUBLIC_PACKAGE_VERSION,
-    )
-    if public != expected_public:
-        raise RuntimeError(f"Public release identity mismatch: {public!r}")
+    _verify_namespace("src/arenyxa/__init__.py")
+    _verify_namespace("legacy/win7/src/arenyxa/__init__.py")
 
-    if __engineering_build__ != ENGINEERING_BASELINE or __internal_version__ != INTERNAL_VERSION:
-        raise RuntimeError(
-            "Internal engineering baseline changed unexpectedly: "
-            f"{__engineering_build__!r}, {__internal_version__!r}"
-        )
-    if __compat_version__ != COMPAT_VERSION:
-        raise RuntimeError(f"Runtime compatibility identity changed unexpectedly: {__compat_version__!r}")
-
-    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    match = re.search(r'(?ms)^\[project\]\s*$.*?^version\s*=\s*["\']([^"\']+)["\']', pyproject)
-    if match is None or match.group(1) != PUBLIC_PACKAGE_VERSION:
+    if _project_version() != PUBLIC_PACKAGE_VERSION:
         raise RuntimeError("pyproject.toml does not carry the public 0.1.0 distribution identity")
 
     _require("packaging/version_info.txt", "filevers=(0,1,0,0)")
@@ -96,37 +92,45 @@ def main() -> int:
     _require("packaging/installer_win7.iss", f"OutputBaseFilename={LEGACY_INSTALLER}")
     _require_pascal_code_comments("packaging/installer.iss")
     _require_pascal_code_comments("packaging/installer_win7.iss")
+
     _require("scripts/build.ps1", "verify_release_identity.py")
     _require("scripts/build-win7.ps1", "verify_release_identity.py")
-    _require("scripts/build_release_attestation.py", 'parser.add_argument("--version", default="0.1.0")')
+    _require(
+        "scripts/build_release_attestation.py",
+        'parser.add_argument("--version", default="0.1.0")',
+    )
     _require("RUN_ARENYXA.cmd", "title Arenyxa v0.1 Source Launcher")
+
     _require("README.md", "# Arenyxa v0.1")
     _require("README.md", "Internal engineering baseline:")
+    _require("VERSIONING.md", "The GitHub release line starts at **v0.1**.")
+
     _require("RELEASE_IDENTITY.json", '"display_version": "0.1"')
+    _require("RELEASE_IDENTITY.json", '"package_version": "0.1.0"')
     _require("RELEASE_IDENTITY.json", '"engineering_baseline": "v8.2.0"')
     _require("V8_2_RELEASE_IDENTITY.json", '"version_scope": "internal_engineering_milestone"')
 
-    legacy_namespace = (ROOT / "legacy/win7/src/arenyxa/__init__.py").read_text(encoding="utf-8")
-    for token in (
-        '__version__ = "0.1"',
-        '__package_version__ = "0.1.0"',
-        '__engineering_build__ = "v8.2.0"',
-        '__compat_version__ = "6.8.0"',
-    ):
-        if token not in legacy_namespace:
-            raise RuntimeError(f"Legacy runtime identity is stale: {token}")
-
-    matrix = compatibility_matrix()
-    if matrix.get("product_release_version") != PUBLIC_PACKAGE_VERSION:
-        raise RuntimeError("compatibility matrix public product version is stale")
-    if matrix.get("runtime_compatibility_identity") != COMPAT_VERSION:
-        raise RuntimeError("runtime compatibility identity changed without an explicit migration")
-
-    docs_matrix = json.loads((ROOT / "docs/release/COMPATIBILITY_MATRIX.json").read_text(encoding="utf-8"))
+    docs_matrix = json.loads(
+        (ROOT / "docs/release/COMPATIBILITY_MATRIX.json").read_text(encoding="utf-8")
+    )
     if docs_matrix.get("product_release_version") != PUBLIC_PACKAGE_VERSION:
         raise RuntimeError("documented compatibility matrix public product version is stale")
     if docs_matrix.get("runtime_compatibility_identity") != COMPAT_VERSION:
         raise RuntimeError("documented compatibility identity is stale")
+    if docs_matrix.get("engineering_baseline") != ENGINEERING_BASELINE:
+        raise RuntimeError("documented engineering baseline is stale")
+
+    _require(
+        "src/arenyxa/architecture_contracts.py",
+        'CompatibilityContract("arenyxa", "python-package", '
+        '"Public facade remains importable and re-exports public v0.1 version metadata.", "0.1")',
+    )
+    _require(
+        "src/arenyxa/architecture_contracts.py",
+        'CompatibilityContract("plugin-api", "plugin", '
+        '"Existing manifest/API compatibility comparator remains at 6.8.0 unless explicitly migrated.", '
+        '"6.8.0")',
+    )
 
     print("Arenyxa v0.1 public release identity gate: PASS")
     print(f"- public display version: {PUBLIC_DISPLAY_VERSION}")
