@@ -50,6 +50,7 @@ from arenyxa.repair import StartupHealthScanner, installation_root
 from arenyxa.infrastructure.atomic_io import fsync_existing_file, read_text_limited
 from arenyxa.infrastructure.observability import Redactor
 from arenyxa.presentation.background import run_background
+from arenyxa.presentation.i18n_runtime import source_text
 from arenyxa.presentation.language import LOCALES, LanguageManager, literal_for_locale
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.themes import ThemeTokens
@@ -64,6 +65,22 @@ from arenyxa.presentation.widgets import (
 LOGGER = logging.getLogger(__name__)
 
 from arenyxa.presentation.pages.settings_support import AboutPage, ThemePreviewCard, _DeveloperTermsDialog
+
+
+def _i18n_label(key: str) -> QLabel:
+    label = QLabel(source_text(key))
+    label.setProperty("i18n_key_text", key)
+    return label
+
+
+def _bind_text(widget, key: str):
+    widget.setProperty("i18n_key_text", key)
+    return widget
+
+
+def _bind_tooltip(widget, key: str) -> None:
+    widget.setProperty("i18n_key_tooltip", key)
+
 
 class SettingsPage(WorkspacePage):
                                                                                           
@@ -89,7 +106,12 @@ class SettingsPage(WorkspacePage):
         if app is not None:
             app.aboutToQuit.connect(self._flush_settings_save)
 
-        layout.addWidget(PageHeader("设置", "系统、语言、性能、资源治理、诊断与高级维护"))
+        layout.addWidget(PageHeader(
+            source_text("settings.title"),
+            source_text("settings.subtitle"),
+            title_key="settings.title",
+            subtitle_key="settings.subtitle",
+        ))
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QScrollArea.Shape.NoFrame)
@@ -100,28 +122,29 @@ class SettingsPage(WorkspacePage):
         scroll.setWidget(container)
         layout.addWidget(scroll, 1)
 
-        experience_card = SectionCard(theme, "使用模式")
+        experience_card = SectionCard(theme, source_text("settings.experience.title"), title_key="settings.experience.title")
         experience_form = QFormLayout()
         self.experience_status = QLabel()
         self.experience_status.setWordWrap(True)
         self.experience_status.setProperty("muted", True)
-        self.reopen_welcome_button = QPushButton("重新选择使用模式")
-        experience_form.addRow("当前模式", self.experience_status)
+        self.reopen_welcome_button = _bind_text(QPushButton(source_text("settings.experience.reselect")), "settings.experience.reselect")
+        experience_form.addRow(_i18n_label("settings.experience.current"), self.experience_status)
         experience_form.addRow("", self.reopen_welcome_button)
-        experience_hint = QLabel(
-            "使用模式只调整工作区呈现与默认导航，不是权限等级。Developer / Enterprise 权限始终由后端安全策略决定；主题和预设仍在独立“个性化”页面。"
+        experience_hint = _bind_text(
+            QLabel(source_text("settings.experience.hint")),
+            "settings.experience.hint",
         )
         experience_hint.setWordWrap(True)
         experience_hint.setProperty("muted", True)
-        experience_form.addRow("说明", experience_hint)
+        experience_form.addRow(_i18n_label("settings.common.description"), experience_hint)
         experience_card.body.addLayout(experience_form)
         body.addWidget(experience_card)
 
-        performance_card = SectionCard(theme, "性能与资源治理")
+        performance_card = SectionCard(theme, source_text("settings.performance.title"), title_key="settings.performance.title")
         performance_form = QFormLayout()
         self.performance = ScrollSafeComboBox()
         self.performance.addItems(["auto", "quality", "balanced", "efficiency"])
-        self.resource_governor_enabled = QCheckBox("启用 Resource Governor（推荐）")
+        self.resource_governor_enabled = _bind_text(QCheckBox(source_text("settings.performance.governor_enabled")), "settings.performance.governor_enabled")
         self.resource_cpu_soft = ScrollSafeSpinBox()
         self.resource_cpu_soft.setRange(40, 98)
         self.resource_cpu_soft.setSuffix("%")
@@ -136,88 +159,90 @@ class SettingsPage(WorkspacePage):
         self.resource_status = QLabel()
         self.resource_status.setProperty("muted", True)
         self.resource_status.setWordWrap(True)
-        performance_form.addRow("性能模式", self.performance)
+        performance_form.addRow(_i18n_label("settings.performance.mode"), self.performance)
         performance_form.addRow(self.resource_governor_enabled)
-        performance_form.addRow("CPU 软阈值", self.resource_cpu_soft)
-        performance_form.addRow("内存软阈值", self.resource_memory_soft)
-        performance_form.addRow("磁盘安全余量", self.resource_min_disk)
-        performance_form.addRow("浏览器实例上限", self.resource_browser_limit)
-        performance_form.addRow("当前状态", self.resource_status)
+        performance_form.addRow(_i18n_label("settings.performance.cpu_soft"), self.resource_cpu_soft)
+        performance_form.addRow(_i18n_label("settings.performance.memory_soft"), self.resource_memory_soft)
+        performance_form.addRow(_i18n_label("settings.performance.disk_reserve"), self.resource_min_disk)
+        performance_form.addRow(_i18n_label("settings.performance.browser_limit"), self.resource_browser_limit)
+        performance_form.addRow(_i18n_label("settings.common.current_status"), self.resource_status)
         performance_card.body.addLayout(performance_form)
         body.addWidget(performance_card)
 
-        concurrency_card = SectionCard(theme, "网页抓取并发")
+        concurrency_card = SectionCard(theme, source_text("settings.concurrency.title"), title_key="settings.concurrency.title")
         concurrency_form = QFormLayout()
         self.request_concurrency = ScrollSafeSpinBox()
         self.request_concurrency.setRange(1, 64)
         self.per_host_concurrency = ScrollSafeSpinBox()
         self.per_host_concurrency.setRange(1, 32)
-        self.adaptive_request_concurrency = QCheckBox("自动调节全局请求并发（推荐）")
-        concurrency_form.addRow("全局请求并发硬上限", self.request_concurrency)
-        concurrency_form.addRow("单域名并发上限", self.per_host_concurrency)
+        self.adaptive_request_concurrency = _bind_text(QCheckBox(source_text("settings.concurrency.adaptive")), "settings.concurrency.adaptive")
+        concurrency_form.addRow(_i18n_label("settings.concurrency.global_limit"), self.request_concurrency)
+        concurrency_form.addRow(_i18n_label("settings.concurrency.per_host_limit"), self.per_host_concurrency)
         concurrency_form.addRow(self.adaptive_request_concurrency)
-        concurrency_hint = QLabel(
-            "Resource Governor 只能向下收紧并发，不能突破这里的用户硬上限。CPU、RAM、磁盘或浏览器压力上升时会退避；"
-            "恢复必须经过连续健康采样，避免并发振荡。"
+        concurrency_hint = _bind_text(
+            QLabel(source_text("settings.concurrency.hint")),
+            "settings.concurrency.hint",
         )
         concurrency_hint.setProperty("muted", True)
         concurrency_hint.setWordWrap(True)
-        concurrency_form.addRow("调度策略", concurrency_hint)
+        concurrency_form.addRow(_i18n_label("settings.concurrency.strategy"), concurrency_hint)
         concurrency_card.body.addLayout(concurrency_form)
         body.addWidget(concurrency_card)
 
-        locale_card = SectionCard(theme, "语言")
+        locale_card = SectionCard(theme, source_text("settings.language.title"), title_key="settings.language.title")
         locale_form = QFormLayout()
         self.locale_box = ScrollSafeComboBox()
         for code, name in LOCALES.items():
             self.locale_box.addItem(name, code)
-        locale_form.addRow("界面语言", self.locale_box)
+        locale_form.addRow(_i18n_label("settings.language.interface"), self.locale_box)
         locale_card.body.addLayout(locale_form)
         body.addWidget(locale_card)
 
-        self.advanced_card = SectionCard(theme, "高级设置与维护")
-        advanced_hint = QLabel(
-            "诊断、Repair Center 与 Developer Mode 集中在这里。个性化主题、动效和界面缩放位于独立“个性化”页面。"
+        self.advanced_card = SectionCard(theme, source_text("settings.advanced.title"), title_key="settings.advanced.title")
+        advanced_hint = _bind_text(
+            QLabel(source_text("settings.advanced.hint")),
+            "settings.advanced.hint",
         )
         advanced_hint.setProperty("muted", True)
         advanced_hint.setWordWrap(True)
         self.advanced_card.body.addWidget(advanced_hint)
-        self.developer = QCheckBox("Developer Experience（仅界面偏好；不会授予 Developer Authority）")
+        self.developer = _bind_text(QCheckBox(source_text("settings.advanced.developer_experience")), "settings.advanced.developer_experience")
         self.advanced_card.body.addWidget(self.developer)
-        self.direct_shell = QCheckBox("Direct Shell（允许 PowerShell / CMD / Persistent Shell；仅 Developer Mode）")
-        self.direct_shell.setToolTip("完整 Shell 使用当前 Windows 用户权限执行；高风险命令仍会额外确认并写入终端审计。")
+        self.direct_shell = _bind_text(QCheckBox(source_text("settings.advanced.direct_shell")), "settings.advanced.direct_shell")
+        self.direct_shell.setToolTip(source_text("settings.advanced.direct_shell_tooltip"))
+        _bind_tooltip(self.direct_shell, "settings.advanced.direct_shell_tooltip")
         self.advanced_card.body.addWidget(self.direct_shell)
 
         maintenance_row = QHBoxLayout()
-        self.diagnostics_button = QPushButton("运行诊断")
-        self.repair_button = QPushButton("打开 Repair Center")
-        self.export_diagnostics_button = QPushButton("导出诊断包")
+        self.diagnostics_button = _bind_text(QPushButton(source_text("settings.advanced.run_diagnostics")), "settings.advanced.run_diagnostics")
+        self.repair_button = _bind_text(QPushButton(source_text("settings.advanced.open_repair")), "settings.advanced.open_repair")
+        self.export_diagnostics_button = _bind_text(QPushButton(source_text("settings.advanced.export_diagnostics")), "settings.advanced.export_diagnostics")
         maintenance_row.addWidget(self.diagnostics_button)
         maintenance_row.addWidget(self.repair_button)
         maintenance_row.addWidget(self.export_diagnostics_button)
         maintenance_row.addStretch()
         self.advanced_card.body.addLayout(maintenance_row)
-        self.diagnostic_status = QLabel("尚未在本次会话中运行诊断。")
+        self.diagnostic_status = _bind_text(QLabel(source_text("settings.advanced.diagnostic_idle")), "settings.advanced.diagnostic_idle")
         self.diagnostic_status.setWordWrap(True)
         self.diagnostic_status.setProperty("muted", True)
         self.advanced_card.body.addWidget(self.diagnostic_status)
         privacy_form = QFormLayout()
-        self.include_paths = QCheckBox("诊断包包含本机路径（默认关闭）")
+        self.include_paths = _bind_text(QCheckBox(source_text("settings.advanced.include_paths")), "settings.advanced.include_paths")
         privacy_form.addRow(self.include_paths)
         self.advanced_card.body.addLayout(privacy_form)
         reset_row = QHBoxLayout()
-        self.reset_settings_button = QPushButton("恢复全部默认设置")
-        self.reset_settings_button.setToolTip("重置应用设置与个性化偏好；不会删除 Projects、Captures、Exports 或正式结果数据")
+        self.reset_settings_button = _bind_text(QPushButton(source_text("settings.advanced.reset")), "settings.advanced.reset")
+        self.reset_settings_button.setToolTip(source_text("settings.advanced.reset_tooltip"))
+        _bind_tooltip(self.reset_settings_button, "settings.advanced.reset_tooltip")
         reset_row.addWidget(self.reset_settings_button)
         reset_row.addStretch()
         self.advanced_card.body.addLayout(reset_row)
         body.addWidget(self.advanced_card)
 
-        self.official_developer_card = SectionCard(theme, "官方开发者授权")
-        official_hint = QLabel(
-            "用于 Arenyxa 官方开发调试能力。登录需要 .aryxdev Developer Login Bundle 与本机匹配的 "
-            "Developer Personal Key Vault，并通过一次性私钥挑战；认证后只获得证书明确列出的 capability。"
-            "它与公开 Developer Profile、企业管理员权限和 Root Developer 最高技术权限是彼此独立的授权流程。"
+        self.official_developer_card = SectionCard(theme, source_text("settings.official.title"), title_key="settings.official.title")
+        official_hint = _bind_text(
+            QLabel(source_text("settings.official.hint")),
+            "settings.official.hint",
         )
         official_hint.setProperty("muted", True)
         official_hint.setWordWrap(True)
@@ -227,8 +252,8 @@ class SettingsPage(WorkspacePage):
         self.official_developer_status.setProperty("muted", True)
         self.official_developer_card.body.addWidget(self.official_developer_status)
         official_row = QHBoxLayout()
-        self.official_developer_login_button = QPushButton("登录官方开发者")
-        self.official_developer_logout_button = QPushButton("退出官方开发者")
+        self.official_developer_login_button = _bind_text(QPushButton(source_text("settings.official.login")), "settings.official.login")
+        self.official_developer_logout_button = _bind_text(QPushButton(source_text("settings.official.logout")), "settings.official.logout")
         for button in (self.official_developer_login_button, self.official_developer_logout_button):
             official_row.addWidget(button)
         official_row.addStretch()
@@ -238,10 +263,10 @@ class SettingsPage(WorkspacePage):
         # Root Developer is an explicit break-glass entry, not a normal preference.
         # Keep it completely hidden unless the user has deliberately selected the
         # Developer experience and enabled Developer Mode in Settings.
-        self.root_developer_card = SectionCard(theme, "Root Developer · 最高技术权限")
-        root_hint = QLabel(
-            "仅供根开发者进行最高技术权限调试。这里使用独立的 Root Owner 身份包与设备密钥完成强认证，"
-            "并继续执行 Root Integrity Challenge；它不是普通官方开发者登录，也不会由企业管理员身份自动获得。"
+        self.root_developer_card = SectionCard(theme, source_text("settings.root.title"), title_key="settings.root.title")
+        root_hint = _bind_text(
+            QLabel(source_text("settings.root.hint")),
+            "settings.root.hint",
         )
         root_hint.setWordWrap(True)
         root_hint.setProperty("muted", True)
@@ -251,12 +276,11 @@ class SettingsPage(WorkspacePage):
         self.root_developer_status.setProperty("muted", True)
         self.root_developer_card.body.addWidget(self.root_developer_status)
         root_row = QHBoxLayout()
-        self.root_developer_login_button = QPushButton("登录 Root Developer")
-        self.root_developer_login_button.setToolTip(
-            "最高风险权限入口：仅在 Developer Experience + Developer Mode 同时启用时显示。"
-        )
+        self.root_developer_login_button = _bind_text(QPushButton(source_text("settings.root.login")), "settings.root.login")
+        self.root_developer_login_button.setToolTip(source_text("settings.root.login_tooltip"))
+        _bind_tooltip(self.root_developer_login_button, "settings.root.login_tooltip")
         root_row.addWidget(self.root_developer_login_button)
-        self.root_developer_logout_button = QPushButton("退出 Root Developer")
+        self.root_developer_logout_button = _bind_text(QPushButton(source_text("settings.root.logout")), "settings.root.logout")
         self.root_developer_logout_button.setVisible(False)
         root_row.addWidget(self.root_developer_logout_button)
         root_row.addStretch()
