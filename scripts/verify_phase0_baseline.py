@@ -178,15 +178,15 @@ def verify_release_identity(root: Path) -> dict[str, str]:
     if project_match is None:
         raise RuntimeError("Unable to read [project] version from pyproject.toml")
     package_version = project_match.group(1)
-    if package_version != "8.1.0":
+    if package_version != "0.1.0":
         raise RuntimeError(f"Unexpected package version: {package_version}")
 
     namespace = (root / "src" / "arenyxa" / "__init__.py").read_text(encoding="utf-8")
-    required = ('__version__ = "8.1"', '__package_version__ = "8.1.0"', '__compat_version__ = "6.8.0"')
+    required = ('__version__ = "0.1"', '__package_version__ = "0.1.0"', '__engineering_build__ = "v8.2.0"', '__compat_version__ = "6.8.0"')
     for token in required:
         if token not in namespace:
             raise RuntimeError(f"Release identity token missing: {token}")
-    return {"runtime": "8.1", "package": "8.1.0", "compat": "6.8.0"}
+    return {"public": "0.1", "package": "0.1.0", "engineering": "v8.2.0", "compat": "6.8.0"}
 
 
 def verify_clean_tree(root: Path, *, allow_local_artifacts: bool = False) -> dict[str, object]:
@@ -209,7 +209,7 @@ def verify_clean_tree(root: Path, *, allow_local_artifacts: bool = False) -> dic
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Verify Arenyxa v8.1 release baseline invariants")
+    parser = argparse.ArgumentParser(description="Verify Arenyxa v0.1 public release baseline invariants")
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--json", action="store_true", dest="as_json")
     parser.add_argument(
