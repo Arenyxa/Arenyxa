@@ -9,7 +9,7 @@ from arenyxa.qt_compat.QtWidgets import (
 from arenyxa.application.experience import EXPERIENCE_PROFILES
 from arenyxa.navigation import NavigationContextFactory, NavigationResolver, RuntimeMode
 from arenyxa.navigation.manifest import DEFAULT_PAGE_MANIFESTS
-from arenyxa.presentation.language import source_text
+from arenyxa.presentation.i18n_runtime import source_text
 from arenyxa.presentation.widgets import PageHeader, SectionCard
 
 
