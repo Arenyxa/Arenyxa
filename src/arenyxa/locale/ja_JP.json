@@ -143,5 +143,8 @@
   "shell.expand_sidebar": "サイドバーを展開",
   "shell.local_service": "●  ローカルサービス · 127.0.0.1:8787",
   "shell.local_service_tooltip": "Headless Server は既定で loopback のみにバインドします",
-  "shell.inspector_title": "コンテキストインスペクター"
+  "shell.inspector_title": "コンテキストインスペクター",
+  "settings.direct_shell_confirm.title": "Direct Shell を有効化",
+  "settings.direct_shell_confirm.body": "PowerShell / CMD / Persistent Shell は現在の Windows ユーザー権限で実行されます。",
+  "settings.direct_shell_confirm.detail": "これはセキュリティサンドボックスではありません。Arenyxa はプロセスツリー終了、出力予算、機密情報のマスキング、高リスクコマンド警告を維持しますが、現在のユーザーが既に持つシステム権限を制限することはできません。"
 }
