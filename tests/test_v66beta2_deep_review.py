@@ -178,16 +178,16 @@ def test_application_quit_orders_context_shutdown_before_data_root_release() -> 
 
 
 def test_v66_final_version_identity_is_consistent_and_package_safe() -> None:
-    assert arenyxa.__version__ == "8.1"
-    assert arenyxa.__package_version__ == "8.1.0"
+    assert arenyxa.__version__ == "0.1"
+    assert arenyxa.__package_version__ == "0.1.0"
     assert arenyxa.__compat_version__ == "6.8.0"
-    assert 'version = "8.1.1"' in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert 'version = "0.1.0"' in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     version_info = (ROOT / "packaging" / "version_info.txt").read_text(encoding="utf-8")
-    assert "filevers=(8,1,1,0)" in version_info
-    assert "ProductVersion', '8.1.1'" in version_info
+    assert "filevers=(0,1,0,0)" in version_info
+    assert "ProductVersion', '0.1.0'" in version_info
     installer = (ROOT / "packaging" / "installer.iss").read_text(encoding="utf-8")
-    assert '#define MyAppVersion "8.1.1"' in installer
-    assert "OutputBaseFilename=Arenyxa_V8.1.1_Setup_x64" in installer
+    assert '#define MyAppVersion "0.1.0"' in installer
+    assert "OutputBaseFilename=Arenyxa_v0.1_Setup_x64" in installer
 
 
 def test_repair_worker_refuses_to_mutate_when_data_root_is_owned(tmp_path: Path, monkeypatch) -> None:
