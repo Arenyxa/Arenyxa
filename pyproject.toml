@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "arenyxa"
-version = "8.2.0"
+version = "0.1.0"
 description = "Enterprise network security, proxy debugging, traffic forensics, API analysis, and automation platform"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
