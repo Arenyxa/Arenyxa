@@ -50,7 +50,7 @@ from arenyxa.repair import StartupHealthScanner, installation_root
 from arenyxa.infrastructure.atomic_io import fsync_existing_file, read_text_limited
 from arenyxa.infrastructure.observability import Redactor
 from arenyxa.presentation.background import run_background
-from arenyxa.presentation.i18n_runtime import source_text
+from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.language import LOCALES, LanguageManager, literal_for_locale
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.themes import ThemeTokens
@@ -553,10 +553,10 @@ class SettingsPage(WorkspacePage):
             return
         if enabled:
             box = QMessageBox(self)
-            box.setWindowTitle("启用 Direct Shell")
+            box.setWindowTitle(current_text("settings.direct_shell_confirm.title"))
             box.setIcon(QMessageBox.Icon.Warning)
-            box.setText("PowerShell / CMD / Persistent Shell 将以当前 Windows 用户权限执行。")
-            box.setInformativeText("这不是安全沙箱。Arenyxa 会保留进程树终止、输出预算、敏感信息脱敏与高风险命令提示，但无法限制当前用户本身拥有的系统权限。")
+            box.setText(current_text("settings.direct_shell_confirm.body"))
+            box.setInformativeText(current_text("settings.direct_shell_confirm.detail"))
             box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             box.setDefaultButton(QMessageBox.StandardButton.No)
             if box.exec() != QMessageBox.StandardButton.Yes:
