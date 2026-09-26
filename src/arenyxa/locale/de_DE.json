@@ -12,7 +12,7 @@
   "developer.test_lab": "Testlabor",
   "enterprise.enrollment": "Unternehmensregistrierung",
   "welcome.use_mode": "Diesen Modus verwenden",
-  "welcome.title": "Willkommen bei Arenyxa V8.2.0",
+  "welcome.title": "Willkommen bei Arenyxa v0.1",
   "welcome.subtitle": "Choose how you want to work first. This only changes workspace presentation and default navigation; it is not an authority level. Enterprise and developer identities are established through separate security flows.",
   "welcome.scenario.title": "Persönliches Startseitenszenario",
   "welcome.scenario.hint": "When Personal Mode is selected, Arenyxa uses this scenario to configure the first home view. All personal features remain available afterward.",
