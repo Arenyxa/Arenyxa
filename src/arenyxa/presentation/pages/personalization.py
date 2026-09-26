@@ -13,7 +13,7 @@ from arenyxa.compat import strict_zip
 from arenyxa.domain.models import MotionProfile
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.pages.settings import ThemePreviewCard
-from arenyxa.presentation.language import current_text, source_text
+from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.themes import THEMES
 from arenyxa.presentation.widgets import PageHeader, SectionCard, ScrollSafeComboBox, ScrollSafeSlider, ScrollSafeSpinBox
 
