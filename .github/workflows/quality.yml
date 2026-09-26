@@ -58,7 +58,7 @@ jobs:
       - name: Architecture and release identity gates
         run: |
           python scripts/architecture_debt_gate.py
-          python scripts/verify_v81_release_identity.py
+          python scripts/verify_release_identity.py
       - name: Core headless regression
         run: >-
           python -m pytest -q
