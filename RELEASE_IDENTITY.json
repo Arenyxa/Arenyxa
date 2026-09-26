@@ -1,14 +1,18 @@
 {
   "schema": "arenyxa.release-identity/v1",
   "product": "Arenyxa",
-  "display_version": "8.2",
-  "package_version": "8.2.0",
-  "windows_file_version": "8.2.0.0",
+  "display_version": "0.1",
+  "package_version": "0.1.0",
+  "windows_file_version": "0.1.0.0",
   "release_channel": "stable",
   "completed_phase": 8,
-  "artifact_name": "Arenyxa_v8.2",
-  "baseline": "Arenyxa_v8.1.1",
+  "artifact_name": "Arenyxa_v0.1",
+  "baseline": "internal-engineering-v8.2.0",
   "compatibility_identity": "6.8.0",
-  "promotion_source": "v8.2_audit_fix_release_2026_09_10",
-  "release_status": "official_source_release"
+  "promotion_source": "public_version_reset_2026_09_26",
+  "release_status": "formal_public_release",
+  "github_public_release": true,
+  "engineering_baseline": "v8.2.0",
+  "internal_version": "8.2.0",
+  "versioning_note": "GitHub public release numbering starts at v0.1. Historical v6/v7/v8 labels are internal engineering milestones only."
 }
