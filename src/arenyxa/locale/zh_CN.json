@@ -12,7 +12,7 @@
   "developer.test_lab": "测试实验室",
   "enterprise.enrollment": "企业注册",
   "welcome.use_mode": "使用此模式",
-  "welcome.title": "欢迎使用 Arenyxa V8.2.0",
+  "welcome.title": "欢迎使用 Arenyxa v0.1",
   "welcome.subtitle": "先选择工作方式。这里只调整工作区呈现与默认导航，不是权限等级；企业身份和开发者身份由独立安全流程建立。",
   "welcome.scenario.title": "Personal 首页场景",
   "welcome.scenario.hint": "选择 Personal Mode 时，Arenyxa 会用该场景配置首次进入的首页；之后仍可访问全部个人功能。",
