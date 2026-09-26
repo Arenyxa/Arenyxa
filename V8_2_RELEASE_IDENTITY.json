@@ -10,5 +10,9 @@
   "baseline": "Arenyxa_v8.1.1",
   "compatibility_identity": "6.8.0",
   "promotion_source": "v8.2_audit_fix_release_2026_09_10",
-  "release_status": "official_source_release"
+  "release_status": "internal_engineering_milestone",
+  "version_scope": "internal_engineering_milestone",
+  "github_public_release": false,
+  "public_release_mapping": "v0.1",
+  "versioning_note": "Historical engineering identifier retained for provenance. It was not a GitHub public release version."
 }
