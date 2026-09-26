@@ -1,4 +1,4 @@
-# Arenyxa V8.2 I18N System Report
+# Arenyxa v0.1 I18N System Report
 
 ## Implementation
 
@@ -35,4 +35,4 @@ Their user-facing copy is now sourced from semantic catalog keys under the `welc
 
 ## Remaining migration work
 
-Legacy pages still contain compatibility phrase mappings and hard-coded UI text that are translated through the existing `translate_tree` compatibility path. Migration should continue incrementally by page and should not internationalize machine identifiers, database keys, protocol/event codes, permission identifiers, or persisted enum values.
+The public release is v0.1; the preserved internal engineering baseline is v8.2.0. Legacy pages still contain compatibility phrase mappings and hard-coded UI text that are translated through the existing `translate_tree` compatibility path. Migration should continue incrementally by page and should not internationalize machine identifiers, database keys, protocol/event codes, permission identifiers, or persisted enum values.
