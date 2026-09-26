@@ -1,17 +1,17 @@
 # Arenyxa v0.1 — Current Capability Manifest
 
-## Version identity
+## Release identity
 
 - Public display version: `v0.1`
-- Python package/distribution version: `0.1.0`
-- Windows file version: `0.1.0.0`
+- Package/distribution version: `0.1.0`
+- Windows file/product version: `0.1.0.0`
 - Internal engineering baseline: `v8.2.0`
-- Runtime/plugin compatibility identity: `6.8.0`
 - Completed internal engineering phase: **Phase 8**
+- Compatibility identity: `6.8.0` (intentionally preserved)
 - Primary runtime lane: Windows-first Python 3.11–3.13 / PySide6
 - Frozen compatibility lane: Windows 7 SP1 x64 / Python 3.8 / PySide2
 
-The public v0.1 release does not discard the v6/v7/v8 engineering history. Those labels remain internal milestones and are retained in tests, reports, and audit evidence. They are not previous GitHub public releases.
+The v6/v7/v8 identifiers referenced below are internal engineering milestones retained for technical provenance. GitHub public release numbering starts at v0.1.
 
 ## Preserved platform capabilities
 
