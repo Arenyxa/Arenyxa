@@ -39,6 +39,7 @@ class _ExperienceCard(QFrame):
             detail_key = f"welcome.profile.{profile.id}.detail.{detail_index}"
             label = QLabel("• " + source_text(detail_key))
             label.setProperty("i18n_key_text", detail_key)
+            label.setProperty("i18n_prefix_text", "• ")
             label.setWordWrap(True)
             layout.addWidget(label)
         layout.addStretch(1)
