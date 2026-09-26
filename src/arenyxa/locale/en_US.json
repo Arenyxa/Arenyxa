@@ -143,5 +143,8 @@
   "shell.expand_sidebar": "Expand sidebar",
   "shell.local_service": "●  Local service · 127.0.0.1:8787",
   "shell.local_service_tooltip": "Headless Server binds to loopback by default",
-  "shell.inspector_title": "Context Inspector"
+  "shell.inspector_title": "Context Inspector",
+  "settings.direct_shell_confirm.title": "Enable Direct Shell",
+  "settings.direct_shell_confirm.body": "PowerShell / CMD / Persistent Shell will run with the current Windows user's permissions.",
+  "settings.direct_shell_confirm.detail": "This is not a security sandbox. Arenyxa retains process-tree termination, output budgets, sensitive-data redaction, and high-risk command prompts, but it cannot restrict permissions already held by the current user."
 }
