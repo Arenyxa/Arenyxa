@@ -22,6 +22,9 @@ The following high-visibility surfaces no longer embed Chinese user-facing copy 
 
 - Welcome Center / work-mode selection
 - Personalization / visual presets / motion / interface scaling
+- Settings static configuration surfaces
+- About / release identity overview
+- Main shell brand, service, inspector, and sidebar state labels
 
 Their user-facing copy is now sourced from semantic catalog keys under the `welcome.*` and `personalization.*` namespaces.
 
@@ -35,4 +38,6 @@ Their user-facing copy is now sourced from semantic catalog keys under the `welc
 
 ## Remaining migration work
 
-The public release is v0.1; the preserved internal engineering baseline is v8.2.0. Legacy pages still contain compatibility phrase mappings and hard-coded UI text that are translated through the existing `translate_tree` compatibility path. Migration should continue incrementally by page and should not internationalize machine identifiers, database keys, protocol/event codes, permission identifiers, or persisted enum values.
+The public release is v0.1; the preserved internal engineering baseline is v8.2.0. Legacy pages and dynamic status/error flows still contain compatibility phrase mappings and hard-coded UI text that are translated through the existing `translate_tree` compatibility path. Settings authorization/diagnostic status messages, navigation errors, Dashboard, Data, Enterprise, Network, Tasks, Task Center, and Tools remain incremental migration targets.
+
+Migration should continue by surface and must not internationalize machine identifiers, database keys, protocol/event codes, permission identifiers, persisted enum values, or compatibility schema numbers.
