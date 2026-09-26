@@ -59,6 +59,7 @@ jobs:
         run: |
           python scripts/architecture_debt_gate.py
           python scripts/verify_release_identity.py
+          python -m pytest -q tests/test_public_version_identity.py tests/test_i18n_semantic_keys.py
       - name: Core headless regression
         run: >-
           python -m pytest -q
