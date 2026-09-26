@@ -16,9 +16,13 @@ See [VERSIONING.md](VERSIONING.md) for the complete version model.
 
 ## Download
 
-The canonical download location is the latest GitHub Release:
+The public release line is **v0.1**. A v0.1 installer must be built from the v0.1 source identity so its embedded package and Windows metadata also report 0.1; an older v8.x binary must never be relabeled as v0.1.
 
-https://github.com/Arenyxa/Arenyxa/releases/latest
+GitHub Releases:
+
+https://github.com/Arenyxa/Arenyxa/releases
+
+Historical v8.x entries on the Releases page are legacy development snapshots created before the public numbering policy was corrected. They are not part of the public release sequence defined by this repository.
 
 Release assets are Windows installers or explicitly named release artifacts. GitHub-generated source archives are source code and are not Windows installers.
 
