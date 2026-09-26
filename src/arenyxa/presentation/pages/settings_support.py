@@ -330,7 +330,10 @@ class AboutPage(WorkspacePage):
         self.identity_label = QLabel()
         self.identity_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         info.addWidget(self.identity_label)
-        version_line = QLabel(\n            f"Public version {__display_version__} · Engineering baseline {__engineering_build__} · "\n            f"Python {platform.python_version()} · Qt {self._qt_version()}"\n        )
+        version_line = QLabel(
+            f"Public version {__display_version__} · Engineering baseline {__engineering_build__} · "
+            f"Python {platform.python_version()} · Qt {self._qt_version()}"
+        )
         version_line.setProperty("muted", True)
         version_line.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         info.addWidget(version_line)
@@ -515,7 +518,8 @@ class AboutPage(WorkspacePage):
     def _copy_build_info(self) -> None:
         report = self._quick_report or verify_release_attestation(installation_root(), deep_files=False)
         lines = [
-            f"Arenyxa v{__display_version__}",\n            f"Engineering baseline: {__engineering_build__}",
+            f"Arenyxa v{__display_version__}",
+            f"Engineering baseline: {__engineering_build__}",
             f"Release: {report.display_name}",
             f"Channel: {report.channel}",
             f"Build ID: {report.build_id or 'n/a'}",
