@@ -13,6 +13,7 @@ if not binding_available():
 
 from arenyxa.qt_compat.QtWidgets import QComboBox, QLabel
 
+from arenyxa.application.experience import EXPERIENCE_PROFILES
 from arenyxa.presentation.language import LanguageManager
 
 
@@ -31,6 +32,11 @@ def _referenced_keys() -> set[str]:
     for path in MIGRATED_UI_FILES:
         text = path.read_text(encoding="utf-8")
         keys.update(KEY.findall(text))
+    for profile in EXPERIENCE_PROFILES:
+        keys.add(f"welcome.profile.{profile.id}.title")
+        keys.add(f"welcome.profile.{profile.id}.summary")
+        for index, _detail in enumerate(profile.detail):
+            keys.add(f"welcome.profile.{profile.id}.detail.{index}")
     return keys
 
 
