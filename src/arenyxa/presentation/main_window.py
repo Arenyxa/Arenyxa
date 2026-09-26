@@ -44,6 +44,7 @@ from arenyxa.domain.enums import MotionIntent
 from arenyxa.domain.models import MotionProfile
 from arenyxa.presentation.background import begin_background_shutdown, run_background
 from arenyxa.presentation.glass import GlassPanel
+from arenyxa.presentation.i18n_runtime import source_text
 from arenyxa.presentation.language import LanguageManager
 from arenyxa.presentation.launch_geometry import LaunchGeometryPlan
 from arenyxa.presentation.motion import MotionOrchestrator
@@ -323,14 +324,16 @@ class MainWindow(MainWindowNavigationMixin, MainWindowOperationsMixin, MainWindo
         brand_copy.setSpacing(0)
         self.brand_title = QLabel("Arenyxa")
         self.brand_title.setProperty("sidebarBrandTitle", True)
-        self.brand_subtitle = QLabel("本地网络数据工作台")
+        self.brand_subtitle = QLabel(source_text("shell.brand_subtitle"))
+        self.brand_subtitle.setProperty("i18n_key_text", "shell.brand_subtitle")
         self.brand_subtitle.setProperty("sidebarBrandSubtitle", True)
         brand_copy.addWidget(self.brand_title)
         brand_copy.addWidget(self.brand_subtitle)
         self.collapse_nav = QPushButton("‹")
         self.collapse_nav.setProperty("sidebarCollapse", True)
         self.collapse_nav.setFixedSize(32, 32)
-        self.collapse_nav.setToolTip("折叠侧边栏")
+        self.collapse_nav.setToolTip(source_text("shell.collapse_sidebar"))
+        self.collapse_nav.setProperty("i18n_key_tooltip", "shell.collapse_sidebar")
         brand.addWidget(self.brand_icon)
         brand.addWidget(self.brand_text, 1)
         brand.addWidget(self.collapse_nav)
@@ -446,9 +449,11 @@ class MainWindow(MainWindowNavigationMixin, MainWindowOperationsMixin, MainWindo
         # remaining visible until the user manually re-selects a mode.
         self._refresh_nav_visibility()
 
-        self.service_label = QLabel("●  本地服务 · 127.0.0.1:8787")
+        self.service_label = QLabel(source_text("shell.local_service"))
+        self.service_label.setProperty("i18n_key_text", "shell.local_service")
         self.service_label.setProperty("servicePill", True)
-        self.service_label.setToolTip("Headless Server 默认仅绑定 loopback")
+        self.service_label.setToolTip(source_text("shell.local_service_tooltip"))
+        self.service_label.setProperty("i18n_key_tooltip", "shell.local_service_tooltip")
         self.service_label.setFixedHeight(28)
         footer_layout.addWidget(self.service_label)
         self.nav_layout.addWidget(self.nav_footer)
@@ -523,7 +528,8 @@ class MainWindow(MainWindowNavigationMixin, MainWindowOperationsMixin, MainWindo
         inspector_layout.setContentsMargins(14, 13, 14, 14)
         inspector_header = QHBoxLayout()
         inspector_header.setDirection(QBoxLayout.Direction.LeftToRight)
-        self.inspector_title = QLabel("上下文检查器")
+        self.inspector_title = QLabel(source_text("shell.inspector_title"))
+        self.inspector_title.setProperty("i18n_key_text", "shell.inspector_title")
         self.inspector_title.setProperty("section", True)
         close_inspector = QPushButton("×")
         close_inspector.setFixedSize(30, 30)
