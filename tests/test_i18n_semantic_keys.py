@@ -44,6 +44,8 @@ def _referenced_keys() -> set[str]:
         keys.add(f"welcome.profile.{profile.id}.summary")
         for index, _detail in enumerate(profile.detail):
             keys.add(f"welcome.profile.{profile.id}.detail.{index}")
+    # Source scans also encounter the persisted settings filename; it is not an i18n key.
+    keys.discard("settings.json")
     return keys
 
 
