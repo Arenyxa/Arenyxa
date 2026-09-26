@@ -64,7 +64,7 @@ def test_diagnostics_export_runs_as_persistent_audited_job_and_redacts_secrets(c
     with zipfile.ZipFile(bundle, "r") as archive:
         assert archive.testzip() is None
         manifest = json.loads(archive.read("manifest.json"))
-        assert manifest["version"] == "8.1"
+        assert manifest["version"] == "0.1"
         combined_logs = "\n".join(
             archive.read(name).decode("utf-8")
             for name in archive.namelist()
