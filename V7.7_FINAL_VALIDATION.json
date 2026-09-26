@@ -46,5 +46,9 @@
     ]
   },
   "external_evidence_boundary": "No real three-machine production chaos campaign or PostgreSQL service was available in this validation container. The code now refuses to certify production readiness without that evidence rather than treating local simulation as proof.",
-  "static_tooling_note": "Pinned Ruff/Mypy remain release-blocking in the project's final static gate; they were unavailable in the offline validation container and are not falsely represented as executed."
+  "static_tooling_note": "Pinned Ruff/Mypy remain release-blocking in the project's final static gate; they were unavailable in the offline validation container and are not falsely represented as executed.",
+  "version_scope": "internal_engineering_milestone",
+  "github_public_release": false,
+  "public_release_mapping": "v0.1",
+  "versioning_note": "The v6/v7/v8 number in this historical evidence is an internal engineering milestone, not a GitHub public release."
 }
