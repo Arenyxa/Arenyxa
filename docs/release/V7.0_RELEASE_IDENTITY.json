@@ -10,5 +10,10 @@
   "enterprise_protocol_minimum": 1,
   "modern_installer": "Arenyxa_V7.0_Setup_x64.exe",
   "legacy_win7_installer": "Arenyxa_V7.0_Legacy_Win7_x64_Setup.exe",
-  "startup_visual_frozen": true
+  "startup_visual_frozen": true,
+  "version_scope": "internal_engineering_milestone",
+  "github_public_release": false,
+  "release_status": "internal_engineering_milestone",
+  "public_release_mapping": "v0.1",
+  "versioning_note": "Historical engineering identifier retained for provenance. It was not a GitHub public release version."
 }
