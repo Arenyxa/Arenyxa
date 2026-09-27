@@ -5,6 +5,7 @@ from arenyxa.presentation.pages.enterprise_distributed_actions import Enterprise
 import json
 import sqlite3
 from pathlib import Path
+from typing import TypeVar
 
 from arenyxa.qt_compat.QtCore import Qt, Signal
 from arenyxa.qt_compat.QtWidgets import (
@@ -24,11 +25,18 @@ from arenyxa.domain.errors import ArenyxaError
 from arenyxa.enterprise.coordinator import CoordinatorClient
 from arenyxa.enterprise.enrollment import parse_enrollment_token, verify_enrollment_token
 from arenyxa.infrastructure.atomic_io import atomic_write_bytes, atomic_write_json, read_bytes_limited
+from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.widgets import PageHeader, ResponsiveActionBar, SectionCard
 
 
 ENTERPRISE_UI_ERRORS = (ArenyxaError, sqlite3.Error, OSError, RuntimeError, ValueError, TypeError, KeyError)
+_TWidget = TypeVar("_TWidget", bound=QWidget)
+
+
+def _i18n_widget(widget: _TWidget, key: str) -> _TWidget:
+    widget.setProperty("i18n_key_text", key)
+    return widget
 
 
 class EnterprisePage(EnterpriseIdentityActionsMixin, EnterpriseDistributedActionsMixin, WorkspacePage):
@@ -44,8 +52,10 @@ class EnterprisePage(EnterpriseIdentityActionsMixin, EnterpriseDistributedAction
         super().__init__(context, theme, motion, parent)
         layout = page_layout(self)
         layout.addWidget(PageHeader(
-            "企业管理",
-            "Identity / Enrollment / Coordinator / Governance / Distributed Runtime",
+            source_text("enterprise.page.title"),
+            source_text("enterprise.page.subtitle"),
+            title_key="enterprise.page.title",
+            subtitle_key="enterprise.page.subtitle",
         ))
 
                                                                                               
@@ -62,20 +72,21 @@ class EnterprisePage(EnterpriseIdentityActionsMixin, EnterpriseDistributedAction
         self.scroll_area.setWidget(self.scroll_container)
         layout.addWidget(self.scroll_area, 1)
 
-        console_card = SectionCard(theme, "企业功能入口")
-        console_hint = QLabel(
-            "模式负责进入企业工作环境；Identity、Fleet、Server、Worker、Jobs、Audit 与 Policy 的具体操作继续由 capability policy 授权。"
+        console_card = SectionCard(theme, source_text("enterprise.console.title"), title_key="enterprise.console.title")
+        console_hint = _i18n_widget(
+            QLabel(source_text("enterprise.console.hint")),
+            "enterprise.console.hint",
         )
         console_hint.setWordWrap(True)
         console_hint.setProperty("muted", True)
         console_card.body.addWidget(console_hint)
-        self.console_identity_button = QPushButton("Identity")
-        self.console_fleet_button = QPushButton("Fleet")
-        self.console_server_button = QPushButton("Server")
-        self.console_worker_button = QPushButton("Worker")
-        self.console_jobs_button = QPushButton("Jobs")
-        self.console_audit_button = QPushButton("Audit")
-        self.console_policy_button = QPushButton("Policy")
+        self.console_identity_button = _i18n_widget(QPushButton(source_text("enterprise.console.identity")), "enterprise.console.identity")
+        self.console_fleet_button = _i18n_widget(QPushButton(source_text("enterprise.console.fleet")), "enterprise.console.fleet")
+        self.console_server_button = _i18n_widget(QPushButton(source_text("enterprise.console.server")), "enterprise.console.server")
+        self.console_worker_button = _i18n_widget(QPushButton(source_text("enterprise.console.worker")), "enterprise.console.worker")
+        self.console_jobs_button = _i18n_widget(QPushButton(source_text("enterprise.console.jobs")), "enterprise.console.jobs")
+        self.console_audit_button = _i18n_widget(QPushButton(source_text("enterprise.console.audit")), "enterprise.console.audit")
+        self.console_policy_button = _i18n_widget(QPushButton(source_text("enterprise.console.policy")), "enterprise.console.policy")
         console_card.body.addWidget(ResponsiveActionBar((
             self.console_identity_button, self.console_fleet_button, self.console_server_button,
             self.console_worker_button, self.console_jobs_button, self.console_audit_button,
@@ -83,25 +94,25 @@ class EnterprisePage(EnterpriseIdentityActionsMixin, EnterpriseDistributedAction
         )))
         body.addWidget(console_card)
 
-        status_card = SectionCard(theme, "本地企业状态")
+        status_card = SectionCard(theme, source_text("enterprise.status.title"), title_key="enterprise.status.title")
         self.status_label = QLabel()
         self.status_label.setWordWrap(True)
         self.status_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         status_card.body.addWidget(self.status_label)
-        self.create_button = QPushButton("创建本地企业")
-        self.unlock_button = QPushButton("解锁 Identity Vault")
-        self.login_button = QPushButton("企业登录")
-        self.logout_button = QPushButton("退出企业会话")
-        self.lock_button = QPushButton("锁定 Vault")
+        self.create_button = _i18n_widget(QPushButton(source_text("enterprise.status.create")), "enterprise.status.create")
+        self.unlock_button = _i18n_widget(QPushButton(source_text("enterprise.status.unlock")), "enterprise.status.unlock")
+        self.login_button = _i18n_widget(QPushButton(source_text("enterprise.status.login")), "enterprise.status.login")
+        self.logout_button = _i18n_widget(QPushButton(source_text("enterprise.status.logout")), "enterprise.status.logout")
+        self.lock_button = _i18n_widget(QPushButton(source_text("enterprise.status.lock")), "enterprise.status.lock")
         status_card.body.addWidget(ResponsiveActionBar((
             self.create_button, self.unlock_button, self.login_button, self.logout_button, self.lock_button,
         )))
         body.addWidget(status_card)
 
-        account_card = SectionCard(theme, "账户与 RBAC")
-        account_hint = QLabel(
-            "角色只是产品预设；真正授权由 SecurityKernel 的 capability / policy / resource / context 决策。"
-            "禁用账户、修改角色或密码会递增 auth_generation，并立即撤销对应本机会话。"
+        account_card = SectionCard(theme, source_text("enterprise.accounts.title"), title_key="enterprise.accounts.title")
+        account_hint = _i18n_widget(
+            QLabel(source_text("enterprise.accounts.hint")),
+            "enterprise.accounts.hint",
         )
         account_hint.setWordWrap(True)
         account_hint.setProperty("muted", True)
@@ -110,95 +121,104 @@ class EnterprisePage(EnterpriseIdentityActionsMixin, EnterpriseDistributedAction
         self.accounts_view.setReadOnly(True)
         self.accounts_view.setMinimumHeight(170)
         account_card.body.addWidget(self.accounts_view)
-        self.refresh_accounts_button = QPushButton("刷新账户")
-        self.add_account_button = QPushButton("新增账户")
-        self.toggle_account_button = QPushButton("禁用 / 启用账户")
-        self.roles_button = QPushButton("修改角色")
-        self.rbac_matrix_button = QPushButton("RBAC Matrix")
-        self.password_button = QPushButton("修改密码")
-        self.delete_account_button = QPushButton("删除账户")
+        self.refresh_accounts_button = _i18n_widget(QPushButton(source_text("enterprise.accounts.refresh")), "enterprise.accounts.refresh")
+        self.add_account_button = _i18n_widget(QPushButton(source_text("enterprise.accounts.add")), "enterprise.accounts.add")
+        self.toggle_account_button = _i18n_widget(QPushButton(source_text("enterprise.accounts.toggle")), "enterprise.accounts.toggle")
+        self.roles_button = _i18n_widget(QPushButton(source_text("enterprise.accounts.roles")), "enterprise.accounts.roles")
+        self.rbac_matrix_button = _i18n_widget(QPushButton(source_text("enterprise.accounts.matrix")), "enterprise.accounts.matrix")
+        self.password_button = _i18n_widget(QPushButton(source_text("enterprise.accounts.password")), "enterprise.accounts.password")
+        self.delete_account_button = _i18n_widget(QPushButton(source_text("enterprise.accounts.delete")), "enterprise.accounts.delete")
         account_card.body.addWidget(ResponsiveActionBar((
             self.refresh_accounts_button, self.add_account_button, self.toggle_account_button,
             self.roles_button, self.rbac_matrix_button, self.password_button, self.delete_account_button,
         )))
         body.addWidget(account_card)
 
-        vault_card = SectionCard(theme, "Identity Vault 与恢复")
-        vault_hint = QLabel(
-            "Vault 使用认证加密、版本化格式和同目录原子替换。备份与高风险账户治理要求最近一次 step-up authentication。"
-            "恢复只能在 Vault 锁定时执行，避免用新持久状态替换仍在运行的旧授权会话。"
+        vault_card = SectionCard(theme, source_text("enterprise.vault.title"), title_key="enterprise.vault.title")
+        vault_hint = _i18n_widget(
+            QLabel(source_text("enterprise.vault.hint")),
+            "enterprise.vault.hint",
         )
         vault_hint.setWordWrap(True)
         vault_hint.setProperty("muted", True)
         vault_card.body.addWidget(vault_hint)
-        self.step_up_button = QPushButton("Step-up Authentication")
-        self.vault_health_button = QPushButton("Vault Health")
-        self.rotate_vault_button = QPushButton("Rotate Vault Passphrase")
-        self.backup_button = QPushButton("备份 Vault")
-        self.restore_button = QPushButton("恢复 Vault")
+        self.step_up_button = _i18n_widget(QPushButton(source_text("enterprise.vault.step_up")), "enterprise.vault.step_up")
+        self.vault_health_button = _i18n_widget(QPushButton(source_text("enterprise.vault.health")), "enterprise.vault.health")
+        self.rotate_vault_button = _i18n_widget(QPushButton(source_text("enterprise.vault.rotate")), "enterprise.vault.rotate")
+        self.backup_button = _i18n_widget(QPushButton(source_text("enterprise.vault.backup")), "enterprise.vault.backup")
+        self.restore_button = _i18n_widget(QPushButton(source_text("enterprise.vault.restore")), "enterprise.vault.restore")
         vault_card.body.addWidget(ResponsiveActionBar((
             self.step_up_button, self.vault_health_button, self.rotate_vault_button, self.backup_button, self.restore_button,
         )))
         body.addWidget(vault_card)
 
-        audit_card = SectionCard(theme, "Audit 基础")
+        audit_card = SectionCard(theme, source_text("enterprise.audit.title"), title_key="enterprise.audit.title")
         self.audit_label = QLabel()
         self.audit_label.setWordWrap(True)
         audit_card.body.addWidget(self.audit_label)
         body.addWidget(audit_card)
 
-        enrollment_card = SectionCard(theme, "设备加入与信任")
-        self.enrollment_label = QLabel("为新设备生成一次性加入凭据，登记设备公钥并限制设备只能加入受信任的企业环境。")
+        enrollment_card = SectionCard(theme, source_text("enterprise.enrollment.title"), title_key="enterprise.enrollment.title")
+        self.enrollment_label = _i18n_widget(
+            QLabel(source_text("enterprise.enrollment.hint")),
+            "enterprise.enrollment.hint",
+        )
         self.enrollment_label.setWordWrap(True)
         self.enrollment_label.setProperty("muted", True)
         enrollment_card.body.addWidget(self.enrollment_label)
-        self.enroll_campaign_button = QPushButton("为账户创建设备加入凭据")
-        self.enroll_csv_button = QPushButton("批量导入并创建加入凭据")
-        self.devices_button = QPushButton("查看设备")
-        self.revoke_device_button = QPushButton("撤销设备")
-        self.join_button = QPushButton("加入现有企业")
-        self.office_reconnect_button = QPushButton("重新连接企业")
+        self.enroll_campaign_button = _i18n_widget(QPushButton(source_text("enterprise.enrollment.create")), "enterprise.enrollment.create")
+        self.enroll_csv_button = _i18n_widget(QPushButton(source_text("enterprise.enrollment.csv")), "enterprise.enrollment.csv")
+        self.devices_button = _i18n_widget(QPushButton(source_text("enterprise.enrollment.devices")), "enterprise.enrollment.devices")
+        self.revoke_device_button = _i18n_widget(QPushButton(source_text("enterprise.enrollment.revoke")), "enterprise.enrollment.revoke")
+        self.join_button = _i18n_widget(QPushButton(source_text("enterprise.enrollment.join")), "enterprise.enrollment.join")
+        self.office_reconnect_button = _i18n_widget(QPushButton(source_text("enterprise.enrollment.reconnect")), "enterprise.enrollment.reconnect")
         enrollment_card.body.addWidget(ResponsiveActionBar((
             self.enroll_campaign_button, self.enroll_csv_button, self.devices_button,
             self.revoke_device_button, self.join_button, self.office_reconnect_button,
         )))
         body.addWidget(enrollment_card)
 
-        coordinator_card = SectionCard(theme, "企业局域网协调器")
-        self.coordinator_label = QLabel("协调器用于同一企业局域网内的设备注册和连接。局域网发现只负责找到服务地址，真正身份仍由企业签名与 TLS 证书验证。")
+        coordinator_card = SectionCard(theme, source_text("enterprise.coordinator.title"), title_key="enterprise.coordinator.title")
+        self.coordinator_label = _i18n_widget(
+            QLabel(source_text("enterprise.coordinator.hint")),
+            "enterprise.coordinator.hint",
+        )
         self.coordinator_label.setWordWrap(True)
         coordinator_card.body.addWidget(self.coordinator_label)
-        self.coordinator_start_button = QPushButton("启动企业协调器")
-        self.coordinator_stop_button = QPushButton("停止企业协调器")
+        self.coordinator_start_button = _i18n_widget(QPushButton(source_text("enterprise.coordinator.start")), "enterprise.coordinator.start")
+        self.coordinator_stop_button = _i18n_widget(QPushButton(source_text("enterprise.coordinator.stop")), "enterprise.coordinator.stop")
         coordinator_card.body.addWidget(ResponsiveActionBar((
             self.coordinator_start_button, self.coordinator_stop_button,
         )))
         body.addWidget(coordinator_card)
 
-        governance_card = SectionCard(theme, "Enterprise Workspace Governance")
-        self.governance_label = QLabel("Workspace / Team / Project 资源边界、资源级 RBAC、Quota、Approval 与 Audit Query 已接入治理层。")
+        governance_card = SectionCard(theme, source_text("enterprise.governance.title"), title_key="enterprise.governance.title")
+        self.governance_label = _i18n_widget(
+            QLabel(source_text("enterprise.governance.hint")),
+            "enterprise.governance.hint",
+        )
         self.governance_label.setWordWrap(True)
         governance_card.body.addWidget(self.governance_label)
-        self.workspace_button = QPushButton("创建 Workspace")
-        self.resource_button = QPushButton("登记受治理资源")
-        self.audit_query_button = QPushButton("查询最近 Audit")
-        self.ops_dashboard_button = QPushButton("Operations Dashboard")
+        self.workspace_button = _i18n_widget(QPushButton(source_text("enterprise.governance.create_workspace")), "enterprise.governance.create_workspace")
+        self.resource_button = _i18n_widget(QPushButton(source_text("enterprise.governance.register_resource")), "enterprise.governance.register_resource")
+        self.audit_query_button = _i18n_widget(QPushButton(source_text("enterprise.governance.audit_query")), "enterprise.governance.audit_query")
+        self.ops_dashboard_button = _i18n_widget(QPushButton(source_text("enterprise.governance.dashboard")), "enterprise.governance.dashboard")
         governance_card.body.addWidget(ResponsiveActionBar((
             self.workspace_button, self.resource_button, self.audit_query_button, self.ops_dashboard_button,
         )))
         body.addWidget(governance_card)
 
-        server_card = SectionCard(theme, "Enterprise Server / Distributed Worker")
-        self.server_label = QLabel(
-            "Enterprise Server 与 Worker 共享同一 Core Runtime / Task / Run 模型。Desktop 这里只提供受授权的"
-            "远程运维视图；Server/Worker 本身仍通过独立 runtime/launcher 运行，不在 UI 内 fork 第二套执行引擎。"
+        server_card = SectionCard(theme, source_text("enterprise.server.title"), title_key="enterprise.server.title")
+        self.server_label = _i18n_widget(
+            QLabel(source_text("enterprise.server.hint")),
+            "enterprise.server.hint",
         )
         self.server_label.setWordWrap(True)
         self.server_label.setProperty("muted", True)
         server_card.body.addWidget(self.server_label)
-        self.server_health_button = QPushButton("分布式队列健康")
-        self.server_workers_button = QPushButton("查看 Worker")
-        self.server_jobs_button = QPushButton("查看分布式 Job")
+        self.server_health_button = _i18n_widget(QPushButton(source_text("enterprise.server.health")), "enterprise.server.health")
+        self.server_workers_button = _i18n_widget(QPushButton(source_text("enterprise.server.workers")), "enterprise.server.workers")
+        self.server_jobs_button = _i18n_widget(QPushButton(source_text("enterprise.server.jobs")), "enterprise.server.jobs")
         server_card.body.addWidget(ResponsiveActionBar((
             self.server_health_button, self.server_workers_button, self.server_jobs_button,
         )))
@@ -275,7 +295,7 @@ class EnterprisePage(EnterpriseIdentityActionsMixin, EnterpriseDistributedAction
     def refresh(self) -> None:
         service = self.service
         if service is None:
-            self.status_label.setText("Local Enterprise Identity 后端不可用。")
+            self.status_label.setText(current_text("enterprise.status.backend_unavailable"))
             for button in (
                 self.create_button, self.unlock_button, self.login_button, self.logout_button, self.lock_button,
                 self.refresh_accounts_button, self.add_account_button, self.toggle_account_button, self.roles_button, self.rbac_matrix_button,
@@ -288,18 +308,21 @@ class EnterprisePage(EnterpriseIdentityActionsMixin, EnterpriseDistributedAction
             return
         status = service.status()
         if not status.configured:
-            self.status_label.setText(
-                "尚未建立企业身份。你可以创建本地企业，或使用管理员提供的一次性设备加入凭据加入现有企业。"
-            )
+            self.status_label.setText(current_text("enterprise.status.not_configured"))
         elif not status.unlocked:
-            self.status_label.setText("本机已配置 Enterprise Identity；Identity Vault 当前锁定。")
+            self.status_label.setText(current_text("enterprise.status.locked"))
         elif not status.authenticated:
-            self.status_label.setText(f"{status.enterprise_name} · {status.enterprise_id}\nVault 已解锁，尚未建立企业用户会话。")
+            self.status_label.setText(current_text("enterprise.status.unlocked").format(name=status.enterprise_name, enterprise_id=status.enterprise_id))
         else:
             self.status_label.setText(
-                f"{status.enterprise_name} · {status.enterprise_id}\n"
-                f"当前账户：{status.username} · Roles: {', '.join(status.roles)}\n"
-                f"Permissions: {', '.join(status.permissions)}\nSession expires: {status.session_expires_at}"
+                current_text("enterprise.status.authenticated").format(
+                    name=status.enterprise_name,
+                    enterprise_id=status.enterprise_id,
+                    username=status.username,
+                    roles=", ".join(status.roles),
+                    permissions=", ".join(status.permissions),
+                    expires=status.session_expires_at,
+                )
             )
         self.create_button.setEnabled(not status.configured)
         self.unlock_button.setEnabled(status.configured and not status.unlocked)
@@ -342,16 +365,22 @@ class EnterprisePage(EnterpriseIdentityActionsMixin, EnterpriseDistributedAction
         if coordinator is not None:
             health = coordinator.health()
             self.coordinator_label.setText(
-                f"Coordinator: {'RUNNING' if health['running'] else 'STOPPED'} · ID={health['coordinator_id']} · "
-                f"sessions={health['active_sessions']} · challenges={health['pending_challenges']}"
+                current_text("enterprise.coordinator.status").format(
+                    state=current_text(
+                        "enterprise.common.running" if health["running"] else "enterprise.common.stopped"
+                    ),
+                    coordinator_id=health["coordinator_id"],
+                    sessions=health["active_sessions"],
+                    challenges=health["pending_challenges"],
+                )
             )
         self._refresh_accounts(silent=True)
         try:
             integrity = self.context.security.audit.verify() if self.context.security is not None else {"valid": False, "reason": "security unavailable"}
         except ENTERPRISE_UI_ERRORS as exc:
             integrity = {"valid": False, "reason": f"{type(exc).__name__}: {exc}"}
-        self.audit_label.setText(f"Security Audit integrity: {integrity}")
-        self.inspectorChanged.emit("Enterprise", status.to_dict())
+        self.audit_label.setText(current_text("enterprise.audit.integrity").format(integrity=integrity))
+        self.inspectorChanged.emit(current_text("enterprise.page.title"), status.to_dict())
 
 
 
