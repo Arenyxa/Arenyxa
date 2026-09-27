@@ -524,7 +524,7 @@ class AboutPage(WorkspacePage):
 
         def failed(message: str) -> None:
             self.verify_button.setEnabled(True)
-            self.verify_button.setText(self._t("重新深度验证"))
+            self.verify_button.setText(current_text("about.verify.rerun"))
             self.integrity_result.setText(current_text("about.verify.failed").format(message=message))
 
         run_background(worker, completed, failed)
