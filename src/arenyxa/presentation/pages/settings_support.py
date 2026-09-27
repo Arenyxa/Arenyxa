@@ -452,7 +452,8 @@ class AboutPage(WorkspacePage):
 
     def _render_identity(self, report, *, quick: bool) -> None:
         self._quick_report = report
-        identity = self._STATE_LABELS.get(report.state.value, build_identity_summary(report))
+        label_key = self._STATE_LABELS.get(report.state.value)
+        identity = current_text(label_key) if label_key else build_identity_summary(report)
         if report.build_id:
             identity += f" · Build {report.build_id}"
         if report.signer_key_id:
@@ -463,24 +464,23 @@ class AboutPage(WorkspacePage):
         )
         self.identity_label.style().unpolish(self.identity_label)
         self.identity_label.style().polish(self.identity_label)
-        detail = self._STATE_DETAILS.get(report.state.value, "发行身份检查已完成。")
+        detail_key = self._STATE_DETAILS.get(report.state.value)
+        detail = current_text(detail_key) if detail_key else current_text("about.detail.complete")
         hash_text = report.manifest_hash[:16] + "…" if report.manifest_hash else "n/a"
-        scope = (
-            "快速状态只验证发行证明；只有“深度验证安装”才会逐文件核对安装内容。"
-            if quick
-            else "当前身份状态已经包含本次深度安装完整性校验结果。"
+        scope = current_text("about.provenance.scope_quick" if quick else "about.provenance.scope_deep")
+        metadata = current_text("about.provenance.metadata").format(
+            version=report.version or __version__,
+            channel=report.channel or "n/a",
+            hash=hash_text,
         )
-        metadata = f"Version: {report.version or __version__} · Channel: {report.channel or 'n/a'}"
-        self.provenance_text.setText(
-            self._t(f"{identity}\n{detail}\n\n{metadata}\nManifest SHA-256: {hash_text}\n{scope}")
-        )
+        self.provenance_text.setText(f"{identity}\n{detail}\n\n{metadata}\n{scope}")
 
     def _deep_verify(self) -> None:
         if not self.verify_button.isEnabled():
             return
         self.verify_button.setEnabled(False)
-        self.verify_button.setText(self._t("正在后台验证…"))
-        self.integrity_result.setText(self._t("正在核对发布证明、签名清单、安装文件、额外可加载代码、恢复包与 SQLite 完整性…"))
+        self.verify_button.setText(current_text("about.verify.running_button"))
+        self.integrity_result.setText(current_text("about.verify.running"))
 
         def worker() -> dict[str, object]:
             report = verify_release_attestation(installation_root(), deep_files=True)
@@ -492,39 +492,40 @@ class AboutPage(WorkspacePage):
 
         def completed(result: object) -> None:
             self.verify_button.setEnabled(True)
-            self.verify_button.setText(self._t("重新深度验证"))
+            self.verify_button.setText(current_text("about.verify.rerun"))
             if not isinstance(result, dict):
-                self.integrity_result.setText(self._t("深度验证返回了无法识别的结果。"))
+                self.integrity_result.setText(current_text("about.verify.unrecognized"))
                 return
             report = result.get("provenance")
             if report is None:
-                self.integrity_result.setText(self._t("深度验证未返回发行完整性结果。"))
+                self.integrity_result.setText(current_text("about.verify.no_provenance"))
                 return
             modified = list(getattr(report, "modified_files", []))
             unexpected = list(getattr(report, "unexpected_files", []))
             db_health = str(result.get("database_health", "unknown"))
-            state_name = self._STATE_LABELS.get(getattr(report.state, "value", ""), getattr(report, "display_name", "unknown"))
+            state_key = self._STATE_LABELS.get(getattr(report.state, "value", ""))
+            state_name = current_text(state_key) if state_key else getattr(report, "display_name", "unknown")
             lines = [
-                f"发行状态：{state_name}",
-                f"签名清单中已修改文件：{len(modified)}",
-                f"额外可加载文件：{len(unexpected)}",
-                f"SQLite integrity_check：{db_health}",
+                current_text("about.verify.state").format(state=state_name),
+                current_text("about.verify.modified_count").format(count=len(modified)),
+                current_text("about.verify.unexpected_count").format(count=len(unexpected)),
+                current_text("about.verify.sqlite").format(status=db_health),
             ]
             if modified:
-                lines.append("已修改：" + ", ".join(modified[:8]))
+                lines.append(current_text("about.verify.modified").format(files=", ".join(modified[:8])))
             if unexpected:
-                lines.append("额外文件：" + ", ".join(unexpected[:8]))
+                lines.append(current_text("about.verify.unexpected").format(files=", ".join(unexpected[:8])))
             notes = list(getattr(report, "notes", []))
             if notes:
-                lines.append("说明：" + " | ".join(notes[:4]))
-            lines.append("深度验证仅读取本机安装内容与数据库完整性信息，不需要联网。")
-            self.integrity_result.setText(self._t("\n".join(lines)))
+                lines.append(current_text("about.verify.notes").format(notes=" | ".join(notes[:4])))
+            lines.append(current_text("about.verify.offline"))
+            self.integrity_result.setText("\n".join(lines))
             self._render_identity(report, quick=False)
 
         def failed(message: str) -> None:
             self.verify_button.setEnabled(True)
             self.verify_button.setText(self._t("重新深度验证"))
-            self.integrity_result.setText(self._t(f"深度验证失败：{message}"))
+            self.integrity_result.setText(current_text("about.verify.failed").format(message=message))
 
         run_background(worker, completed, failed)
 
@@ -532,19 +533,19 @@ class AboutPage(WorkspacePage):
         report = self._quick_report or verify_release_attestation(installation_root(), deep_files=False)
         lines = [
             f"Arenyxa v{__display_version__}",
-            f"Engineering baseline: {__engineering_build__}",
-            f"Release: {report.display_name}",
-            f"Channel: {report.channel}",
-            f"Build ID: {report.build_id or 'n/a'}",
-            f"Signer: {report.signer_key_id or 'n/a'}",
-            f"Manifest SHA-256: {report.manifest_hash or 'n/a'}",
-            f"Python: {platform.python_version()}",
-            f"Qt Binding: {self._qt_version()}",
-            f"Platform: {platform.platform()}",
+            current_text("about.copy.engineering").format(value=__engineering_build__),
+            current_text("about.copy.release").format(value=report.display_name),
+            current_text("about.copy.channel").format(value=report.channel),
+            current_text("about.copy.build_id").format(value=report.build_id or "n/a"),
+            current_text("about.copy.signer").format(value=report.signer_key_id or "n/a"),
+            current_text("about.copy.manifest").format(value=report.manifest_hash or "n/a"),
+            current_text("about.copy.python").format(value=platform.python_version()),
+            current_text("about.copy.qt").format(value=self._qt_version()),
+            current_text("about.copy.platform").format(value=platform.platform()),
             "License: GPL-3.0-or-later",
         ]
         QApplication.clipboard().setText("\n".join(lines))
-        self.statusMessage.emit("构建信息已复制到剪贴板")
+        self.statusMessage.emit(current_text("about.copy.done"))
 
     @staticmethod
     def _qt_version() -> str:
