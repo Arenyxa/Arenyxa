@@ -598,7 +598,7 @@ class SettingsPage(WorkspacePage):
             return
         self.official_developer_login_button.setEnabled(not status.authenticated)
         self.official_developer_logout_button.setEnabled(status.authenticated)
-        self.official_developer_logout_button.setText("退出官方开发者")
+        self.official_developer_logout_button.setText(current_text("settings.official.logout"))
         if not status.authenticated:
             self.official_developer_status.setText(current_text("settings.official.not_logged_in"))
             return
