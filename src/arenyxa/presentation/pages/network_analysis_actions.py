@@ -546,7 +546,7 @@ class NetworkAnalysisActionsMixin:
             self.statusMessage.emit(current_text("network.packet.analytics_completed"))
         def failed(message: str) -> None:
             self.packet_analytics.setEnabled(True)
-            QMessageBox.warning(self, "Packet Intelligence", message)
+            QMessageBox.warning(self, current_text("network.packet.title"), message)
         run_background(analyze, completed, failed)
 
     def process_snapshot(self) -> None:
