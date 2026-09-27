@@ -12,6 +12,7 @@ from collections import deque
 from dataclasses import asdict, fields
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TypeVar
 from arenyxa.qt_compat.QtCore import QRectF, QTimer, Qt, Signal
 from arenyxa.branding import application_icon_png_path
 from arenyxa.qt_compat.QtGui import QColor, QPainter, QPainterPath, QPen, QPixmap
@@ -60,13 +61,16 @@ LOGGER = logging.getLogger(__name__)
 from arenyxa.presentation.pages.settings_support import AboutPage, ThemePreviewCard, _DeveloperTermsDialog
 
 
-def _i18n_widget(widget: QWidget, key: str) -> QWidget:
+_TWidget = TypeVar("_TWidget", bound=QWidget)
+
+
+def _i18n_widget(widget: _TWidget, key: str) -> _TWidget:
     widget.setProperty("i18n_key_text", key)
     return widget
 
 
 def _i18n_label(key: str) -> QLabel:
-    return _i18n_widget(QLabel(source_text(key)), key)  # type: ignore[return-value]
+    return _i18n_widget(QLabel(source_text(key)), key)
 
 
 def _i18n_tooltip(widget: QWidget, key: str) -> None:
