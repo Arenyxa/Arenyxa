@@ -134,7 +134,14 @@ class SettingsPage(WorkspacePage):
         performance_card = SectionCard(theme, source_text("settings.performance.title"), title_key="settings.performance.title")
         performance_form = QFormLayout()
         self.performance = ScrollSafeComboBox()
-        self.performance.addItems(["auto", "quality", "balanced", "efficiency"])
+        for index, (key, value) in enumerate((
+            ("settings.performance.option_auto", "auto"),
+            ("settings.performance.option_quality", "quality"),
+            ("settings.performance.option_balanced", "balanced"),
+            ("settings.performance.option_efficiency", "efficiency"),
+        )):
+            self.performance.addItem(source_text(key), value)
+            self.performance.setProperty(f"i18n_item_key_{index}", key)
         self.resource_governor_enabled = _i18n_widget(QCheckBox(source_text("settings.performance.governor_enable")), "settings.performance.governor_enable")
         self.resource_cpu_soft = ScrollSafeSpinBox()
         self.resource_cpu_soft.setRange(40, 98)
@@ -302,7 +309,7 @@ class SettingsPage(WorkspacePage):
             self.localeRequested.emit(str(locale))
 
     def _performance_activated(self, *_args) -> None:
-        mode = self.performance.currentText()
+        mode = str(self.performance.currentData() or "")
         if mode not in {"auto", "quality", "balanced", "efficiency"}:
             return
         self.context.settings.performance_mode = mode
@@ -366,7 +373,8 @@ class SettingsPage(WorkspacePage):
         ]
         previous = [widget.blockSignals(True) for widget in widgets]
         try:
-            self.performance.setCurrentText(settings.performance_mode)
+            performance_index = self.performance.findData(settings.performance_mode)
+            self.performance.setCurrentIndex(max(0, performance_index))
             self.resource_governor_enabled.setChecked(settings.resource_governor_enabled)
             self.resource_cpu_soft.setValue(settings.resource_cpu_soft_percent)
             self.resource_memory_soft.setValue(settings.resource_memory_soft_percent)
@@ -456,7 +464,7 @@ class SettingsPage(WorkspacePage):
         if not self.context.settings.resource_governor_enabled:
             self.resource_status.setText(current_text("settings.resource.disabled"))
         elif isinstance(decision, dict):
-            reasons = ", ".join(str(x) for x in decision.get("reasons", [])) or "none"
+            reasons = ", ".join(str(x) for x in decision.get("reasons", [])) or current_text("settings.common.none")
             self.resource_status.setText(
                 current_text("settings.resource.sampled").format(
                     pressure=decision.get("pressure", "unknown"),
@@ -474,7 +482,7 @@ class SettingsPage(WorkspacePage):
         self._refresh_official_developer_status()
         self._refresh_root_developer_entry()
         self.inspectorChanged.emit(
-            "Settings",
+            current_text("settings.page.title"),
             {
                 "locale": self.context.settings.locale,
                 "performance_mode": self.context.settings.performance_mode,
@@ -612,13 +620,13 @@ class SettingsPage(WorkspacePage):
             return
         bundle_path, _ = QFileDialog.getOpenFileName(
             self, current_text("settings.official.select_bundle"), str(self.context.paths.root),
-            "Arenyxa Developer (*.aryxdev *.json);;JSON (*.json);;All Files (*)"
+            current_text("settings.official.bundle_filter")
         )
         if not bundle_path:
             return
         vault_path, _ = QFileDialog.getOpenFileName(
             self, current_text("settings.official.select_vault"), str(Path(bundle_path).parent),
-            "Developer Vault (*.aryxkey *.json);;JSON (*.json);;All Files (*)"
+            current_text("settings.official.vault_filter")
         )
         if not vault_path:
             return
@@ -660,7 +668,7 @@ class SettingsPage(WorkspacePage):
             self,
             current_text("settings.root.select_bundle"),
             str(Path.home()),
-            "Arenyxa Root Owner Login (*.aryxowner *.aryxowner.json *.json);;JSON (*.json);;All Files (*)",
+            current_text("settings.root.bundle_filter"),
         )
         if not owner_bundle_path:
             return
@@ -668,7 +676,7 @@ class SettingsPage(WorkspacePage):
             self,
             current_text("settings.root.select_vault"),
             str(Path(owner_bundle_path).parent),
-            "Arenyxa Owner Key Vault (*.aryxkey *.json);;JSON (*.json);;All Files (*)",
+            current_text("settings.root.vault_filter"),
         )
         if not vault_path:
             return
@@ -706,7 +714,7 @@ class SettingsPage(WorkspacePage):
                 and status.kind == "root_owner"
                 and "platform.root" in status.capabilities
             ):
-                raise RuntimeError("Root Owner proof completed without a platform.root session")
+                raise RuntimeError(current_text("settings.root.proof_no_session"))
 
             # complete_root_owner_login provisions/verifies the protected workstation
             # binding.  Only after that succeeds may the live ExperienceContext project
@@ -714,9 +722,7 @@ class SettingsPage(WorkspacePage):
             binding = manager.root_workstation_status()
             if not bool(getattr(binding, "active", False)):
                 manager.logout(reason="ROOT_WORKSTATION_BIND_REQUIRED")
-                raise RuntimeError(
-                    "Root Owner proof succeeded, but the protected Root Workstation binding is not active"
-                )
+                raise RuntimeError(current_text("settings.root.binding_inactive"))
             self.context.root_developer_workstation = True
             self.context.root_workstation_registered = bool(manager.root_workstation_registered())
             self.context.root_capability_state = manager.root_capability_state()
