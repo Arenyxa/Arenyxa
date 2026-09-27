@@ -27,11 +27,12 @@ MIGRATED_UI_FILES = (
     ROOT / "src/arenyxa/presentation/pages/network.py",
     ROOT / "src/arenyxa/presentation/pages/network_capture_actions.py",
     ROOT / "src/arenyxa/presentation/pages/network_analysis_actions.py",
+    ROOT / "src/arenyxa/presentation/pages/studio_operations.py",
 )
 CATALOG_LOCALES = ("en_US", "zh_CN", "fr_FR", "de_DE", "ja_JP")
 CJK = re.compile(r"[\u3400-\u9fff]")
 KEY = re.compile(
-    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network)\.[A-Za-z0-9_.]+)(?:"|\')'
+    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio)\.[A-Za-z0-9_.]+)(?:"|\')'
 )
 
 
@@ -77,6 +78,20 @@ def test_semantic_tab_keys_retranslate_on_locale_change(qapp) -> None:
     manager.apply("zh_CN")
     manager.translate_tree(tabs)
     assert tabs.tabText(0) == "概览"
+
+
+def test_studio_semantic_tabs_are_bound() -> None:
+    source = (ROOT / "src/arenyxa/presentation/pages/studio_operations.py").read_text(
+        encoding="utf-8"
+    )
+    for key in (
+        "studio.tab.templates_environment",
+        "studio.tab.profiles_marketplace",
+        "studio.tab.compatibility",
+        "studio.tab.portability",
+        "studio.tab.autopilot",
+    ):
+        assert f'_add_i18n_tab(tab, "{key}")' in source
 
 
 def test_semantic_catalog_helpers_follow_active_locale(qapp) -> None:
