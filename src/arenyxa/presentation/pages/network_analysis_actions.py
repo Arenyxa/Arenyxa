@@ -153,7 +153,7 @@ class WaterfallWidget(QWidget):
             painter.setPen(QColor(tokens.text_muted))
             app = QApplication.instance()
             locale = str(app.property("arenyxa_locale") or "zh_CN") if app is not None else "zh_CN"
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, literal_for_locale("等待网络事件", locale))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, current_text("network.waterfall.waiting"))
             return
         durations = [
             max(
