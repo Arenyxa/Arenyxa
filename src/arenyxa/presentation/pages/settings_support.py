@@ -34,29 +34,17 @@ from arenyxa.qt_compat.QtWidgets import (
     QWidget,
 )
 from arenyxa import __display_version__, __display_version__ as __version__, __engineering_build__
-from arenyxa.compat import strict_zip
-from arenyxa.config import AppSettings
-from arenyxa.application.developer_safety import (
-    DEVELOPER_TERMS_VERSION,
-    RISK_AGREEMENT_TEXT,
-    RISK_AGREEMENT_TITLE,
-    WAIVER_TEXT,
-    WAIVER_TITLE,
-)
-from arenyxa.domain.models import MotionProfile
 from arenyxa.provenance import build_identity_summary, commercialization_notice, verify_release_attestation
 from arenyxa.repair import StartupHealthScanner, installation_root
 from arenyxa.infrastructure.atomic_io import fsync_existing_file
 from arenyxa.infrastructure.observability import Redactor
 from arenyxa.presentation.background import run_background
-from arenyxa.presentation.language import LOCALES, LanguageManager, current_text, literal_for_locale, source_text
+from arenyxa.presentation.language import LanguageManager, current_text, literal_for_locale, source_text
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.themes import ThemeTokens
 from arenyxa.presentation.widgets import (
     PageHeader,
     SectionCard,
-    ScrollSafeComboBox,
-    ScrollSafeSpinBox,
 )
 
 THEME_META = {
@@ -343,17 +331,10 @@ class AboutPage(WorkspacePage):
         self.identity_label = QLabel()
         self.identity_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         info.addWidget(self.identity_label)
-        version_line = QLabel(
-            current_text("about.version_line").format(
-                public=__display_version__,
-                engineering=__engineering_build__,
-                python=platform.python_version(),
-                qt=self._qt_version(),
-            )
-        )
-        version_line.setProperty("muted", True)
-        version_line.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        info.addWidget(version_line)
+        self.version_line = QLabel()
+        self.version_line.setProperty("muted", True)
+        self.version_line.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        info.addWidget(self.version_line)
         button_row = QHBoxLayout()
         self.verify_button = QPushButton(source_text("about.verify.button"))
         self.verify_button.setProperty("i18n_key_text", "about.verify.button")
@@ -409,12 +390,10 @@ class AboutPage(WorkspacePage):
         body.addWidget(privacy)
 
         license_card = SectionCard(theme, source_text("about.license.title"), title_key="about.license.title")
-        license_text = QLabel(
-            current_text("about.license.text").format(notice=commercialization_notice())
-        )
-        license_text.setWordWrap(True)
-        license_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        license_card.body.addWidget(license_text)
+        self.license_text = QLabel()
+        self.license_text.setWordWrap(True)
+        self.license_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        license_card.body.addWidget(self.license_text)
         body.addWidget(license_card)
 
         capabilities = SectionCard(theme, source_text("about.capabilities.title"), title_key="about.capabilities.title")
@@ -427,11 +406,42 @@ class AboutPage(WorkspacePage):
         body.addStretch()
 
         self._quick_report = None
+        self._refresh_localized_static()
         self._refresh_quick_identity()
 
     def set_language_manager(self, manager: LanguageManager) -> None:
         self.language_manager = manager
+        manager.changed.connect(self._language_changed)
+        self._language_changed()
+
+    def _language_changed(self, *_args) -> None:
+        self._refresh_localized_static()
         self._refresh_quick_identity()
+
+    def _refresh_localized_static(self) -> None:
+        self.version_line.setText(
+            current_text("about.version_line").format(
+                public=__display_version__,
+                engineering=__engineering_build__,
+                python=platform.python_version(),
+                qt=self._qt_version(),
+            )
+        )
+        self.environment_text.setText(
+            current_text("about.environment.summary").format(
+                os=platform.platform(),
+                architecture=platform.machine() or "unknown",
+                python=platform.python_version(),
+                qt=self._qt_version(),
+                app_root=installation_root(),
+                data_root=self.context.paths.root,
+                database=self.context.paths.database,
+                logs=self.context.paths.logs,
+            )
+        )
+        self.license_text.setText(
+            current_text("about.license.text").format(notice=commercialization_notice())
+        )
 
     def _t(self, text: str) -> str:
         return self.language_manager.literal(text) if self.language_manager is not None else text
