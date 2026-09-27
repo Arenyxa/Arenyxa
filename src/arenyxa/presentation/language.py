@@ -830,6 +830,9 @@ class LanguageManager(QObject):
 
             if isinstance(widget, QTabWidget):
                 for index in range(widget.count()):
+                    semantic_key = widget.property(f"i18n_tab_key_{index}")
+                    if semantic_key:
+                        widget.setTabText(index, self.text(str(semantic_key))); continue
                     source_key = f"i18n_tab_{index}"
                     source = widget.property(source_key)
                     current = widget.tabText(index)
