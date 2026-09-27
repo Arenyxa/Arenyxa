@@ -313,7 +313,7 @@ class SettingsPage(WorkspacePage):
             return
         self.context.settings.performance_mode = mode
         self._schedule_settings_save()
-        self.statusMessage.emit("性能模式已保存；线程池与完整缓存预算将在下次启动时应用。")
+        self.statusMessage.emit(current_text("settings.status.performance_saved"))
 
     def _save_resource_settings(self, *_args) -> None:
         settings = self.context.settings
@@ -328,7 +328,7 @@ class SettingsPage(WorkspacePage):
         if hasattr(self.context, "browser_pool"):
             self.context.browser_pool.set_limit(settings.resource_max_browser_instances)
         self._refresh_resource_status()
-        self.statusMessage.emit("资源治理阈值已保存；完整 Governor 阈值与启停状态将在下次启动时应用。")
+        self.statusMessage.emit(current_text("settings.status.resource_saved"))
 
     def _save_concurrency(self, *_args) -> None:
         request_workers = max(1, min(64, self.request_concurrency.value()))
@@ -349,9 +349,17 @@ class SettingsPage(WorkspacePage):
         else:
             self.context.runner.set_request_limit(min(self.context.runner.request_workers, settings.request_concurrency))
         self._refresh_resource_status()
+        mode_label = current_text(
+            "settings.concurrency.mode_adaptive"
+            if settings.adaptive_request_concurrency
+            else "settings.concurrency.mode_manual"
+        )
         self.statusMessage.emit(
-            f"抓取并发已保存：请求硬上限 {settings.request_concurrency} / 单域名 {settings.per_host_concurrency} / "
-            + ("自适应" if settings.adaptive_request_concurrency else "手动固定")
+            current_text("settings.status.concurrency_saved").format(
+                request=settings.request_concurrency,
+                per_host=settings.per_host_concurrency,
+                mode=mode_label,
+            )
         )
 
     def _sync_controls_from_settings(self) -> None:
@@ -383,16 +391,19 @@ class SettingsPage(WorkspacePage):
         finally:
             for widget, old in strict_zip(widgets, previous, strict=False):
                 widget.blockSignals(old)
-        profile_labels = {
-            "personal": "一般用户 · 简单模式",
-            "power": "高级用户",
-            "professional": "专业工作",
-            "developer": "Developer Profile",
-            "enterprise": "企业工作模式",
-            "root_developer": "Root Developer",
+        profile_keys = {
+            "personal": "welcome.profile.personal.title",
+            "power": "welcome.profile.power.title",
+            "professional": "welcome.profile.professional.title",
+            "developer": "welcome.profile.developer.title",
+            "enterprise": "welcome.profile.enterprise.title",
+            "root_developer": "experience.root_developer",
         }
         profile_id = str(getattr(settings, "experience_profile", "") or "")
-        self.experience_status.setText(profile_labels.get(profile_id, "尚未选择；下次启动将显示 Welcome Center"))
+        profile_key = profile_keys.get(profile_id)
+        self.experience_status.setText(
+            current_text(profile_key) if profile_key else current_text("settings.experience.not_selected")
+        )
         self._refresh_resource_status()
         self._refresh_root_developer_entry()
 
@@ -411,13 +422,11 @@ class SettingsPage(WorkspacePage):
             return
         manager = getattr(self.context, "developer_access", None)
         if manager is None:
-            self.root_developer_status.setText("Root Developer 认证组件当前不可用。")
+            self.root_developer_status.setText(current_text("settings.root.backend_unavailable"))
             self.root_developer_login_button.setEnabled(False)
             return
         if not manager.ready:
-            self.root_developer_status.setText(
-                "Root Developer 信任信息尚未就绪，因此登录已安全关闭（fail-closed）。"
-            )
+            self.root_developer_status.setText(current_text("settings.root.trust_unavailable"))
             self.root_developer_login_button.setEnabled(False)
             return
         status = manager.status()
@@ -429,23 +438,20 @@ class SettingsPage(WorkspacePage):
         )
         if root_active:
             self.root_developer_status.setText(
-                f"已激活：{status.developer_id}\n"
-                f"Fingerprint: {status.fingerprint}\n"
-                "当前进程拥有经过验证的 platform.root 会话。退出只结束本次 Root Developer 会话，"
-                "不会修改 Root 信任材料或工作站注册。"
+                current_text("settings.root.active_status").format(
+                    developer_id=status.developer_id,
+                    fingerprint=status.fingerprint,
+                )
             )
-            self.root_developer_login_button.setText("Root Developer 已激活")
+            self.root_developer_login_button.setText(current_text("settings.root.active_button"))
             self.root_developer_login_button.setEnabled(False)
             self.root_developer_logout_button.setVisible(True)
             self.root_developer_logout_button.setEnabled(True)
             return
         self.root_developer_logout_button.setVisible(False)
-        self.root_developer_login_button.setText("登录 Root Developer")
+        self.root_developer_login_button.setText(current_text("settings.root.login"))
         self.root_developer_login_button.setEnabled(True)
-        self.root_developer_status.setText(
-            "未登录。点击后会先显示最高风险确认，再要求 Root Owner 身份包、设备密钥口令和完整性验证；"
-            "全部通过后才会为当前进程建立 platform.root。"
-        )
+        self.root_developer_status.setText(current_text("settings.root.not_logged_in"))
 
     def _refresh_resource_status(self) -> None:
         try:
@@ -454,15 +460,20 @@ class SettingsPage(WorkspacePage):
         except Exception:
             decision = None
         if not self.context.settings.resource_governor_enabled:
-            self.resource_status.setText("Resource Governor 已配置为关闭；重启后生效。硬并发与浏览器租约上限仍保留。")
+            self.resource_status.setText(current_text("settings.resource.disabled"))
         elif isinstance(decision, dict):
             reasons = ", ".join(str(x) for x in decision.get("reasons", [])) or "none"
             self.resource_status.setText(
-                f"{decision.get('pressure', 'unknown')} · 请求动态上限 {decision.get('request_ceiling', '?')} · "
-                f"运行上限 {decision.get('worker_ceiling', '?')} · 浏览器上限 {decision.get('browser_ceiling', '?')} · {reasons}"
+                current_text("settings.resource.sampled").format(
+                    pressure=decision.get("pressure", "unknown"),
+                    request=decision.get("request_ceiling", "?"),
+                    worker=decision.get("worker_ceiling", "?"),
+                    browser=decision.get("browser_ceiling", "?"),
+                    reasons=reasons,
+                )
             )
         else:
-            self.resource_status.setText("等待 Resource Governor 首次采样；阈值修改会持久化并在下次启动完整应用。")
+            self.resource_status.setText(current_text("settings.resource.waiting"))
 
     def activated(self) -> None:
         self._sync_controls_from_settings()
@@ -511,7 +522,7 @@ class SettingsPage(WorkspacePage):
                 settings.developer_nav_expanded = False
                 settings.save(self.context.paths.root / "settings.json")
                 self.developerModeChanged.emit(False)
-                self.statusMessage.emit("Developer Mode 未启用：必须先同意风险协议与免责协议。")
+                self.statusMessage.emit(current_text("settings.developer.terms_required"))
                 return
             settings.developer_terms_version = DEVELOPER_TERMS_VERSION
             settings.developer_terms_accepted_at = datetime.now(timezone.utc).isoformat()
@@ -529,7 +540,7 @@ class SettingsPage(WorkspacePage):
         self.developerModeChanged.emit(bool(enabled))
         self._refresh_root_developer_entry()
         if enabled:
-            self.statusMessage.emit("Developer Profile 已启用；公开开发工具可用。内部 stress/fault injection 仍需要官方开发者证书明确授权。")
+            self.statusMessage.emit(current_text("settings.developer.enabled"))
 
 
     def _direct_shell_toggled(self, enabled: bool) -> None:
@@ -541,14 +552,14 @@ class SettingsPage(WorkspacePage):
             finally:
                 self.direct_shell.blockSignals(previous)
             settings.developer_direct_shell_enabled = False
-            self.statusMessage.emit("Direct Shell 未启用：请先启用 Developer Mode。")
+            self.statusMessage.emit(current_text("settings.direct_shell.requires_developer"))
             return
         if enabled:
             box = QMessageBox(self)
-            box.setWindowTitle("启用 Direct Shell")
+            box.setWindowTitle(current_text("settings.direct_shell.dialog_title"))
             box.setIcon(QMessageBox.Icon.Warning)
-            box.setText("PowerShell / CMD / Persistent Shell 将以当前 Windows 用户权限执行。")
-            box.setInformativeText("这不是安全沙箱。Arenyxa 会保留进程树终止、输出预算、敏感信息脱敏与高风险命令提示，但无法限制当前用户本身拥有的系统权限。")
+            box.setText(current_text("settings.direct_shell.dialog_text"))
+            box.setInformativeText(current_text("settings.direct_shell.dialog_info"))
             box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             box.setDefaultButton(QMessageBox.StandardButton.No)
             if box.exec() != QMessageBox.StandardButton.Yes:
@@ -562,21 +573,18 @@ class SettingsPage(WorkspacePage):
                 return
         settings.developer_direct_shell_enabled = bool(enabled)
         settings.save(self.context.paths.root / "settings.json")
-        self.statusMessage.emit("Direct Shell 已启用。" if enabled else "Direct Shell 已关闭。")
+        self.statusMessage.emit(current_text("settings.direct_shell.enabled" if enabled else "settings.direct_shell.disabled"))
 
     def _refresh_official_developer_status(self) -> None:
         manager = getattr(self.context, "developer_access", None)
         buttons = (self.official_developer_login_button, self.official_developer_logout_button)
         if manager is None:
-            self.official_developer_status.setText("官方开发者授权后端不可用。")
+            self.official_developer_status.setText(current_text("settings.official.backend_unavailable"))
             for button in buttons:
                 button.setEnabled(False)
             return
         if not manager.ready:
-            self.official_developer_status.setText(
-                "当前构建没有可用的官方 Developer Trust Artifact，因此官方开发者登录保持关闭。"
-                "Personal、Professional 和公开 Developer Profile 不受影响。"
-            )
+            self.official_developer_status.setText(current_text("settings.official.trust_unavailable"))
             for button in buttons:
                 button.setEnabled(False)
             return
@@ -585,25 +593,22 @@ class SettingsPage(WorkspacePage):
         if root_active:
             self.official_developer_login_button.setEnabled(False)
             self.official_developer_logout_button.setEnabled(False)
-            self.official_developer_logout_button.setText("退出官方开发者")
-            self.official_developer_status.setText(
-                "当前活动的是 Root Developer 会话。官方开发者授权不会管理或结束 Root Developer；"
-                "请使用下方“Root Developer · 最高技术权限”区域查看或退出。"
-            )
+            self.official_developer_logout_button.setText(current_text("settings.official.logout"))
+            self.official_developer_status.setText(current_text("settings.official.root_active"))
             return
         self.official_developer_login_button.setEnabled(not status.authenticated)
         self.official_developer_logout_button.setEnabled(status.authenticated)
         self.official_developer_logout_button.setText("退出官方开发者")
         if not status.authenticated:
-            self.official_developer_status.setText(
-                "未登录。需要 .aryxdev Developer Login Bundle 与本机匹配的 Developer Personal Key Vault。"
-            )
+            self.official_developer_status.setText(current_text("settings.official.not_logged_in"))
             return
         self.official_developer_status.setText(
-            f"已认证：{status.developer_id}\n"
-            f"Fingerprint: {status.fingerprint}\n"
-            f"Capabilities: {', '.join(status.capabilities)}\n"
-            f"Session expires: {status.session_expires_at}"
+            current_text("settings.official.authenticated").format(
+                developer_id=status.developer_id,
+                fingerprint=status.fingerprint,
+                capabilities=", ".join(status.capabilities),
+                expires=status.session_expires_at,
+            )
         )
 
     def _official_developer_login(self) -> None:
@@ -612,18 +617,18 @@ class SettingsPage(WorkspacePage):
             self._refresh_official_developer_status()
             return
         bundle_path, _ = QFileDialog.getOpenFileName(
-            self, "选择 Developer Login Bundle", str(self.context.paths.root),
+            self, current_text("settings.official.select_bundle"), str(self.context.paths.root),
             "Arenyxa Developer (*.aryxdev *.json);;JSON (*.json);;All Files (*)"
         )
         if not bundle_path:
             return
         vault_path, _ = QFileDialog.getOpenFileName(
-            self, "选择 Developer Personal Key Vault", str(Path(bundle_path).parent),
+            self, current_text("settings.official.select_vault"), str(Path(bundle_path).parent),
             "Developer Vault (*.aryxkey *.json);;JSON (*.json);;All Files (*)"
         )
         if not vault_path:
             return
-        passphrase, ok = QInputDialog.getText(self, "官方开发者登录", "Developer Personal Key 口令：", QLineEdit.EchoMode.Password)
+        passphrase, ok = QInputDialog.getText(self, current_text("settings.official.login_dialog"), current_text("settings.official.passphrase"), QLineEdit.EchoMode.Password)
         if not ok or not passphrase:
             return
         try:
@@ -633,10 +638,10 @@ class SettingsPage(WorkspacePage):
             signature = sign_login_challenge(load_vault(Path(vault_path)), passphrase, challenge.to_dict())
             manager.complete_login(challenge.challenge_id, signature)
         except Exception as exc:
-            self.statusMessage.emit(f"官方开发者登录失败：{type(exc).__name__}: {exc}")
-            QMessageBox.warning(self, "官方开发者登录", f"认证失败。\n\n{type(exc).__name__}: {exc}")
+            self.statusMessage.emit(current_text("settings.official.login_failed").format(error=f"{type(exc).__name__}: {exc}"))
+            QMessageBox.warning(self, current_text("settings.official.login_dialog"), current_text("settings.official.authentication_failed").format(error=f"{type(exc).__name__}: {exc}"))
         else:
-            self.statusMessage.emit("官方开发者已认证；内部能力继续按证书 capability 精确授权。")
+            self.statusMessage.emit(current_text("settings.official.auth_success"))
             self.developerModeChanged.emit(bool(self.context.settings.developer_mode))
         finally:
             passphrase = ""
@@ -654,12 +659,12 @@ class SettingsPage(WorkspacePage):
         from arenyxa.presentation.root_developer_gate import confirm_root_developer_login
 
         if not confirm_root_developer_login(self):
-            self.statusMessage.emit("Root Developer 登录已取消；未发生任何权限变化。")
+            self.statusMessage.emit(current_text("settings.root.login_cancelled"))
             return
 
         owner_bundle_path, _ = QFileDialog.getOpenFileName(
             self,
-            "选择 Root Owner Login Bundle",
+            current_text("settings.root.select_bundle"),
             str(Path.home()),
             "Arenyxa Root Owner Login (*.aryxowner *.aryxowner.json *.json);;JSON (*.json);;All Files (*)",
         )
@@ -667,7 +672,7 @@ class SettingsPage(WorkspacePage):
             return
         vault_path, _ = QFileDialog.getOpenFileName(
             self,
-            "选择 Root Owner Device Key Vault",
+            current_text("settings.root.select_vault"),
             str(Path(owner_bundle_path).parent),
             "Arenyxa Owner Key Vault (*.aryxkey *.json);;JSON (*.json);;All Files (*)",
         )
@@ -675,8 +680,8 @@ class SettingsPage(WorkspacePage):
             return
         passphrase, ok = QInputDialog.getText(
             self,
-            "Root Developer · Root Owner 强认证",
-            "Root Owner Device Key 口令：",
+            current_text("settings.root.auth_dialog"),
+            current_text("settings.root.passphrase"),
             QLineEdit.EchoMode.Password,
         )
         if not ok or not passphrase:
@@ -692,7 +697,7 @@ class SettingsPage(WorkspacePage):
                 read_text_limited(Path(owner_bundle_path), 2 * 1024 * 1024, encoding="utf-8")
             )
             if not isinstance(raw_bundle, dict):
-                raise ValueError("Root Owner Login Bundle 必须是 JSON object")
+                raise ValueError(current_text("settings.root.bundle_invalid"))
             challenge = manager.begin_root_owner_login(raw_bundle)
             signature = sign_owner_login_challenge(
                 load_owner_device_vault(Path(vault_path)),
@@ -723,29 +728,22 @@ class SettingsPage(WorkspacePage):
             self.context.root_capability_state = manager.root_capability_state()
         except Exception as exc:
             self.context.root_developer_workstation = False
-            self.statusMessage.emit(
-                f"Root Developer 登录失败：{type(exc).__name__}: {exc}"
-            )
+            self.statusMessage.emit(current_text("settings.root.login_failed").format(error=f"{type(exc).__name__}: {exc}"))
             QMessageBox.critical(
                 self,
-                "Root Developer 认证失败",
-                "Root Developer 未激活。安全边界保持 fail-closed。\n\n"
-                f"{type(exc).__name__}: {exc}",
+                current_text("settings.root.authentication_failed_title"),
+                current_text("settings.root.authentication_failed").format(error=f"{type(exc).__name__}: {exc}"),
             )
         else:
-            self.statusMessage.emit(
-                "Root Owner 强认证与 Root Integrity 验证通过；Root Developer 已为当前进程激活。"
-            )
+            self.statusMessage.emit(current_text("settings.root.auth_success"))
             # Reuse the existing navigation/Experience rebuild signal instead of adding
             # a second authority path. NavigationContextFactory will promote the live
             # context to ROOT_DEVELOPER only when this verified Root session is active.
             self.developerModeChanged.emit(True)
             QMessageBox.information(
                 self,
-                "Root Developer 已激活",
-                "Root Developer Authority 已激活。\n\n"
-                "这是当前进程的受验证 Root 会话；不会因为 Settings 偏好而自动恢复。"
-                "下次启动仍将按 Root Workstation 安全策略重新验证。",
+                current_text("settings.root.active_dialog_title"),
+                current_text("settings.root.active_dialog_text"),
             )
         finally:
             passphrase = ""
@@ -760,16 +758,16 @@ class SettingsPage(WorkspacePage):
         try:
             status = manager.status()
             if status.authenticated and "platform.root" in status.capabilities:
-                self.statusMessage.emit("当前活动的是 Root Developer；请使用下方 Root Developer 区域退出。")
+                self.statusMessage.emit(current_text("settings.official.root_logout_redirect"))
                 self._refresh_official_developer_status()
                 self._refresh_root_developer_entry()
                 return
             manager.logout()
         except Exception as exc:
-            self.statusMessage.emit(f"官方开发者会话已退出，但审计写入失败：{type(exc).__name__}: {exc}")
-            QMessageBox.warning(self, "官方开发者退出", f"会话已撤销，但审计写入失败。\n\n{type(exc).__name__}: {exc}")
+            self.statusMessage.emit(current_text("settings.official.logout_audit_failed").format(error=f"{type(exc).__name__}: {exc}"))
+            QMessageBox.warning(self, current_text("settings.official.logout_dialog"), current_text("settings.common.revoked_audit_failed").format(error=f"{type(exc).__name__}: {exc}"))
         else:
-            self.statusMessage.emit("官方开发者授权已退出。")
+            self.statusMessage.emit(current_text("settings.official.logout_success"))
         self._refresh_official_developer_status()
         self._refresh_root_developer_entry()
 
@@ -783,7 +781,7 @@ class SettingsPage(WorkspacePage):
         try:
             status = manager.status()
             if not (status.authenticated and "platform.root" in status.capabilities):
-                self.statusMessage.emit("当前没有活动的 Root Developer 会话。")
+                self.statusMessage.emit(current_text("settings.root.no_active_session"))
                 return
             manager.logout()
             self.context.root_developer_workstation = False
@@ -797,10 +795,10 @@ class SettingsPage(WorkspacePage):
             self._refresh_official_developer_status()
             self._refresh_root_developer_entry()
         if error is not None:
-            self.statusMessage.emit(f"Root Developer 会话已撤销，但审计写入失败：{type(error).__name__}: {error}")
-            QMessageBox.warning(self, "Root Developer 退出", f"会话已撤销，但审计写入失败。\n\n{type(error).__name__}: {error}")
+            self.statusMessage.emit(current_text("settings.root.logout_audit_failed").format(error=f"{type(error).__name__}: {error}"))
+            QMessageBox.warning(self, current_text("settings.root.logout_dialog"), current_text("settings.common.revoked_audit_failed").format(error=f"{type(error).__name__}: {error}"))
         else:
-            self.statusMessage.emit("Root Developer 已退出；Root 信任材料和工作站注册保持不变。")
+            self.statusMessage.emit(current_text("settings.root.logout_success"))
 
     def _include_paths_toggled(self, enabled: bool) -> None:
         self.context.settings.diagnostics_include_paths = bool(enabled)
@@ -808,7 +806,7 @@ class SettingsPage(WorkspacePage):
 
     def run_diagnostics(self) -> None:
         self.diagnostics_button.setEnabled(False)
-        self.diagnostic_status.setText("正在后台运行健康诊断…")
+        self.diagnostic_status.setText(current_text("settings.diagnostics.running"))
 
         def worker():
             return StartupHealthScanner(
@@ -820,26 +818,30 @@ class SettingsPage(WorkspacePage):
             report = value
             findings = list(getattr(report, "findings", []))
             if not findings:
-                self.diagnostic_status.setText("诊断完成：未发现需要处理的异常。")
-                self.statusMessage.emit("诊断完成：系统健康")
+                self.diagnostic_status.setText(current_text("settings.diagnostics.healthy"))
+                self.statusMessage.emit(current_text("settings.diagnostics.healthy_status"))
                 return
             critical = sum(1 for item in findings if getattr(item, "severity", "") == "critical")
             categories = len(getattr(report, "categories", []))
             self.diagnostic_status.setText(
-                f"诊断完成：发现 {len(findings)} 项异常，涉及 {categories} 类，其中 {critical} 项为关键问题。可打开 Repair Center 自动处理。"
+                current_text("settings.diagnostics.issues").format(
+                    findings=len(findings),
+                    categories=categories,
+                    critical=critical,
+                )
             )
-            self.statusMessage.emit("诊断完成：发现需要关注的项目")
+            self.statusMessage.emit(current_text("settings.diagnostics.attention"))
 
         def failed(message: str) -> None:
             self.diagnostics_button.setEnabled(True)
-            self.diagnostic_status.setText(f"诊断失败：{message}")
-            QMessageBox.warning(self, "诊断失败", message)
+            self.diagnostic_status.setText(current_text("settings.diagnostics.failed").format(message=message))
+            QMessageBox.warning(self, current_text("settings.diagnostics.failed_title"), message)
 
         run_background(worker, completed, failed)
 
     def export_diagnostics(self) -> None:
         self.export_diagnostics_button.setEnabled(False)
-        self.diagnostic_status.setText("正在生成脱敏诊断包…")
+        self.diagnostic_status.setText(current_text("settings.diagnostics.exporting"))
 
         def worker() -> Path:
             report = StartupHealthScanner(
@@ -893,21 +895,21 @@ class SettingsPage(WorkspacePage):
         def completed(value: object) -> None:
             self.export_diagnostics_button.setEnabled(True)
             destination = Path(value)
-            self.diagnostic_status.setText(f"诊断包已导出：{destination.name}")
-            self.statusMessage.emit("诊断包导出完成")
+            self.diagnostic_status.setText(current_text("settings.diagnostics.exported").format(name=destination.name))
+            self.statusMessage.emit(current_text("settings.diagnostics.export_complete"))
 
         def failed(message: str) -> None:
             self.export_diagnostics_button.setEnabled(True)
-            self.diagnostic_status.setText(f"诊断包导出失败：{message}")
-            QMessageBox.warning(self, "导出诊断包失败", message)
+            self.diagnostic_status.setText(current_text("settings.diagnostics.export_failed").format(message=message))
+            QMessageBox.warning(self, current_text("settings.diagnostics.export_failed_title"), message)
 
         run_background(worker, completed, failed)
 
     def reset_settings(self) -> None:
         choice = QMessageBox.question(
             self,
-            "恢复默认设置",
-            "重置全部应用设置和个性化偏好，并关闭 Developer Mode。Projects、Captures、Exports、数据库与正式结果数据不会删除。继续？",
+            current_text("settings.reset.dialog_title"),
+            current_text("settings.reset.dialog_text"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
         )
         if choice != QMessageBox.StandardButton.Yes:
@@ -941,5 +943,5 @@ class SettingsPage(WorkspacePage):
         app = QApplication.instance()
         if app is not None:
             app.setProperty("arenyxa_high_contrast", bool(defaults.high_contrast))
-        self.diagnostic_status.setText("设置已恢复默认值。原设置文件已备份；用户数据未删除。")
-        self.statusMessage.emit("设置已恢复默认值")
+        self.diagnostic_status.setText(current_text("settings.reset.done_detail"))
+        self.statusMessage.emit(current_text("settings.reset.done"))
