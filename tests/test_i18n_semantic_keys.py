@@ -75,9 +75,11 @@ def test_semantic_widget_keys_retranslate_on_locale_change(qapp) -> None:
     manager.translate_tree(combo)
     assert label.text() == "Personalization"
     assert combo.itemText(0) == "Automatic (adapt to performance)"
+    assert combo.itemData(0) == "auto"
 
     manager.apply("zh_CN")
     manager.translate_tree(label)
     manager.translate_tree(combo)
     assert label.text() == "个性化"
     assert combo.itemText(0) == "自动（根据性能动态调整）"
+    assert combo.itemData(0) == "auto"
