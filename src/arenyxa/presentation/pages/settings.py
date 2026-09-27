@@ -36,13 +36,7 @@ from arenyxa.qt_compat.QtWidgets import (
 from arenyxa import __display_version__ as __version__
 from arenyxa.compat import strict_zip
 from arenyxa.config import AppSettings
-from arenyxa.application.developer_safety import (
-    DEVELOPER_TERMS_VERSION,
-    RISK_AGREEMENT_TEXT,
-    RISK_AGREEMENT_TITLE,
-    WAIVER_TEXT,
-    WAIVER_TITLE,
-)
+from arenyxa.application.developer_safety import DEVELOPER_TERMS_VERSION
 from arenyxa.domain.errors import ArenyxaError
 from arenyxa.domain.models import MotionProfile
 from arenyxa.provenance import build_identity_summary, commercialization_notice, verify_release_attestation
