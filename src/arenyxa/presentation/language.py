@@ -133,8 +133,7 @@ def _load_locale_catalogs() -> None:
 
 _load_locale_catalogs()
 
-                                                                                   
-                                                                                                  
+
 PHRASES = {
     "仪表盘":"Dashboard", "概览您的本地网页索引与系统状态":"Overview of your local web index and system status",
     "抓取任务":"Capture Tasks", "搜索中心":"Search Center", "数据管理":"Data Management", "网络分析":"Network Analysis",

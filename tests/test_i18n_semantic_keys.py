@@ -14,6 +14,7 @@ if not binding_available():
 from arenyxa.qt_compat.QtWidgets import QComboBox, QLabel
 
 from arenyxa.application.experience import EXPERIENCE_PROFILES
+from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.language import LanguageManager
 
 
@@ -21,10 +22,14 @@ ROOT = Path(__file__).resolve().parents[1]
 MIGRATED_UI_FILES = (
     ROOT / "src/arenyxa/presentation/pages/welcome.py",
     ROOT / "src/arenyxa/presentation/pages/personalization.py",
+    ROOT / "src/arenyxa/presentation/pages/settings.py",
+    ROOT / "src/arenyxa/presentation/pages/settings_support.py",
 )
 CATALOG_LOCALES = ("en_US", "zh_CN", "fr_FR", "de_DE", "ja_JP")
 CJK = re.compile(r"[\u3400-\u9fff]")
-KEY = re.compile(r'(?:"|\')((?:welcome|personalization)\.[A-Za-z0-9_.]+)(?:"|\')')
+KEY = re.compile(
+    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme)\.[A-Za-z0-9_.]+)(?:"|\')'
+)
 
 
 def _referenced_keys() -> set[str]:
@@ -32,6 +37,7 @@ def _referenced_keys() -> set[str]:
     for path in MIGRATED_UI_FILES:
         text = path.read_text(encoding="utf-8")
         keys.update(KEY.findall(text))
+    keys.discard("settings.json")
     for profile in EXPERIENCE_PROFILES:
         keys.add(f"welcome.profile.{profile.id}.title")
         keys.add(f"welcome.profile.{profile.id}.summary")
@@ -55,6 +61,16 @@ def test_migrated_page_keys_exist_in_packaged_catalogs() -> None:
         assert not missing, f"{locale} missing i18n keys: {missing}"
 
 
+def test_semantic_catalog_helpers_follow_active_locale(qapp) -> None:
+    manager = LanguageManager(qapp, "en_US")
+    manager.apply("en_US")
+    assert source_text("settings.page.title") == "Settings"
+    assert current_text("settings.page.title") == "Settings"
+
+    manager.apply("zh_CN")
+    assert current_text("settings.page.title") == "设置"
+
+
 def test_semantic_widget_keys_retranslate_on_locale_change(qapp) -> None:
     manager = LanguageManager(qapp, "en_US")
 
@@ -70,9 +86,11 @@ def test_semantic_widget_keys_retranslate_on_locale_change(qapp) -> None:
     manager.translate_tree(combo)
     assert label.text() == "Personalization"
     assert combo.itemText(0) == "Automatic (adapt to performance)"
+    assert combo.itemData(0) == "auto"
 
     manager.apply("zh_CN")
     manager.translate_tree(label)
     manager.translate_tree(combo)
     assert label.text() == "个性化"
     assert combo.itemText(0) == "自动（根据性能动态调整）"
+    assert combo.itemData(0) == "auto"
