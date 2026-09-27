@@ -14,7 +14,7 @@ if not binding_available():
 from arenyxa.qt_compat.QtWidgets import QComboBox, QLabel
 
 from arenyxa.application.experience import EXPERIENCE_PROFILES
-from arenyxa.presentation.language import LanguageManager
+from arenyxa.presentation.language import LanguageManager, current_text, source_text
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -58,6 +58,16 @@ def test_migrated_page_keys_exist_in_packaged_catalogs() -> None:
         payload = json.loads((ROOT / f"src/arenyxa/locale/{locale}.json").read_text(encoding="utf-8"))
         missing = sorted(required - payload.keys())
         assert not missing, f"{locale} missing i18n keys: {missing}"
+
+
+def test_semantic_catalog_helpers_follow_active_locale(qapp) -> None:
+    manager = LanguageManager(qapp, "en_US")
+    manager.apply("en_US")
+    assert source_text("settings.page.title") == "Settings"
+    assert current_text("settings.page.title") == "Settings"
+
+    manager.apply("zh_CN")
+    assert current_text("settings.page.title") == "设置"
 
 
 def test_semantic_widget_keys_retranslate_on_locale_change(qapp) -> None:
