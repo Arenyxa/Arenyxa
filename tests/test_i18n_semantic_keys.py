@@ -27,11 +27,24 @@ MIGRATED_UI_FILES = (
     ROOT / "src/arenyxa/presentation/pages/network.py",
     ROOT / "src/arenyxa/presentation/pages/network_capture_actions.py",
     ROOT / "src/arenyxa/presentation/pages/network_analysis_actions.py",
+    ROOT / "src/arenyxa/presentation/pages/enterprise.py",
+    ROOT / "src/arenyxa/presentation/pages/enterprise_identity_actions.py",
+    ROOT / "src/arenyxa/presentation/pages/enterprise_distributed_actions.py",
 )
 CATALOG_LOCALES = ("en_US", "zh_CN", "fr_FR", "de_DE", "ja_JP")
 CJK = re.compile(r"[\u3400-\u9fff]")
+ENTERPRISE_MACHINE_IDENTIFIERS = {
+    "enterprise.account.manage",
+    "enterprise.audit.read",
+    "enterprise.coordinator.manage",
+    "enterprise.device.manage",
+    "enterprise.enrollment.manage",
+    "enterprise.remote_ops",
+    "enterprise.vault.manage",
+    "enterprise.workspace.manage",
+}
 KEY = re.compile(
-    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network)\.[A-Za-z0-9_.]+)(?:"|\')'
+    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|enterprise)\.[A-Za-z0-9_.]+)(?:"|\')'
 )
 
 
@@ -41,6 +54,7 @@ def _referenced_keys() -> set[str]:
         text = path.read_text(encoding="utf-8")
         keys.update(KEY.findall(text))
     keys.discard("settings.json")
+    keys.difference_update(ENTERPRISE_MACHINE_IDENTIFIERS)
     for profile in EXPERIENCE_PROFILES:
         keys.add(f"welcome.profile.{profile.id}.title")
         keys.add(f"welcome.profile.{profile.id}.summary")
@@ -77,6 +91,21 @@ def test_semantic_tab_keys_retranslate_on_locale_change(qapp) -> None:
     manager.apply("zh_CN")
     manager.translate_tree(tabs)
     assert tabs.tabText(0) == "概览"
+
+
+def test_enterprise_resource_kind_display_does_not_replace_machine_value() -> None:
+    source = (ROOT / "src/arenyxa/presentation/pages/enterprise_distributed_actions.py").read_text(
+        encoding="utf-8"
+    )
+    for key, value in (
+        ("enterprise.resource_kind.workflow", "workflow"),
+        ("enterprise.resource_kind.dataset", "dataset"),
+        ("enterprise.resource_kind.capture", "capture"),
+        ("enterprise.resource_kind.schedule", "schedule"),
+        ("enterprise.resource_kind.worker", "worker"),
+        ("enterprise.resource_kind.project", "project"),
+    ):
+        assert f'("{key}", "{value}")' in source
 
 
 def test_semantic_catalog_helpers_follow_active_locale(qapp) -> None:
