@@ -11,7 +11,7 @@ from arenyxa.qt_compat import binding_available
 if not binding_available():
     pytest.skip("No supported Qt binding is installed", allow_module_level=True)
 
-from arenyxa.qt_compat.QtWidgets import QComboBox, QLabel
+from arenyxa.qt_compat.QtWidgets import QComboBox, QLabel, QTabWidget, QWidget
 
 from arenyxa.application.experience import EXPERIENCE_PROFILES
 from arenyxa.presentation.i18n_runtime import current_text, source_text
@@ -24,11 +24,14 @@ MIGRATED_UI_FILES = (
     ROOT / "src/arenyxa/presentation/pages/personalization.py",
     ROOT / "src/arenyxa/presentation/pages/settings.py",
     ROOT / "src/arenyxa/presentation/pages/settings_support.py",
+    ROOT / "src/arenyxa/presentation/pages/network.py",
+    ROOT / "src/arenyxa/presentation/pages/network_capture_actions.py",
+    ROOT / "src/arenyxa/presentation/pages/network_analysis_actions.py",
 )
 CATALOG_LOCALES = ("en_US", "zh_CN", "fr_FR", "de_DE", "ja_JP")
 CJK = re.compile(r"[\u3400-\u9fff]")
 KEY = re.compile(
-    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme)\.[A-Za-z0-9_.]+)(?:"|\')'
+    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network)\.[A-Za-z0-9_.]+)(?:"|\')'
 )
 
 
@@ -59,6 +62,21 @@ def test_migrated_page_keys_exist_in_packaged_catalogs() -> None:
         payload = json.loads((ROOT / f"src/arenyxa/locale/{locale}.json").read_text(encoding="utf-8"))
         missing = sorted(required - payload.keys())
         assert not missing, f"{locale} missing i18n keys: {missing}"
+
+
+def test_semantic_tab_keys_retranslate_on_locale_change(qapp) -> None:
+    manager = LanguageManager(qapp, "en_US")
+    tabs = QTabWidget()
+    tabs.addTab(QWidget(), "placeholder")
+    tabs.setProperty("i18n_tab_key_0", "network.tab.overview")
+
+    manager.apply("en_US")
+    manager.translate_tree(tabs)
+    assert tabs.tabText(0) == "Overview"
+
+    manager.apply("zh_CN")
+    manager.translate_tree(tabs)
+    assert tabs.tabText(0) == "概览"
 
 
 def test_semantic_catalog_helpers_follow_active_locale(qapp) -> None:
