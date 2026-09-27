@@ -133,6 +133,20 @@ def _load_locale_catalogs() -> None:
 
 _load_locale_catalogs()
 
+
+def source_text(key: str) -> str:
+    """Return the canonical English source text for a semantic i18n key."""
+    return EN.get(str(key), str(key))
+
+
+def current_text(key: str) -> str:
+    """Return a semantic i18n value for the locale currently applied to QApplication."""
+    normalized = str(key)
+    app = QApplication.instance()
+    locale = str(app.property("arenyxa_locale") or "en_US") if app is not None else "en_US"
+    table = TRANSLATIONS.get(locale, EN)
+    return table.get(normalized, EN.get(normalized, normalized))
+
                                                                                    
                                                                                                   
 PHRASES = {
