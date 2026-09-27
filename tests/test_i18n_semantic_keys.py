@@ -14,7 +14,8 @@ if not binding_available():
 from arenyxa.qt_compat.QtWidgets import QComboBox, QLabel
 
 from arenyxa.application.experience import EXPERIENCE_PROFILES
-from arenyxa.presentation.language import LanguageManager, current_text, source_text
+from arenyxa.presentation.i18n_runtime import current_text, source_text
+from arenyxa.presentation.language import LanguageManager
 
 
 ROOT = Path(__file__).resolve().parents[1]
