@@ -387,6 +387,27 @@ class NetworkPage(NetworkCaptureActionsMixin, NetworkAnalysisActionsMixin, Works
             )
         )
 
+    def refresh_localized_previews(self) -> None:
+        if self.model.columnCount() > 0:
+            self.model.headerDataChanged.emit(
+                Qt.Orientation.Horizontal,
+                0,
+                self.model.columnCount() - 1,
+            )
+        self.waterfall.update()
+        if self.simple_mode:
+            self.simple_advanced_button.setText(
+                current_text(
+                    "network.action.collapse_advanced"
+                    if self.simple_advanced_button.isChecked()
+                    else "network.action.advanced"
+                )
+            )
+        if self.context.capture.session is None:
+            self.capture_status.setText(current_text("network.status.idle"))
+        else:
+            self.update_status()
+
     def activated(self) -> None:
         self.refresh_sessions()
         self.update_status()
