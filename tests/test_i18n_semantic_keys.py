@@ -21,10 +21,14 @@ ROOT = Path(__file__).resolve().parents[1]
 MIGRATED_UI_FILES = (
     ROOT / "src/arenyxa/presentation/pages/welcome.py",
     ROOT / "src/arenyxa/presentation/pages/personalization.py",
+    ROOT / "src/arenyxa/presentation/pages/settings.py",
+    ROOT / "src/arenyxa/presentation/pages/settings_support.py",
 )
 CATALOG_LOCALES = ("en_US", "zh_CN", "fr_FR", "de_DE", "ja_JP")
 CJK = re.compile(r"[\u3400-\u9fff]")
-KEY = re.compile(r'(?:"|\')((?:welcome|personalization)\.[A-Za-z0-9_.]+)(?:"|\')')
+KEY = re.compile(
+    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme)\.[A-Za-z0-9_.]+)(?:"|\')'
+)
 
 
 def _referenced_keys() -> set[str]:
@@ -32,6 +36,7 @@ def _referenced_keys() -> set[str]:
     for path in MIGRATED_UI_FILES:
         text = path.read_text(encoding="utf-8")
         keys.update(KEY.findall(text))
+    keys.discard("settings.json")
     for profile in EXPERIENCE_PROFILES:
         keys.add(f"welcome.profile.{profile.id}.title")
         keys.add(f"welcome.profile.{profile.id}.summary")
