@@ -49,7 +49,7 @@ from arenyxa.repair import StartupHealthScanner, installation_root
 from arenyxa.infrastructure.atomic_io import fsync_existing_file
 from arenyxa.infrastructure.observability import Redactor
 from arenyxa.presentation.background import run_background
-from arenyxa.presentation.language import LOCALES, LanguageManager, literal_for_locale
+from arenyxa.presentation.language import LOCALES, LanguageManager, current_text, literal_for_locale, source_text
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.themes import ThemeTokens
 from arenyxa.presentation.widgets import (
@@ -60,12 +60,12 @@ from arenyxa.presentation.widgets import (
 )
 
 THEME_META = {
-    "modern_dark": ("正式预设 · 默认", "现代深色 / 高信息密度 / 专业工作台"),
-    "aurora_glass": ("正式预设", "极光液态玻璃 / 青绿光晕 / 深海渐变"),
-    "clean_light": ("正式预设", "明亮浅色 / 清洁留白 / 绿色强调"),
-    "terminal_green": ("正式预设", "复古终端 / 荧光绿 / 低圆角科技感"),
-    "professional_graphite": ("扩展预设", "石墨灰 / 克制玻璃 / 企业专业感"),
-    "blue_productivity": ("扩展预设", "蓝色生产力 / 明亮商务 / 高可读性"),
+    "modern_dark": ("theme.modern_dark.meta", "theme.modern_dark.description"),
+    "aurora_glass": ("theme.aurora_glass.meta", "theme.aurora_glass.description"),
+    "clean_light": ("theme.clean_light.meta", "theme.clean_light.description"),
+    "terminal_green": ("theme.terminal_green.meta", "theme.terminal_green.description"),
+    "professional_graphite": ("theme.professional_graphite.meta", "theme.professional_graphite.description"),
+    "blue_productivity": ("theme.blue_productivity.meta", "theme.blue_productivity.description"),
 }
 
 LOGGER = logging.getLogger(__name__)
@@ -184,9 +184,9 @@ class ThemePreviewCard(QFrame):
                                                                                            
         app = QApplication.instance()
         locale = str(app.property("arenyxa_locale") or "zh_CN") if app is not None else "zh_CN"
-        meta_source, description_source = THEME_META.get(self.theme_id, ("视觉预设", "Arenyxa visual profile"))
-        meta = literal_for_locale(meta_source, locale)
-        description = literal_for_locale(description_source, locale)
+        meta_key, description_key = THEME_META.get(self.theme_id, ("theme.default.meta", "theme.default.description"))
+        meta = current_text(meta_key)
+        description = current_text(description_key)
         display_name = literal_for_locale(t.name, locale)
         text_align = Qt.AlignmentFlag.AlignRight if locale.startswith("ar") else Qt.AlignmentFlag.AlignLeft
         painter.setPen(QColor(t.text))
@@ -220,29 +220,36 @@ class _DeveloperTermsDialog(QDialog):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("启用 Developer Mode")
+        self.setWindowTitle(source_text("developer.terms.dialog_title"))
+        self.setProperty("i18n_key_window_title", "developer.terms.dialog_title")
         self.setModal(True)
         self.setMinimumWidth(620)
         layout = QVBoxLayout(self)
 
-        risk_title = QLabel(RISK_AGREEMENT_TITLE)
+        risk_title = QLabel(source_text("developer.terms.risk_title"))
+        risk_title.setProperty("i18n_key_text", "developer.terms.risk_title")
         risk_title.setStyleSheet("font-weight: 700;")
-        risk_text = QLabel(RISK_AGREEMENT_TEXT)
+        risk_text = QLabel(source_text("developer.terms.risk_text"))
+        risk_text.setProperty("i18n_key_text", "developer.terms.risk_text")
         risk_text.setWordWrap(True)
         risk_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         layout.addWidget(risk_title)
         layout.addWidget(risk_text)
 
-        waiver_title = QLabel(WAIVER_TITLE)
+        waiver_title = QLabel(source_text("developer.terms.waiver_title"))
+        waiver_title.setProperty("i18n_key_text", "developer.terms.waiver_title")
         waiver_title.setStyleSheet("font-weight: 700; margin-top: 8px;")
-        waiver_text = QLabel(WAIVER_TEXT)
+        waiver_text = QLabel(source_text("developer.terms.waiver_text"))
+        waiver_text.setProperty("i18n_key_text", "developer.terms.waiver_text")
         waiver_text.setWordWrap(True)
         waiver_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         layout.addWidget(waiver_title)
         layout.addWidget(waiver_text)
 
-        self.risk_accept = QCheckBox("我已阅读并同意开发者风险协议")
-        self.waiver_accept = QCheckBox("我已阅读并同意测试免责协议")
+        self.risk_accept = QCheckBox(source_text("developer.terms.accept_risk"))
+        self.risk_accept.setProperty("i18n_key_text", "developer.terms.accept_risk")
+        self.waiver_accept = QCheckBox(source_text("developer.terms.accept_waiver"))
+        self.waiver_accept.setProperty("i18n_key_text", "developer.terms.accept_waiver")
         layout.addWidget(self.risk_accept)
         layout.addWidget(self.waiver_accept)
 
@@ -265,21 +272,21 @@ class AboutPage(WorkspacePage):
     
 
     _STATE_LABELS = {
-        "development": "源码 / 开发构建",
-        "verified_official": "已验证官方版本",
-        "verified_community": "已验证社区版本",
-        "modified": "已修改版本",
-        "unverified": "未验证发行版",
-        "invalid": "发行签名无效",
+        "development": "about.state.development",
+        "verified_official": "about.state.verified_official",
+        "verified_community": "about.state.verified_community",
+        "modified": "about.state.modified",
+        "unverified": "about.state.unverified",
+        "invalid": "about.state.invalid",
     }
 
     _STATE_DETAILS = {
-        "development": "源码模式允许自由修改；完整性检查不会把正常开发修改当成需要强制恢复的篡改。",
-        "verified_official": "发布证明由内置官方信任根验证。深度校验可进一步核对全部已签名文件与可加载代码。",
-        "verified_community": "发布签名有效，但属于社区/第三方发行身份，不代表 Arenyxa 官方背书。",
-        "modified": "当前安装内容与签名发行清单不一致。软件仍可使用，但不能继续声称为未修改的已验证发行版。",
-        "unverified": "当前发行版没有可验证的发布证明。这不等同于恶意软件，但不能确认其官方来源。",
-        "invalid": "发布证明、签名链或发行清单无效。安装版建议运行深度验证并按结果使用自愈修复中心。",
+        "development": "about.detail.development",
+        "verified_official": "about.detail.verified_official",
+        "verified_community": "about.detail.verified_community",
+        "modified": "about.detail.modified",
+        "unverified": "about.detail.unverified",
+        "invalid": "about.detail.invalid",
     }
 
     def __init__(self, context, theme, motion, parent=None) -> None:
@@ -290,7 +297,12 @@ class AboutPage(WorkspacePage):
         self.language_manager: LanguageManager | None = None
         self._quick_identity_at = 0.0
         outer = page_layout(self)
-        outer.addWidget(PageHeader("关于 Arenyxa", "发行身份、运行环境、隐私边界与项目健康信息"))
+        outer.addWidget(PageHeader(
+            source_text("about.page.title"),
+            source_text("about.page.subtitle"),
+            title_key="about.page.title",
+            subtitle_key="about.page.subtitle",
+        ))
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -323,7 +335,8 @@ class AboutPage(WorkspacePage):
         title = QLabel("Arenyxa")
         title.setStyleSheet("font-size: 30px; font-weight: 750;")
         info.addWidget(title)
-        subtitle = QLabel("本地优先、开源的 Web 数据采集、检索与网络分析工作台")
+        subtitle = QLabel(source_text("about.hero.subtitle"))
+        subtitle.setProperty("i18n_key_text", "about.hero.subtitle")
         subtitle.setWordWrap(True)
         subtitle.setProperty("muted", True)
         info.addWidget(subtitle)
@@ -331,15 +344,21 @@ class AboutPage(WorkspacePage):
         self.identity_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         info.addWidget(self.identity_label)
         version_line = QLabel(
-            f"Public version {__display_version__} · Engineering baseline {__engineering_build__} · "
-            f"Python {platform.python_version()} · Qt {self._qt_version()}"
+            current_text("about.version_line").format(
+                public=__display_version__,
+                engineering=__engineering_build__,
+                python=platform.python_version(),
+                qt=self._qt_version(),
+            )
         )
         version_line.setProperty("muted", True)
         version_line.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         info.addWidget(version_line)
         button_row = QHBoxLayout()
-        self.verify_button = QPushButton("深度验证安装")
-        self.copy_button = QPushButton("复制构建信息")
+        self.verify_button = QPushButton(source_text("about.verify.button"))
+        self.verify_button.setProperty("i18n_key_text", "about.verify.button")
+        self.copy_button = QPushButton(source_text("about.copy.button"))
+        self.copy_button.setProperty("i18n_key_text", "about.copy.button")
         self.verify_button.clicked.connect(self._deep_verify)
         self.copy_button.clicked.connect(self._copy_build_info)
         button_row.addWidget(self.verify_button)
@@ -351,62 +370,56 @@ class AboutPage(WorkspacePage):
         hero.body.addLayout(row)
         body.addWidget(hero)
 
-        provenance_card = SectionCard(theme, "发行身份与完整性")
+        provenance_card = SectionCard(theme, source_text("about.provenance.title"), title_key="about.provenance.title")
         self.provenance_text = QLabel()
         self.provenance_text.setWordWrap(True)
         self.provenance_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         provenance_card.body.addWidget(self.provenance_text)
-        self.integrity_result = QLabel("深度文件验证尚未运行。点击“深度验证安装”可在后台核对程序文件、可加载代码、恢复包和 SQLite 数据库。")
+        self.integrity_result = QLabel(source_text("about.verify.not_run"))
+        self.integrity_result.setProperty("i18n_key_text", "about.verify.not_run")
         self.integrity_result.setWordWrap(True)
         self.integrity_result.setProperty("muted", True)
         self.integrity_result.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         provenance_card.body.addWidget(self.integrity_result)
         body.addWidget(provenance_card)
 
-        environment = SectionCard(theme, "运行环境与本地数据")
+        environment = SectionCard(theme, source_text("about.environment.title"), title_key="about.environment.title")
         self.environment_text = QLabel(
-            f"Operating system   {platform.platform()}\n"
-            f"Architecture       {platform.machine() or 'unknown'}\n"
-            f"Python             {platform.python_version()}\n"
-            f"Qt Binding         {self._qt_version()}\n"
-            f"Application root   {installation_root()}\n"
-            f"Data root          {context.paths.root}\n"
-            f"Database           {context.paths.database}\n"
-            f"Logs               {context.paths.logs}"
+            current_text("about.environment.summary").format(
+                os=platform.platform(),
+                architecture=platform.machine() or "unknown",
+                python=platform.python_version(),
+                qt=self._qt_version(),
+                app_root=installation_root(),
+                data_root=context.paths.root,
+                database=context.paths.database,
+                logs=context.paths.logs,
+            )
         )
         self.environment_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.environment_text.setProperty("muted", True)
         environment.body.addWidget(self.environment_text)
         body.addWidget(environment)
 
-        privacy = SectionCard(theme, "本地优先与隐私边界")
-        privacy_text = QLabel(
-            "• Arenyxa 核心任务、数据库、搜索索引和设置默认保存在本机，不要求 Arenyxa 官方云账户。\n"
-            "• Arenyxa 核心采集、解析、检索、导出与网络分析采用本地确定性流程。\n"
-            "• 抓取目标网站、用户主动启用的服务器/市场/网络分析功能会按其用途访问网络；本地优先不代表“永不联网”。\n"
-            "• Cookie、Authorization、Token 等敏感值在日志、诊断和插件边界默认经过脱敏策略。"
-        )
+        privacy = SectionCard(theme, source_text("about.privacy.title"), title_key="about.privacy.title")
+        privacy_text = QLabel(source_text("about.privacy.text"))
+        privacy_text.setProperty("i18n_key_text", "about.privacy.text")
         privacy_text.setWordWrap(True)
         privacy.body.addWidget(privacy_text)
         body.addWidget(privacy)
 
-        license_card = SectionCard(theme, "开源许可证与发行边界")
+        license_card = SectionCard(theme, source_text("about.license.title"), title_key="about.license.title")
         license_text = QLabel(
-            "License: GPL-3.0-or-later\n\n"
-            + commercialization_notice()
-            + "\n\n发行签名用于验证来源与完整性，不限制源码修改，也不是许可证授权、联网激活或硬件绑定。"
+            current_text("about.license.text").format(notice=commercialization_notice())
         )
         license_text.setWordWrap(True)
         license_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         license_card.body.addWidget(license_text)
         body.addWidget(license_card)
 
-        capabilities = SectionCard(theme, "核心能力")
-        capability_text = QLabel(
-            "Capture & Replay · HTTP / Browser / Packet · Search & Data · Dataset Revision · Visualization\n"
-            "Workflow & Automation · Headless Server / RBAC · Plugins & Sandbox · Terminal / Packet Console\n"
-            "Repair Center · Release Provenance · Liquid Glass & Professional Motion · 10 Languages / RTL"
-        )
+        capabilities = SectionCard(theme, source_text("about.capabilities.title"), title_key="about.capabilities.title")
+        capability_text = QLabel(source_text("about.capabilities.text"))
+        capability_text.setProperty("i18n_key_text", "about.capabilities.text")
         capability_text.setWordWrap(True)
         capability_text.setProperty("muted", True)
         capabilities.body.addWidget(capability_text)
