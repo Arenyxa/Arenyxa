@@ -268,5 +268,16 @@
   "theme.blue_productivity.meta": "Extended preset",
   "theme.blue_productivity.description": "Blue productivity / bright business / high readability",
   "theme.default.meta": "Visual preset",
-  "theme.default.description": "Arenyxa visual profile"
+  "theme.default.description": "Arenyxa visual profile",
+  "settings.performance.option_auto": "Automatic",
+  "settings.performance.option_quality": "Quality",
+  "settings.performance.option_balanced": "Balanced",
+  "settings.performance.option_efficiency": "Efficiency",
+  "settings.common.none": "none",
+  "settings.official.bundle_filter": "Arenyxa Developer (*.aryxdev *.json);;JSON (*.json);;All Files (*)",
+  "settings.official.vault_filter": "Developer Vault (*.aryxkey *.json);;JSON (*.json);;All Files (*)",
+  "settings.root.bundle_filter": "Arenyxa Root Owner Login (*.aryxowner *.aryxowner.json *.json);;JSON (*.json);;All Files (*)",
+  "settings.root.vault_filter": "Arenyxa Owner Key Vault (*.aryxkey *.json);;JSON (*.json);;All Files (*)",
+  "settings.root.proof_no_session": "Root Owner proof completed without a platform.root session",
+  "settings.root.binding_inactive": "Root Owner proof succeeded, but the protected Root Workstation binding is not active"
 }
