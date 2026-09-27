@@ -45,7 +45,8 @@ from arenyxa.repair import StartupHealthScanner, installation_root
 from arenyxa.infrastructure.atomic_io import fsync_existing_file, read_text_limited
 from arenyxa.infrastructure.observability import Redactor
 from arenyxa.presentation.background import run_background
-from arenyxa.presentation.language import LOCALES, LanguageManager, current_text, literal_for_locale, source_text
+from arenyxa.presentation.i18n_runtime import current_text, source_text
+from arenyxa.presentation.language import LOCALES, LanguageManager, literal_for_locale
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.themes import ThemeTokens
 from arenyxa.presentation.widgets import (
