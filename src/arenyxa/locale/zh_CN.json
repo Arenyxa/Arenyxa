@@ -268,5 +268,16 @@
   "theme.blue_productivity.meta": "扩展预设",
   "theme.blue_productivity.description": "蓝色生产力 / 明亮商务 / 高可读性",
   "theme.default.meta": "视觉预设",
-  "theme.default.description": "Arenyxa visual profile"
+  "theme.default.description": "Arenyxa visual profile",
+  "settings.performance.option_auto": "自动",
+  "settings.performance.option_quality": "质量优先",
+  "settings.performance.option_balanced": "平衡",
+  "settings.performance.option_efficiency": "效率优先",
+  "settings.common.none": "无",
+  "settings.official.bundle_filter": "Arenyxa 开发者包 (*.aryxdev *.json);;JSON (*.json);;所有文件 (*)",
+  "settings.official.vault_filter": "Developer Vault (*.aryxkey *.json);;JSON (*.json);;所有文件 (*)",
+  "settings.root.bundle_filter": "Arenyxa Root Owner 登录包 (*.aryxowner *.aryxowner.json *.json);;JSON (*.json);;所有文件 (*)",
+  "settings.root.vault_filter": "Arenyxa Owner Key Vault (*.aryxkey *.json);;JSON (*.json);;所有文件 (*)",
+  "settings.root.proof_no_session": "Root Owner 验证已完成，但没有建立 platform.root 会话",
+  "settings.root.binding_inactive": "Root Owner 验证成功，但受保护的 Root Workstation 绑定未处于活动状态"
 }
