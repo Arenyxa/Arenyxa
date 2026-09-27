@@ -100,7 +100,7 @@ class EnterpriseDistributedActionsMixin:
         try:
             rows = enrollment.list_devices()
         except ENTERPRISE_UI_ERRORS as exc:
-            self._show_error("读取设备失败", exc); return
+            self._show_error(current_text("enterprise.enrollment.devices_read_failed"), exc); return
         labels = [f"{row['id']} · {row.get('username','')} · {row.get('status','')}" for row in rows if row.get("status") == "active"]
         if not labels:
             return
