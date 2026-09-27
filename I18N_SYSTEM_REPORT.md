@@ -25,6 +25,7 @@ The following high-visibility surfaces no longer embed Chinese user-facing copy 
 - Settings / resource governance / diagnostics / Developer and Root authorization prompts
 - About / release provenance / integrity verification / Developer Terms
 - Personalization theme-card metadata
+- Network Analysis / capture controls / Replay / TLS / DNS / Professional Analysis / PCAP and process-monitor messaging
 
 Their user-facing copy is now sourced from semantic catalog keys under the `welcome.*` and `personalization.*` namespaces.
 
@@ -38,4 +39,4 @@ Their user-facing copy is now sourced from semantic catalog keys under the `welc
 
 ## Remaining migration work
 
-The public release is v0.1; the preserved internal engineering baseline is v8.2.0. Legacy business pages still contain compatibility phrase mappings and hard-coded UI text that are translated through the existing `translate_tree` compatibility path. The next migration targets are Recovery, Network/Capture, Proxy, Enterprise, and other high-visibility operational pages. Migration should continue incrementally by page and should not internationalize machine identifiers, database keys, protocol/event codes, permission identifiers, or persisted enum values.
+The public release is v0.1; the preserved internal engineering baseline is v8.2.0. Legacy business pages still contain compatibility phrase mappings and hard-coded UI text that are translated through the existing `translate_tree` compatibility path. The next migration targets are remaining operational surfaces such as Enterprise and any residual Proxy/Recovery or auxiliary tool copy not already catalog-backed. Migration should continue incrementally by page and should not internationalize machine identifiers, database keys, protocol/event codes, permission identifiers, or persisted enum values.

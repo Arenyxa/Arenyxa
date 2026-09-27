@@ -142,6 +142,9 @@ class MainWindowLifecycleMixin:
         personalization_page = self.pages.get("personalization")
         if isinstance(personalization_page, PersonalizationPage):
             personalization_page.refresh_localized_previews()
+        network_page = self.pages.get("network")
+        if isinstance(network_page, NetworkPage):
+            network_page.refresh_localized_previews()
 
                                                                                            
                                                                                              
