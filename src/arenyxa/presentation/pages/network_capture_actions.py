@@ -151,7 +151,7 @@ class WaterfallWidget(QWidget):
             painter.setPen(QColor(tokens.text_muted))
             app = QApplication.instance()
             locale = str(app.property("arenyxa_locale") or "zh_CN") if app is not None else "zh_CN"
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, literal_for_locale("等待网络事件", locale))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, current_text("network.waterfall.waiting"))
             return
         durations = [
             max(
@@ -306,7 +306,7 @@ class NetworkCaptureActionsMixin:
             )
             self.context.nextgen.activity.publish("capture-stop", "Capture completed", level="warning" if session.dropped_events else "info", details={"session_id": session.id, "events": session.event_count, "dropped": session.dropped_events})
             self.start_button.setEnabled(True)
-            self.pause_button.setText("暂停")
+            self.pause_button.setText(current_text("network.action.pause"))
             self.operationProgress.emit("Capture", 0, 0, "clear")
             self._last_capture_state = session.state.value
             if self.simple_mode:
@@ -318,7 +318,7 @@ class NetworkCaptureActionsMixin:
             self.start_button.setEnabled(True)
             self.pause_button.setEnabled(False)
             self.stop_button.setEnabled(False)
-            self.pause_button.setText("暂停")
+            self.pause_button.setText(current_text("network.action.pause"))
             self.operationProgress.emit("Capture", 0, 0, "clear")
             session = self.context.capture.session
             self._last_capture_state = session.state.value if session is not None else None
@@ -383,7 +383,7 @@ class NetworkCaptureActionsMixin:
             self.start_button.setEnabled(True)
             self.pause_button.setEnabled(False)
             self.stop_button.setEnabled(False)
-            self.pause_button.setText("暂停")
+            self.pause_button.setText(current_text("network.action.pause"))
             self.operationProgress.emit("Capture", 0, 0, "clear")
             self._flush_live_events()
             self.refresh_sessions()
