@@ -22,6 +22,7 @@ from arenyxa.domain.errors import ArenyxaError
 from arenyxa.enterprise.coordinator import CoordinatorClient
 from arenyxa.enterprise.enrollment import parse_enrollment_token, verify_enrollment_token
 from arenyxa.infrastructure.atomic_io import atomic_write_bytes, atomic_write_json, read_bytes_limited
+from arenyxa.presentation.i18n_runtime import current_text
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.widgets import PageHeader, ResponsiveActionBar, SectionCard
 
@@ -42,31 +43,31 @@ class EnterpriseIdentityActionsMixin:
         service = self.service
         if service is None:
             return
-        name, ok = QInputDialog.getText(self, "创建本地企业", "企业名称：")
+        name, ok = QInputDialog.getText(self, current_text("enterprise.identity.create_title"), current_text("enterprise.identity.enterprise_name"))
         if not ok or not name.strip():
             return
-        username, ok = QInputDialog.getText(self, "创建本地企业", "Local Super Administrator 用户名：")
+        username, ok = QInputDialog.getText(self, current_text("enterprise.identity.create_title"), current_text("enterprise.identity.super_admin_username"))
         if not ok or not username.strip():
             return
-        display_name, ok = QInputDialog.getText(self, "创建本地企业", "管理员显示名称：")
+        display_name, ok = QInputDialog.getText(self, current_text("enterprise.identity.create_title"), current_text("enterprise.identity.admin_display_name"))
         if not ok:
             return
-        password = self._prompt_secret("创建本地企业", "Super Administrator 密码（至少 12 个字符）：")
+        password = self._prompt_secret(current_text("enterprise.identity.create_title"), current_text("enterprise.identity.super_admin_password"))
         if password is None:
             return
-        passphrase = self._prompt_secret("创建本地企业", "Identity Vault 口令（至少 12 个字符，请与账户密码区分）：")
+        passphrase = self._prompt_secret(current_text("enterprise.identity.create_title"), current_text("enterprise.identity.vault_passphrase"))
         if passphrase is None:
             return
-        confirm = self._prompt_secret("创建本地企业", "再次输入 Identity Vault 口令：")
+        confirm = self._prompt_secret(current_text("enterprise.identity.create_title"), current_text("enterprise.identity.vault_passphrase_confirm"))
         if confirm != passphrase:
-            QMessageBox.warning(self, "创建本地企业", "两次 Vault 口令不一致。")
+            QMessageBox.warning(self, current_text("enterprise.identity.create_title"), current_text("enterprise.identity.vault_passphrase_mismatch"))
             return
         try:
             service.create_enterprise(name, username, display_name, password, passphrase)
         except ENTERPRISE_UI_ERRORS as exc:
-            self._show_error("创建本地企业失败", exc)
+            self._show_error(current_text("enterprise.identity.create_failed"), exc)
         else:
-            QMessageBox.information(self, "本地企业已创建", "Enterprise Identity Vault 已初始化。请使用刚创建的 Super Administrator 登录。")
+            QMessageBox.information(self, current_text("enterprise.identity.created_title"), current_text("enterprise.identity.created_message"))
         finally:
             password = passphrase = confirm = ""
             self.refresh()
@@ -75,13 +76,13 @@ class EnterpriseIdentityActionsMixin:
         service = self.service
         if service is None:
             return
-        passphrase = self._prompt_secret("解锁 Identity Vault", "Vault 口令：")
+        passphrase = self._prompt_secret(current_text("enterprise.identity.unlock_title"), current_text("enterprise.identity.vault_passphrase_short"))
         if passphrase is None:
             return
         try:
             service.unlock(passphrase)
         except ENTERPRISE_UI_ERRORS as exc:
-            self._show_error("解锁失败", exc)
+            self._show_error(current_text("enterprise.identity.unlock_failed"), exc)
         finally:
             passphrase = ""
             self.refresh()
@@ -90,16 +91,16 @@ class EnterpriseIdentityActionsMixin:
         service = self.service
         if service is None:
             return
-        username, ok = QInputDialog.getText(self, "企业登录", "用户名：")
+        username, ok = QInputDialog.getText(self, current_text("enterprise.identity.login_title"), current_text("enterprise.identity.username"))
         if not ok or not username.strip():
             return
-        password = self._prompt_secret("企业登录", "密码：")
+        password = self._prompt_secret(current_text("enterprise.identity.login_title"), current_text("enterprise.identity.password"))
         if password is None:
             return
         try:
             service.login(username, password)
         except ENTERPRISE_UI_ERRORS as exc:
-            self._show_error("企业登录失败", exc)
+            self._show_error(current_text("enterprise.identity.login_failed"), exc)
         finally:
             password = ""
             self.refresh()
@@ -109,7 +110,7 @@ class EnterpriseIdentityActionsMixin:
             try:
                 self.service.logout()
             except ENTERPRISE_UI_ERRORS as exc:
-                self._show_error("退出企业会话时审计写入失败", exc)
+                self._show_error(current_text("enterprise.identity.logout_audit_failed"), exc)
         self.refresh()
 
     def _lock(self) -> None:
@@ -119,7 +120,7 @@ class EnterpriseIdentityActionsMixin:
             except ENTERPRISE_UI_ERRORS as exc:
 
 
-                self._show_error("锁定 Vault 时发生错误", exc)
+                self._show_error(current_text("enterprise.identity.lock_failed"), exc)
         self.refresh()
 
     def _refresh_accounts(self, *_args, silent: bool = False) -> None:
@@ -131,13 +132,13 @@ class EnterpriseIdentityActionsMixin:
         except ENTERPRISE_UI_ERRORS as exc:
             self.accounts_view.clear()
             if not silent:
-                self._show_error("读取账户失败", exc)
+                self._show_error(current_text("enterprise.accounts.read_failed"), exc)
             return
         lines = []
         for row in rows:
             state = "enabled" if row["enabled"] else "disabled"
             lines.append(f"{row['username']} · {row['display_name']} · {state} · roles={','.join(row['roles'])} · gen={row['auth_generation']} · id={row['id']}")
-        self.accounts_view.setPlainText("\n".join(lines) if lines else "暂无可显示账户。")
+        self.accounts_view.setPlainText("\n".join(lines) if lines else current_text("enterprise.accounts.none"))
 
     def _choose_account(self, title: str):
         service = self.service
@@ -151,7 +152,7 @@ class EnterpriseIdentityActionsMixin:
         labels = [f"{row['username']} · {row['id']}" for row in rows]
         if not labels:
             return None
-        selected, ok = QInputDialog.getItem(self, title, "账户：", labels, 0, False)
+        selected, ok = QInputDialog.getItem(self, title, current_text("enterprise.accounts.account_label"), labels, 0, False)
         if not ok:
             return None
         account_id = selected.rsplit(" · ", 1)[-1]
@@ -161,13 +162,13 @@ class EnterpriseIdentityActionsMixin:
         service = self.service
         if service is None:
             return False
-        password = self._prompt_secret("Step-up Authentication", "重新输入当前企业账户密码：")
+        password = self._prompt_secret(current_text("enterprise.step_up.title"), current_text("enterprise.step_up.password"))
         if password is None:
             return False
         try:
             service.step_up(password)
         except ENTERPRISE_UI_ERRORS as exc:
-            self._show_error("Step-up Authentication 失败", exc)
+            self._show_error(current_text("enterprise.step_up.failed"), exc)
             return False
         finally:
             password = ""
@@ -181,7 +182,7 @@ class EnterpriseIdentityActionsMixin:
             matrix = service.rbac_matrix()
             self.accounts_view.setPlainText(json.dumps(matrix, ensure_ascii=False, indent=2, default=str))
         except ENTERPRISE_UI_ERRORS as exc:
-            self._show_error("RBAC Matrix", exc)
+            self._show_error(current_text("enterprise.accounts.matrix"), exc)
 
     def _vault_health(self) -> None:
         service = self.service
@@ -189,82 +190,82 @@ class EnterpriseIdentityActionsMixin:
             return
         try:
             health = service.vault_health()
-            QMessageBox.information(self, "Enterprise Vault Health", json.dumps(health, ensure_ascii=False, indent=2, default=str))
+            QMessageBox.information(self, current_text("enterprise.vault.health"), json.dumps(health, ensure_ascii=False, indent=2, default=str))
         except ENTERPRISE_UI_ERRORS as exc:
-            self._show_error("Vault Health", exc)
+            self._show_error(current_text("enterprise.vault.health_failed"), exc)
 
     def _rotate_vault_passphrase(self) -> None:
         service = self.service
         if service is None:
             return
-        current = self._prompt_secret("Rotate Vault Passphrase", "Current Vault passphrase:")
+        current = self._prompt_secret(current_text("enterprise.vault.rotate"), current_text("enterprise.vault.current_passphrase"))
         if current is None:
             return
-        new_value = self._prompt_secret("Rotate Vault Passphrase", "New Vault passphrase (12+ characters):")
+        new_value = self._prompt_secret(current_text("enterprise.vault.rotate"), current_text("enterprise.vault.new_passphrase"))
         if new_value is None:
             current = ""
             return
-        confirm = self._prompt_secret("Rotate Vault Passphrase", "Confirm new Vault passphrase:")
+        confirm = self._prompt_secret(current_text("enterprise.vault.rotate"), current_text("enterprise.vault.confirm_passphrase"))
         if confirm != new_value:
             current = new_value = confirm = ""
-            QMessageBox.warning(self, "Rotate Vault Passphrase", "The new Vault passphrases do not match.")
+            QMessageBox.warning(self, current_text("enterprise.vault.rotate"), current_text("enterprise.vault.passphrase_mismatch"))
             return
         try:
             service.rotate_vault_passphrase(current, new_value)
-            QMessageBox.information(self, "Rotate Vault Passphrase", "Vault key envelope was rotated atomically. The Enterprise data key and encrypted payload remain protected.")
+            QMessageBox.information(self, current_text("enterprise.vault.rotate"), current_text("enterprise.vault.rotate_success"))
         except ENTERPRISE_UI_ERRORS as exc:
-            self._show_error("Rotate Vault Passphrase", exc)
+            self._show_error(current_text("enterprise.vault.rotate_failed"), exc)
         finally:
             current = new_value = confirm = ""
             self.refresh()
 
     def _step_up(self) -> None:
         if self._prompt_step_up():
-            QMessageBox.information(self, "Step-up Authentication", "高风险操作认证已刷新，有效时间为 5 分钟。")
+            QMessageBox.information(self, current_text("enterprise.step_up.title"), current_text("enterprise.step_up.success"))
 
     def _add_account(self) -> None:
         service = self.service
         if service is None:
             return
-        username, ok = QInputDialog.getText(self, "新增企业账户", "用户名：")
+        username, ok = QInputDialog.getText(self, current_text("enterprise.accounts.add"), current_text("enterprise.identity.username"))
         if not ok or not username.strip():
             return
-        display, ok = QInputDialog.getText(self, "新增企业账户", "显示名称：")
+        display, ok = QInputDialog.getText(self, current_text("enterprise.accounts.add"), current_text("enterprise.accounts.display_name"))
         if not ok:
             return
-        password = self._prompt_secret("新增企业账户", "初始密码（至少 12 个字符）：")
+        password = self._prompt_secret(current_text("enterprise.accounts.add"), current_text("enterprise.accounts.initial_password"))
         if password is None:
             return
         try:
             roles = [row["id"] for row in service.roles()]
         except ENTERPRISE_UI_ERRORS as exc:
-            self._show_error("读取角色失败", exc)
+            self._show_error(current_text("enterprise.accounts.roles_read_failed"), exc)
             return
-        role, ok = QInputDialog.getItem(self, "新增企业账户", "初始角色：", roles, 0, False)
+        role, ok = QInputDialog.getItem(self, current_text("enterprise.accounts.add"), current_text("enterprise.accounts.initial_role"), roles, 0, False)
         if not ok:
             return
         try:
             service.create_account(username, display, password, [role])
         except ENTERPRISE_UI_ERRORS as exc:
-            self._show_error("新增账户失败", exc)
+            self._show_error(current_text("enterprise.accounts.add_failed"), exc)
         finally:
             password = ""
             self.refresh()
 
     def _toggle_account(self) -> None:
         service = self.service
-        row = self._choose_account("禁用 / 启用账户")
+        row = self._choose_account(current_text("enterprise.accounts.toggle"))
         if service is None or row is None or not self._prompt_step_up():
             return
         try:
             service.set_account_enabled(row["id"], not bool(row["enabled"]))
         except ENTERPRISE_UI_ERRORS as exc:
-            self._show_error("修改账户状态失败", exc)
+            self._show_error(current_text("enterprise.accounts.toggle_failed"), exc)
         self.refresh()
 
     def _change_roles(self) -> None:
         service = self.service
-        row = self._choose_account("修改角色")
+        row = self._choose_account(current_text("enterprise.accounts.roles"))
         if service is None or row is None or not self._prompt_step_up():
             return
         try:
@@ -272,23 +273,23 @@ class EnterpriseIdentityActionsMixin:
         except ENTERPRISE_UI_ERRORS as exc:
             self._show_error("读取角色失败", exc)
             return
-        role, ok = QInputDialog.getItem(self, "修改角色", "选择角色（底层使用 capability / policy / resource 授权）：", roles, 0, False)
+        role, ok = QInputDialog.getItem(self, current_text("enterprise.accounts.roles"), current_text("enterprise.accounts.select_role"), roles, 0, False)
         if not ok:
             return
         try:
             service.set_account_roles(row["id"], [role])
         except ENTERPRISE_UI_ERRORS as exc:
-            self._show_error("修改角色失败", exc)
+            self._show_error(current_text("enterprise.accounts.roles_failed"), exc)
         self.refresh()
 
     def _delete_account(self) -> None:
         service = self.service
-        row = self._choose_account("删除账户")
+        row = self._choose_account(current_text("enterprise.accounts.delete"))
         if service is None or row is None or not self._prompt_step_up():
             return
         answer = QMessageBox.question(
-            self, "确认删除账户",
-            f"删除 {row['username']} 后无法通过本地 Enterprise Identity 登录。\n\n最后一个启用的 Super Administrator 永远不能删除。",
+            self, current_text("enterprise.accounts.delete_confirm_title"),
+            current_text("enterprise.accounts.delete_confirm").format(username=row["username"]),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -297,21 +298,21 @@ class EnterpriseIdentityActionsMixin:
         try:
             service.delete_account(row["id"])
         except ENTERPRISE_UI_ERRORS as exc:
-            self._show_error("删除账户失败", exc)
+            self._show_error(current_text("enterprise.accounts.delete_failed"), exc)
         self.refresh()
 
     def _change_password(self) -> None:
         service = self.service
-        row = self._choose_account("修改密码")
+        row = self._choose_account(current_text("enterprise.accounts.password"))
         if service is None or row is None or not self._prompt_step_up():
             return
-        new_password = self._prompt_secret("修改密码", "新密码（至少 12 个字符）：")
+        new_password = self._prompt_secret(current_text("enterprise.accounts.password"), current_text("enterprise.accounts.new_password"))
         if new_password is None:
             return
         try:
             service.change_password(row["id"], new_password)
         except ENTERPRISE_UI_ERRORS as exc:
-            self._show_error("修改密码失败", exc)
+            self._show_error(current_text("enterprise.accounts.password_failed"), exc)
         finally:
             new_password = ""
             self.refresh()
@@ -321,20 +322,20 @@ class EnterpriseIdentityActionsMixin:
         if service is None or not self._prompt_step_up():
             return
         path, _ = QFileDialog.getSaveFileName(
-            self, "备份 Enterprise Identity Vault", str(self.context.paths.exports / "Arenyxa_Enterprise_Vault_Backup.aryxbak.json"),
+            self, current_text("enterprise.vault.backup_title"), str(self.context.paths.exports / "Arenyxa_Enterprise_Vault_Backup.aryxbak.json"),
             "Arenyxa Vault Backup (*.aryxbak.json *.json);;JSON (*.json);;All Files (*)",
         )
         if not path:
             return
-        passphrase = self._prompt_secret("备份 Enterprise Identity Vault", "Vault 口令：")
+        passphrase = self._prompt_secret(current_text("enterprise.vault.backup_title"), current_text("enterprise.identity.vault_passphrase_short"))
         if passphrase is None:
             return
         try:
             service.backup(Path(path), passphrase)
         except ENTERPRISE_UI_ERRORS as exc:
-            self._show_error("Vault 备份失败", exc)
+            self._show_error(current_text("enterprise.vault.backup_failed"), exc)
         else:
-            QMessageBox.information(self, "Vault 备份完成", f"已写入：{path}")
+            QMessageBox.information(self, current_text("enterprise.vault.backup_done_title"), current_text("enterprise.vault.backup_done").format(path=path))
         finally:
             passphrase = ""
             self.refresh()
@@ -344,17 +345,17 @@ class EnterpriseIdentityActionsMixin:
         if service is None:
             return
         path, _ = QFileDialog.getOpenFileName(
-            self, "恢复 Enterprise Identity Vault", str(self.context.paths.exports),
+            self, current_text("enterprise.vault.restore_title"), str(self.context.paths.exports),
             "Arenyxa Vault Backup (*.aryxbak.json *.json);;JSON (*.json);;All Files (*)",
         )
         if not path:
             return
-        passphrase = self._prompt_secret("恢复 Enterprise Identity Vault", "备份对应的 Vault 口令：")
+        passphrase = self._prompt_secret(current_text("enterprise.vault.restore_title"), current_text("enterprise.vault.restore_passphrase"))
         if passphrase is None:
             return
         confirm = QMessageBox.question(
-            self, "恢复 Enterprise Identity Vault",
-            "恢复会原子替换当前本地 Enterprise Vault。当前 Vault 必须保持锁定。继续？",
+            self, current_text("enterprise.vault.restore_title"),
+            current_text("enterprise.vault.restore_confirm"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if confirm != QMessageBox.StandardButton.Yes:
@@ -362,9 +363,9 @@ class EnterpriseIdentityActionsMixin:
         try:
             service.restore(Path(path), passphrase)
         except ENTERPRISE_UI_ERRORS as exc:
-            self._show_error("Vault 恢复失败", exc)
+            self._show_error(current_text("enterprise.vault.restore_failed"), exc)
         else:
-            QMessageBox.information(self, "Vault 恢复完成", "备份已验证并恢复。请重新解锁和登录。")
+            QMessageBox.information(self, current_text("enterprise.vault.restore_done_title"), current_text("enterprise.vault.restore_done"))
         finally:
             passphrase = ""
             self.refresh()
