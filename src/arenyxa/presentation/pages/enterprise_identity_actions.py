@@ -271,7 +271,7 @@ class EnterpriseIdentityActionsMixin:
         try:
             roles = [item["id"] for item in service.roles()]
         except ENTERPRISE_UI_ERRORS as exc:
-            self._show_error("读取角色失败", exc)
+            self._show_error(current_text("enterprise.accounts.roles_read_failed"), exc)
             return
         role, ok = QInputDialog.getItem(self, current_text("enterprise.accounts.roles"), current_text("enterprise.accounts.select_role"), roles, 0, False)
         if not ok:
