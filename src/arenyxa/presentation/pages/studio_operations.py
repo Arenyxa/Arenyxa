@@ -5,7 +5,7 @@ from arenyxa.application.autopilot_validation import AutopilotProductionValidato
 import json
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 from arenyxa.qt_compat.QtCore import QTimer
 from arenyxa.qt_compat.QtWidgets import (
@@ -34,11 +34,31 @@ from arenyxa.domain.enums import CaptureSource
 from arenyxa.domain.models import NetworkEvent, RequestSpec, RetryPolicy, Workflow, WorkflowNode
 from arenyxa.infrastructure.atomic_io import atomic_write_json
 from arenyxa.presentation.background import run_background
+from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.widgets import PageHeader
 
 
+_TWidget = TypeVar("_TWidget", bound=QWidget)
+
+
+def _i18n_widget(widget: _TWidget, key: str) -> _TWidget:
+    widget.setProperty("i18n_key_text", key)
+    return widget
+
+
+def _i18n_placeholder(widget: QLineEdit, key: str) -> QLineEdit:
+    widget.setPlaceholderText(source_text(key))
+    widget.setProperty("i18n_key_placeholder", key)
+    return widget
+
+
 class StudioOperationsMixin:
+    def _add_i18n_tab(self, tab: QWidget, key: str) -> int:
+        index = self.tabs.addTab(tab, source_text(key))
+        self.tabs.setProperty(f"i18n_tab_key_{index}", key)
+        return index
+
     def _build_secrets_tab(self) -> None:
         tab = QWidget(); layout = QVBoxLayout(tab)
         form = QFormLayout(); self.secret_name = QLineEdit(); self.secret_value = QLineEdit(); self.secret_value.setEchoMode(QLineEdit.EchoMode.Password)
@@ -77,13 +97,13 @@ class StudioOperationsMixin:
         form.addRow("Project", self.project_name)
         actions = QHBoxLayout(); ensure = QPushButton("Create / Ensure Project Env"); save = QPushButton("Save Environment"); load = QPushButton("Load Environment")
         self.py_status = QPushButton("Python Env Status"); self.py_create = QPushButton("Create .venv"); self.py_freeze = QPushButton("pip freeze")
-        self.py_packages = QLineEdit(); self.py_packages.setPlaceholderText("可选：requests httpx pandas")
+        self.py_packages = _i18n_placeholder(QLineEdit(), "studio.python.packages_placeholder")
         self.py_install = QPushButton("Install Packages")
         for button in (ensure, save, load, self.py_status, self.py_create, self.py_freeze): actions.addWidget(button)
         self.template_output = self._editor(True)
         package_row = QHBoxLayout(); package_row.addWidget(QLabel("Project Python")); package_row.addWidget(self.py_packages, 1); package_row.addWidget(self.py_install)
         layout.addLayout(row); layout.addWidget(self.project_env); layout.addLayout(actions); layout.addLayout(package_row); layout.addWidget(self.template_output, 1)
-        self.tabs.addTab(tab, "Templates & Project Environment")
+        self._add_i18n_tab(tab, "studio.tab.templates_environment")
         show.clicked.connect(lambda: self.template_output.setPlainText(json.dumps(self.context.nextgen.templates.templates()[self.template_box.currentText()], ensure_ascii=False, indent=2)))
         create_template.clicked.connect(self.create_template_in_project)
         ensure.clicked.connect(self.ensure_project); save.clicked.connect(self.save_project_env); load.clicked.connect(self.load_project_env)
@@ -115,36 +135,36 @@ class StudioOperationsMixin:
 
     def create_python_env(self) -> None:
         project = self.project_name.text()
-        self._async(lambda: self.context.nextgen.python_envs.create(project), self.template_output, "项目 Python 环境已创建")
+        self._async(lambda: self.context.nextgen.python_envs.create(project), self.template_output, current_text("studio.python.env_created"))
 
     def freeze_python_env(self) -> None:
         project = self.project_name.text()
-        self._async(lambda: self.context.nextgen.python_envs.freeze(project), self.template_output, "pip freeze 完成")
+        self._async(lambda: self.context.nextgen.python_envs.freeze(project), self.template_output, current_text("studio.python.freeze_completed"))
 
     def install_python_packages(self) -> None:
         project = self.project_name.text(); packages = [item for item in self.py_packages.text().split() if item]
         if not packages:
-            QMessageBox.information(self, "Project Python", "请输入至少一个包名。")
+            QMessageBox.information(self, current_text("studio.python.title"), current_text("studio.python.package_required"))
             return
-        if QMessageBox.question(self, "安装 Python 包", "这会从配置的 Python 包索引下载并执行第三方安装包。是否继续？") != QMessageBox.StandardButton.Yes:
+        if QMessageBox.question(self, current_text("studio.python.install_title"), current_text("studio.python.install_warning")) != QMessageBox.StandardButton.Yes:
             return
-        self._async(lambda: self.context.nextgen.python_envs.install(project, packages), self.template_output, "Python 包安装完成")
+        self._async(lambda: self.context.nextgen.python_envs.install(project, packages), self.template_output, current_text("studio.python.install_completed"))
 
     def _build_ecosystem_tab(self) -> None:
         tab = QWidget(); layout = QVBoxLayout(tab)
         profile_form = QFormLayout()
         self.profile_id = QLineEdit("default"); self.profile_name = QLineEdit("Default Browser Profile")
         self.profile_ua = QLineEdit(f"Arenyxa/{__version__}"); self.profile_locale = QLineEdit("zh-CN"); self.profile_timezone = QLineEdit("Asia/Shanghai"); self.profile_proxy = QLineEdit()
-        self.profile_secrets = QLineEdit(); self.profile_secrets.setPlaceholderText("JSON，例如 {\"cookie\":\"site.cookie\"}")
+        self.profile_secrets = _i18n_placeholder(QLineEdit(), "studio.profile.secrets_placeholder")
         for label, widget in (("Profile ID", self.profile_id), ("Name", self.profile_name), ("User-Agent", self.profile_ua), ("Locale", self.profile_locale), ("Timezone", self.profile_timezone), ("Proxy", self.profile_proxy), ("Secret refs", self.profile_secrets)):
             profile_form.addRow(label, widget)
         profile_actions = QHBoxLayout(); psave=QPushButton("Save Profile"); pload=QPushButton("Load Profile"); pexport=QPushButton("Export Safe Metadata")
         for button in (psave,pload,pexport): profile_actions.addWidget(button)
-        marketplace = QHBoxLayout(); self.market_source=QLineEdit(); self.market_source.setPlaceholderText("本地 catalog.json 或 HTTPS catalog URL"); self.market_load=QPushButton("Load Marketplace"); self.market_item=QComboBox(); self.market_install=QPushButton("Install Selected")
+        marketplace = QHBoxLayout(); self.market_source=_i18n_placeholder(QLineEdit(), "studio.marketplace.source_placeholder"); self.market_load=_i18n_widget(QPushButton(source_text("studio.marketplace.load")), "studio.marketplace.load"); self.market_item=QComboBox(); self.market_install=_i18n_widget(QPushButton(source_text("studio.marketplace.install_selected")), "studio.marketplace.install_selected")
         marketplace.addWidget(self.market_source,1); marketplace.addWidget(self.market_load); marketplace.addWidget(self.market_item,1); marketplace.addWidget(self.market_install)
         self.ecosystem_output=self._editor(True)
         layout.addWidget(QLabel("Browser Profile Manager")); layout.addLayout(profile_form); layout.addLayout(profile_actions); layout.addWidget(QLabel("Workflow Marketplace (optional, checksum-verified)")); layout.addLayout(marketplace); layout.addWidget(self.ecosystem_output,1)
-        self.tabs.addTab(tab,"Profiles & Marketplace")
+        self._add_i18n_tab(tab, "studio.tab.profiles_marketplace")
         psave.clicked.connect(self.save_browser_profile); pload.clicked.connect(self.load_browser_profile); pexport.clicked.connect(self.export_browser_profile)
         self.market_load.clicked.connect(self.load_marketplace); self.market_install.clicked.connect(self.install_marketplace_item)
         self._market_items=[]
@@ -169,7 +189,7 @@ class StudioOperationsMixin:
 
     def load_marketplace(self) -> None:
         source=self.market_source.text().strip()
-        if not source: QMessageBox.information(self,"Marketplace","请输入本地 catalog 路径或 HTTPS URL。"); return
+        if not source: QMessageBox.information(self, current_text("studio.marketplace.title"), current_text("studio.marketplace.source_required")); return
         def worker(): return self.context.nextgen.marketplace.load_catalog(Path(source) if "://" not in source else source)
         def completed(value: object) -> None:
             self._market_items=list(value); self.market_item.clear()
@@ -181,7 +201,7 @@ class StudioOperationsMixin:
         index=self.market_item.currentIndex()
         if index < 0 or index >= len(self._market_items): return
         item=self._market_items[index]
-        if QMessageBox.question(self,"Install Workflow Package",f"安装 {item.name} {item.version}？\n权限声明：{', '.join(item.permissions) or 'none'}") != QMessageBox.StandardButton.Yes: return
+        if QMessageBox.question(self, current_text("studio.marketplace.install_title"), current_text("studio.marketplace.install_prompt").format(name=item.name, version=item.version, permissions=", ".join(item.permissions) or current_text("studio.common.none"))) != QMessageBox.StandardButton.Yes: return
         destination=self.context.nextgen.projects.path(self.project_name.text()) / "workflows" / f"{item.id}-{item.version}.arenyxa-workflow"
         self._async(lambda:self.context.nextgen.marketplace.install(item,destination),self.ecosystem_output,"Workflow package installed")
 
@@ -209,7 +229,7 @@ class StudioOperationsMixin:
             if action=="run": return self.context.nextgen.workers.run_task(wid,value)
             if action=="partition": return self.context.nextgen.workers.partition(list(range(1,101)))
             return {}
-        self._async(worker,self.worker_output,f"Worker {action} 完成")
+        self._async(worker, self.worker_output, current_text("studio.worker.completed").format(action=action))
 
     def _build_compatibility_tab(self) -> None:
         tab = QWidget(); layout = QVBoxLayout(tab)
@@ -220,7 +240,7 @@ class StudioOperationsMixin:
         row.addWidget(self.compat_run); row.addWidget(self.compat_note, 1)
         self.compat_output = self._editor(True)
         layout.addLayout(row); layout.addWidget(self.compat_output, 1)
-        self.tabs.addTab(tab, "Compatibility Lab")
+        self._add_i18n_tab(tab, "studio.tab.compatibility")
         self.compat_run.clicked.connect(self.run_compatibility_lab)
 
     def run_compatibility_lab(self) -> None:
@@ -236,12 +256,12 @@ class StudioOperationsMixin:
             self.operationProgress.emit("Compatibility Lab", total, total, "clear")
             payload = value if isinstance(value, dict) else {}
             self.context.nextgen.activity.publish("compatibility", "Offline compatibility baseline completed", details={"pass_rate": payload.get("pass_rate"), "cases": payload.get("cases")})
-            self.statusMessage.emit("Compatibility Lab 回归完成")
+            self.statusMessage.emit(current_text("studio.compatibility.completed"))
         def failed(message: str) -> None:
             self.compat_output.setPlainText(message)
             self.operationProgress.emit("Compatibility Lab", 0, 1, "error")
             QTimer.singleShot(8000, lambda: self.operationProgress.emit("Compatibility Lab", 0, 0, "clear"))
-            self.statusMessage.emit("Compatibility Lab 失败")
+            self.statusMessage.emit(current_text("studio.compatibility.failed"))
         run_background(worker, completed, failed)
 
     def _build_portability_tab(self) -> None:
@@ -252,7 +272,7 @@ class StudioOperationsMixin:
         row.addWidget(self.portable_export); row.addWidget(self.portable_validate); row.addWidget(self.portable_to_debugger); row.addStretch()
         self.portable_output = self._editor(True)
         layout.addWidget(QLabel("Reviewable JSON workflow source")); layout.addWidget(self.portable_workflow, 1); layout.addLayout(row); layout.addWidget(QLabel("Canonical portable document / validation result")); layout.addWidget(self.portable_output, 1)
-        self.tabs.addTab(tab, "Workflow Portability")
+        self._add_i18n_tab(tab, "studio.tab.portability")
         self.portable_export.clicked.connect(self.export_portable_workflow); self.portable_validate.clicked.connect(self.validate_portable_workflow); self.portable_to_debugger.clicked.connect(self.portable_import_to_debugger)
 
     def _portable_source_workflow(self) -> Workflow:
@@ -271,7 +291,7 @@ class StudioOperationsMixin:
         try:
             workflow = self.context.nextgen.portability.load(self.portable_output.toPlainText())
             self._last_portable_workflow = workflow
-            self.statusMessage.emit(f"Portable Workflow 校验通过 · {len(workflow.nodes)} nodes · SHA-256 verified")
+            self.statusMessage.emit(current_text("studio.portability.validated").format(nodes=len(workflow.nodes)))
         except Exception as exc:
             QMessageBox.warning(self, "Workflow Portability", str(exc))
 
@@ -280,7 +300,7 @@ class StudioOperationsMixin:
             workflow = self._last_portable_workflow or self.context.nextgen.portability.load(self.portable_output.toPlainText())
             self.debug_workflow.setPlainText(json.dumps({"name":workflow.name,"id":workflow.id,"nodes":[asdict(node) for node in workflow.nodes]}, ensure_ascii=False, indent=2))
             self.tabs.setCurrentWidget(self.tabs.widget(7))
-            self.statusMessage.emit("Portable Workflow 已发送到 Debugger")
+            self.statusMessage.emit(current_text("studio.portability.sent_to_debugger"))
         except Exception as exc:
             QMessageBox.warning(self, "Workflow Portability", str(exc))
 
@@ -288,7 +308,7 @@ class StudioOperationsMixin:
         tab = QWidget(); layout = QVBoxLayout(tab)
         row = QHBoxLayout()
         self.autopilot_url = QLineEdit("https://example.com")
-        self.autopilot_url.setPlaceholderText("授权分析 URL")
+        self.autopilot_url.setPlaceholderText(source_text("studio.autopilot.url_placeholder")); self.autopilot_url.setProperty("i18n_key_placeholder", "studio.autopilot.url_placeholder")
         self.autopilot_session = QComboBox(); self.autopilot_session.setMinimumWidth(260)
         self.autopilot_analyze = QPushButton("Analyze Autopilot"); self.autopilot_analyze.setProperty("primary", True)
         self.autopilot_success = QPushButton("Record Success")
@@ -304,7 +324,7 @@ class StudioOperationsMixin:
         layout.addLayout(row); layout.addLayout(tools)
         layout.addWidget(QLabel("Experimental local deterministic learning. It is advisory only and cannot override execution safety, authorization, or deterministic Workflow behavior."))
         layout.addWidget(self.autopilot_output, 1)
-        self.tabs.addTab(tab, "Autopilot Learning")
+        self._add_i18n_tab(tab, "studio.tab.autopilot")
         self.autopilot_analyze.clicked.connect(self.run_autopilot)
         self.autopilot_success.clicked.connect(lambda: self.record_autopilot_feedback(True))
         self.autopilot_failure.clicked.connect(lambda: self.record_autopilot_feedback(False))
@@ -356,17 +376,17 @@ class StudioOperationsMixin:
                 details={"engine": plan.recommended_engine, "confidence": plan.confidence, "site_key": plan.site_key},
             )
             self.operationProgress.emit("Autopilot", 1, 1, "clear")
-            self.statusMessage.emit("Analyze Autopilot完成")
+            self.statusMessage.emit(current_text("studio.autopilot.analysis_completed"))
         def failed(message: str) -> None:
             self.autopilot_output.setPlainText(message)
             self.operationProgress.emit("Autopilot", 0, 1, "error")
             QTimer.singleShot(8000, lambda: self.operationProgress.emit("Autopilot", 0, 0, "clear"))
-            self.statusMessage.emit("Analyze Autopilot失败")
+            self.statusMessage.emit(current_text("studio.autopilot.analysis_failed"))
         run_background(worker, completed, failed)
 
     def record_autopilot_feedback(self, success: bool) -> None:
         if not self._last_autopilot_plan:
-            QMessageBox.information(self, "Autopilot", "请先运行一次 Analyze Autopilot。")
+            QMessageBox.information(self, current_text("studio.autopilot.title"), current_text("studio.autopilot.run_first"))
             return
         try:
             engine = str(self._last_autopilot_plan.get("recommended_engine", ""))
@@ -386,7 +406,7 @@ class StudioOperationsMixin:
             )
             self.context.nextgen.activity.publish("autopilot-feedback", "Autopilot outcome recorded", details={"engine": engine, "success": success})
             self.show_autopilot_stats()
-            self.statusMessage.emit("Autopilot 本地反馈已记录；不会上传。")
+            self.statusMessage.emit(current_text("studio.autopilot.feedback_recorded"))
         except Exception as exc:
             QMessageBox.warning(self, "Autopilot", str(exc))
 
@@ -402,7 +422,7 @@ class StudioOperationsMixin:
             path = self.context.nextgen.autopilot.store.export_training_jsonl(self.context.paths.exports / "arenyxa_autopilot_training.jsonl")
             self.autopilot_output.setPlainText(str(path))
             self.context.nextgen.activity.publish("autopilot-export", "Redacted Autopilot dataset exported", details={"path": path.name})
-            self.statusMessage.emit("去标识化训练数据已导出到 Arenyxa Exports。")
+            self.statusMessage.emit(current_text("studio.autopilot.dataset_exported"))
         except Exception as exc:
             QMessageBox.warning(self, "Autopilot", str(exc))
 
