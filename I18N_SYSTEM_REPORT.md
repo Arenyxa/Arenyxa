@@ -29,6 +29,8 @@ The following high-visibility surfaces no longer embed Chinese user-facing copy 
 - Studio tooling / Project Python / Marketplace / Compatibility / Portability / Autopilot
 - Dashboard / metrics / task queue / schedules / local-index statistics
 - Task Center / Simple Mode / guided workflows / runtime-capability guidance
+- Tasks / Task Editor / preflight resource messaging / task and run status display
+- Data / Search / Dataset Revision / streaming export
 
 Their user-facing copy is now sourced from semantic catalog keys under the `welcome.*` and `personalization.*` namespaces.
 
