@@ -12,7 +12,6 @@ from urllib.parse import urlparse
 from arenyxa.qt_compat.QtCore import QPointF, QRectF, Qt
 from arenyxa.qt_compat.QtGui import QColor, QPainter, QPainterPath, QPen
 from arenyxa.qt_compat.QtWidgets import (
-    QApplication,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -27,7 +26,7 @@ from arenyxa.qt_compat.QtWidgets import (
 
 from arenyxa.compat import strict_zip
 from arenyxa.presentation.glass import GlassPanel
-from arenyxa.presentation.language import literal_for_locale
+from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.widgets import RingGauge, SectionCard, format_bytes
 
@@ -70,43 +69,58 @@ class DashboardPage(WorkspacePage):
         self._index_snapshot_error_reported = False
         self.metric_cards: dict[str, DashboardMetricCard] = {}
         metric_specs = [
-            ("records", "已索引页面", "▤", "0", "本地结构化结果", "success", True),
-            ("database", "存储大小（估算）", "▣", "0 B", "本地数据库", "info", True),
-            ("last_run", "上次抓取时间", "◷", "暂无", "尚无运行记录", "warning", False),
-            ("storage_mode", "存储模式", "▥", "磁盘存储", "本地文件系统", "accent", False),
-            ("active", "活动任务", "☷", "0", "无任务运行", "info", False),
-            ("service", "本地服务", "◎", "在线", "http://127.0.0.1:8787", "success", False),
+            ("records", "dashboard.metric.records.title", "▤", "0", "dashboard.metric.records.detail", "success", True),
+            ("database", "dashboard.metric.database.title", "▣", "0 B", "dashboard.metric.database.detail", "info", True),
+            ("last_run", "dashboard.metric.last_run.title", "◷", "dashboard.common.none", "dashboard.metric.last_run.empty", "warning", False),
+            ("storage_mode", "dashboard.metric.storage.title", "▥", "dashboard.metric.storage.value", "dashboard.metric.storage.detail", "accent", False),
+            ("active", "dashboard.metric.active.title", "☷", "0", "dashboard.metric.active.empty", "info", False),
+            ("service", "dashboard.metric.service.title", "◎", "dashboard.common.online", "dashboard.metric.service.detail", "success", False),
         ]
-        for index, (key, title, symbol, value, detail, role, spark) in enumerate(metric_specs):
-            card = DashboardMetricCard(theme, motion, title, symbol, value, detail, role, spark)
+        for index, (key, title_key, symbol, value_source, detail_key, role, spark) in enumerate(metric_specs):
+            value = source_text(value_source) if value_source.startswith("dashboard.") else value_source
+            card = DashboardMetricCard(
+                theme,
+                motion,
+                source_text(title_key),
+                symbol,
+                value,
+                source_text(detail_key),
+                role,
+                spark,
+            )
+            card.title.setProperty("i18n_key_text", title_key)
+            if value_source.startswith("dashboard."):
+                card.value.setProperty("i18n_key_text", value_source)
+            card.detail.setProperty("i18n_key_text", detail_key)
             self.metric_cards[key] = card
             self.grid.addWidget(card, 0, index * 2, 1, 2)
 
-        self.task_card = SectionCard(theme, "☷  任务队列状态", "查看全部任务")
+        self.task_card = SectionCard(theme, source_text("dashboard.tasks.title"), source_text("dashboard.tasks.view_all"), title_key="dashboard.tasks.title", action_key="dashboard.tasks.view_all")
         self.task_rows = QVBoxLayout()
         self.task_rows.setSpacing(2)
         self.task_card.body.addLayout(self.task_rows)
         self.grid.addWidget(self.task_card, 1, 0, 2, 5)
 
-        self.capture_card = SectionCard(theme, "↗  抓取进度")
+        self.capture_card = SectionCard(theme, source_text("dashboard.capture.title"), title_key="dashboard.capture.title")
         self.capture_card.setMinimumHeight(310)
         capture_top = QHBoxLayout()
         capture_top.setSpacing(18)
-        self.capture_gauge = RingGauge(theme, 0, "总体进度")
+        self.capture_gauge = RingGauge(theme, 0, source_text("dashboard.capture.overall_progress"))
         self.capture_gauge.setMinimumSize(145, 145)
         capture_top.addWidget(self.capture_gauge)
         capture_stats = QVBoxLayout()
         capture_stats.setSpacing(7)
         self.capture_labels: dict[str, QLabel] = {}
-        for key, caption in (
-            ("discovered", "已发现页面"),
-            ("indexed", "已索引页面"),
-            ("speed", "当前速度"),
-            ("average", "平均速度"),
-            ("errors", "错误数"),
+        for key, caption_key in (
+            ("discovered", "dashboard.capture.discovered"),
+            ("indexed", "dashboard.capture.indexed"),
+            ("speed", "dashboard.capture.speed"),
+            ("average", "dashboard.capture.average"),
+            ("errors", "dashboard.capture.errors"),
         ):
             row = QHBoxLayout()
-            name = QLabel(caption)
+            name = QLabel(source_text(caption_key))
+            name.setProperty("i18n_key_text", caption_key)
             name.setProperty("muted", True)
             value = QLabel("—")
             value.setStyleSheet("font-weight: 650;")
@@ -120,9 +134,9 @@ class DashboardPage(WorkspacePage):
         self.progress_trend = ProgressTrend(theme, motion)
         self.capture_card.body.addWidget(self.progress_trend)
         current = QHBoxLayout()
-        current_label = QLabel("当前任务：")
+        current_label = QLabel(source_text("dashboard.capture.current_task")); current_label.setProperty("i18n_key_text", "dashboard.capture.current_task")
         current_label.setProperty("muted", True)
-        self.current_task = QLabel("暂无活动任务")
+        self.current_task = QLabel(source_text("dashboard.capture.no_active_task"))
         self.current_task.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         current.addWidget(current_label)
         current.addWidget(self.current_task, 1)
@@ -137,19 +151,19 @@ class DashboardPage(WorkspacePage):
         self.capture_card.body.addWidget(self.capture_progress)
         self.grid.addWidget(self.capture_card, 1, 5, 2, 4)
 
-        self.schedule_card = SectionCard(theme, "▣  定时任务", "查看全部")
+        self.schedule_card = SectionCard(theme, source_text("dashboard.schedules.title"), source_text("dashboard.common.view_all"), title_key="dashboard.schedules.title", action_key="dashboard.common.view_all")
         self.schedule_rows = QVBoxLayout()
         self.schedule_rows.setSpacing(3)
         self.schedule_card.body.addLayout(self.schedule_rows)
         self.grid.addWidget(self.schedule_card, 1, 9, 1, 3)
 
-        self.search_card = SectionCard(theme, "⌕  最近搜索", "查看全部")
+        self.search_card = SectionCard(theme, source_text("dashboard.search.title"), source_text("dashboard.common.view_all"), title_key="dashboard.search.title", action_key="dashboard.common.view_all")
         self.search_rows = QVBoxLayout()
         self.search_rows.setSpacing(3)
         self.search_card.body.addLayout(self.search_rows)
         self.grid.addWidget(self.search_card, 2, 9, 2, 3)
 
-        self.stats_card = SectionCard(theme, "▥  数据统计")
+        self.stats_card = SectionCard(theme, source_text("dashboard.stats.title"), title_key="dashboard.stats.title")
         stats = QHBoxLayout()
         stats.setSpacing(16)
         self.donut = DonutChart(theme, motion)
@@ -159,7 +173,7 @@ class DashboardPage(WorkspacePage):
         stats.addLayout(self.file_legend, 1)
         stats.addWidget(self._vertical_separator())
         domain_box = QVBoxLayout()
-        domain_title = QLabel("热门域名")
+        domain_title = QLabel(source_text("dashboard.stats.top_domains")); domain_title.setProperty("i18n_key_text", "dashboard.stats.top_domains")
         domain_title.setStyleSheet("font-weight: 650;")
         domain_box.addWidget(domain_title)
         self.domain_rows = QVBoxLayout()
@@ -169,7 +183,7 @@ class DashboardPage(WorkspacePage):
         stats.addLayout(domain_box, 2)
         stats.addWidget(self._vertical_separator())
         size_box = QVBoxLayout()
-        size_title = QLabel("各类型内容大小")
+        size_title = QLabel(source_text("dashboard.stats.content_sizes")); size_title.setProperty("i18n_key_text", "dashboard.stats.content_sizes")
         size_title.setStyleSheet("font-weight: 650;")
         size_box.addWidget(size_title)
         self.size_rows = QVBoxLayout()
@@ -192,22 +206,22 @@ class DashboardPage(WorkspacePage):
         layout.setSpacing(10)
         title_stack = QVBoxLayout()
         title_stack.setSpacing(1)
-        title = QLabel("⌁  仪表盘")
+        title = QLabel(source_text("dashboard.page.title")); title.setProperty("i18n_key_text", "dashboard.page.title")
         title.setStyleSheet("font-size: 21px; font-weight: 720;")
-        subtitle = QLabel("概览您的本地网页索引与系统状态")
+        subtitle = QLabel(source_text("dashboard.page.subtitle")); subtitle.setProperty("i18n_key_text", "dashboard.page.subtitle")
         subtitle.setProperty("muted", True)
         title_stack.addWidget(title)
         title_stack.addWidget(subtitle)
         layout.addLayout(title_stack)
         layout.addStretch()
 
-        self.start_button = QPushButton("▷  开始抓取")
+        self.start_button = QPushButton(source_text("dashboard.action.start")); self.start_button.setProperty("i18n_key_text", "dashboard.action.start")
         self.start_button.setProperty("primary", True)
-        self.pause_button = QPushButton("Ⅱ  暂停")
-        self.stop_button = QPushButton("■  停止")
+        self.pause_button = QPushButton(source_text("dashboard.action.pause")); self.pause_button.setProperty("i18n_key_text", "dashboard.action.pause")
+        self.stop_button = QPushButton(source_text("dashboard.action.stop")); self.stop_button.setProperty("i18n_key_text", "dashboard.action.stop")
         self.stop_button.setProperty("danger", True)
-        self.search_button = QPushButton("⌕  打开搜索页面")
-        self.data_button = QPushButton("▣  打开数据文件夹")
+        self.search_button = QPushButton(source_text("dashboard.action.search")); self.search_button.setProperty("i18n_key_text", "dashboard.action.search")
+        self.data_button = QPushButton(source_text("dashboard.action.open_data")); self.data_button.setProperty("i18n_key_text", "dashboard.action.open_data")
         for button in (self.start_button, self.pause_button, self.stop_button, self.search_button, self.data_button):
             layout.addWidget(button)
         return bar
@@ -239,7 +253,7 @@ class DashboardPage(WorkspacePage):
         if callable(callback):
             callback()
         else:
-            self.statusMessage.emit("当前窗口暂不支持此操作")
+            self.statusMessage.emit(current_text("dashboard.status.unsupported"))
 
     def _navigate(self, page_id: str) -> None:
         window = self.window()
@@ -259,26 +273,26 @@ class DashboardPage(WorkspacePage):
         if len(series) < 2:
             series = [0, max(1, metrics["records"])]
         records_card = self.metric_cards["records"]
-        records_card.detail.setText(f"+{max(0, latest.get('result_count', 0) if latest else 0):,}  vs 上次抓取")
+        records_card.detail.setText(current_text("dashboard.metric.records.vs_previous").format(count=f"{max(0, latest.get('result_count', 0) if latest else 0):,}"))
         records_card.sparkline.set_values(series)
         self.motion.animate_number(records_card.value, float(metrics["records"]), lambda value: f"{int(round(value)):,}")
 
         database_card = self.metric_cards["database"]
-        database_card.detail.setText("SQLite + 本地捕获数据")
+        database_card.detail.setText(current_text("dashboard.metric.database.live_detail"))
         database_card.sparkline.set_values([max(1.0, value + 1) for value in series])
         self.motion.animate_number(database_card.value, float(metrics["database_bytes"]), lambda value: format_bytes(int(max(0, value))))
         if latest:
             last_dt = self._format_datetime(latest.get("finished_at") or latest.get("created_at"))
             duration = self._duration_text(latest)
-            self.metric_cards["last_run"].set_metric(last_dt, f"耗时：{duration}")
+            self.metric_cards["last_run"].set_metric(last_dt, current_text("dashboard.metric.last_run.duration").format(duration=duration))
         else:
-            self.metric_cards["last_run"].set_metric("暂无", "尚无运行记录")
-        self.metric_cards["storage_mode"].set_metric("磁盘存储", "本地文件系统 · 持久化")
+            self.metric_cards["last_run"].set_metric(current_text("dashboard.common.none"), current_text("dashboard.metric.last_run.empty"))
+        self.metric_cards["storage_mode"].set_metric(current_text("dashboard.metric.storage.value"), current_text("dashboard.metric.storage.live_detail"))
         queued = max(0, metrics["tasks"] - metrics["active"])
         active_card = self.metric_cards["active"]
-        active_card.detail.setText(f"运行中 · 共 {queued} 个排队")
+        active_card.detail.setText(current_text("dashboard.metric.active.detail").format(queued=queued))
         self.motion.animate_number(active_card.value, float(metrics["active"]), lambda value: str(int(round(value))))
-        self.metric_cards["service"].set_metric("在线", "http://127.0.0.1:8787")
+        self.metric_cards["service"].set_metric(current_text("dashboard.common.online"), "http://127.0.0.1:8787")
 
         self._rebuild_tasks(runs)
         self._refresh_capture(metrics, runs, active_run)
@@ -286,7 +300,7 @@ class DashboardPage(WorkspacePage):
         snapshot = self._load_index_snapshot()
         self._rebuild_recent_search(snapshot["recent_items"])
         self._rebuild_stats(snapshot, metrics["database_bytes"])
-        self.inspectorChanged.emit("仪表盘上下文", metrics)
+        self.inspectorChanged.emit(current_text("dashboard.inspector.context"), metrics)
 
     def _rebuild_tasks(self, runs: list[dict]) -> None:
         self._clear_layout(self.task_rows)
@@ -295,7 +309,7 @@ class DashboardPage(WorkspacePage):
         for run in runs:
             latest_by_task.setdefault(str(run.get("task_id", "")), run)
         if not tasks:
-            label = QLabel("尚无任务。使用“抓取任务”建立第一个采集任务。")
+            label = QLabel(current_text("dashboard.tasks.empty"))
             label.setProperty("muted", True)
             label.setWordWrap(True)
             self.task_rows.addWidget(label)
@@ -308,7 +322,7 @@ class DashboardPage(WorkspacePage):
             total = int(run.get("total_units") or max(1, len(task.requests)))
             percent = round(completed * 100 / total) if total else 0
             status = str(run.get("status") or task.status.value)
-            url = task.requests[0].url if task.requests else "无 URL"
+            url = task.requests[0].url if task.requests else current_text("dashboard.common.no_url")
             row_widget = QWidget()
             row = QHBoxLayout(row_widget)
             row.setContentsMargins(0, 5, 0, 5)
@@ -322,7 +336,7 @@ class DashboardPage(WorkspacePage):
             title = QLabel(url)
             title.setStyleSheet("font-weight: 610;")
             title.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-            meta = QLabel(f"深度：{max(1, len(task.requests))}  ·  优先级：中")
+            meta = QLabel(current_text("dashboard.tasks.meta").format(depth=max(1, len(task.requests)), priority=current_text("dashboard.priority.medium")))
             meta.setProperty("muted", True)
             meta.setStyleSheet("font-size: 10px;")
             text.addWidget(title)
@@ -363,7 +377,7 @@ class DashboardPage(WorkspacePage):
             result_count = 0
             error_count = 0
             started_at = None
-            current_url = "暂无活动任务"
+            current_url = current_text("dashboard.capture.no_active_task")
 
         percent = round(completed * 100 / total) if total else (100 if runs and runs[0].get("status") == "completed" else 0)
         speed = self._run_speed(completed, started_at)
@@ -372,7 +386,7 @@ class DashboardPage(WorkspacePage):
         self.motion.animate_scalar(self.capture_gauge, "gauge", gauge_start, float(percent), self.capture_gauge.set_value, 420, live=True)
         self.motion.animate_progress(self.capture_progress, percent, 420)
         self.motion.animate_number(self.capture_percent, float(percent), lambda value: f"{int(round(value))}%", 360)
-        self.current_task.setText(current_url or "暂无活动任务")
+        self.current_task.setText(current_url or current_text("dashboard.capture.no_active_task"))
         self.motion.animate_number(self.capture_labels["discovered"], float(discovered), lambda value: f"{int(round(value)):,}")
         self.motion.animate_number(self.capture_labels["indexed"], float(metrics['records']), lambda value: f"{int(round(value)):,}")
         self.motion.animate_number(self.capture_labels["speed"], float(speed), lambda value: f"{value:.1f} pages/s")
@@ -387,7 +401,7 @@ class DashboardPage(WorkspacePage):
         self._clear_layout(self.schedule_rows)
         schedules = self.context.store.list_schedules()[:3]
         if not schedules:
-            label = QLabel("暂无定时任务")
+            label = QLabel(current_text("dashboard.schedules.empty"))
             label.setProperty("muted", True)
             self.schedule_rows.addWidget(label)
             self.schedule_rows.addStretch()
@@ -402,7 +416,7 @@ class DashboardPage(WorkspacePage):
             row.addWidget(clock)
             text = QVBoxLayout()
             text.setSpacing(1)
-            name = QLabel(str(schedule.get("task_name") or "定时抓取"))
+            name = QLabel(str(schedule.get("task_name") or current_text("dashboard.schedules.default_name")))
             name.setStyleSheet("font-weight: 610;")
             next_run = QLabel(self._schedule_text(schedule))
             next_run.setProperty("muted", True)
@@ -422,7 +436,7 @@ class DashboardPage(WorkspacePage):
     def _rebuild_recent_search(self, items: list[dict]) -> None:
         self._clear_layout(self.search_rows)
         if not items:
-            label = QLabel("暂无最近索引内容")
+            label = QLabel(current_text("dashboard.search.empty"))
             label.setProperty("muted", True)
             self.search_rows.addWidget(label)
             self.search_rows.addStretch()
@@ -438,10 +452,10 @@ class DashboardPage(WorkspacePage):
             row.addWidget(symbol)
             text = QVBoxLayout()
             text.setSpacing(1)
-            title = QLabel(str(item.get("title") or item.get("url") or "本地索引项"))
+            title = QLabel(str(item.get("title") or item.get("url") or current_text("dashboard.search.local_item")))
             title.setStyleSheet("font-weight: 610;")
             title.setWordWrap(False)
-            meta = QLabel(f"{item.get('object_type', 'index')}  ·  本地索引")
+            meta = QLabel(current_text("dashboard.search.meta").format(object_type=item.get("object_type", "index")))
             meta.setProperty("muted", True)
             meta.setStyleSheet("font-size: 10px;")
             text.addWidget(title)
@@ -462,7 +476,7 @@ class DashboardPage(WorkspacePage):
             values = [1, 0, 0, 0, 0]
             total = 1
         donut_items = [(label, value, role) for label, value, role in strict_zip(labels, values, roles, strict=True)]
-        self.donut.set_items(donut_items, f"{int(sum(snapshot['file_counts'].values())):,} 项")
+        self.donut.set_items(donut_items, current_text("dashboard.stats.items").format(count=f"{int(sum(snapshot['file_counts'].values())):,}"))
 
         self._clear_layout(self.file_legend)
         for label, value, role in donut_items:
@@ -486,7 +500,7 @@ class DashboardPage(WorkspacePage):
         for domain, count in domains[:5]:
             self.domain_rows.addLayout(self._bar_row(domain, count, max_domain, f"{count:,}"))
         if not domains:
-            empty = QLabel("暂无域名统计")
+            empty = QLabel(current_text("dashboard.stats.no_domains"))
             empty.setProperty("muted", True)
             self.domain_rows.addWidget(empty)
 
@@ -496,7 +510,7 @@ class DashboardPage(WorkspacePage):
             estimated = int(database_bytes * value / total) if database_bytes else 0
             self.size_rows.addLayout(self._size_row(label, estimated, value / total))
         if not database_bytes:
-            note = QLabel("等待产生本地数据")
+            note = QLabel(current_text("dashboard.stats.waiting_data"))
             note.setProperty("muted", True)
             self.size_rows.addWidget(note)
 
@@ -608,7 +622,7 @@ class DashboardPage(WorkspacePage):
     @staticmethod
     def _format_datetime(value) -> str:
         if not value:
-            return "暂无"
+            return current_text("dashboard.common.none")
         try:
             dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
             return dt.strftime("%Y-%m-%d %H:%M")
@@ -634,14 +648,14 @@ class DashboardPage(WorkspacePage):
     @staticmethod
     def _status_label(status: str, percent: int) -> str:
         mapping = {
-            "running": f"运行中  {percent}%",
-            "queued": "排队中",
-            "paused": f"已暂停  {percent}%",
-            "completed": "已完成",
-            "partial": "部分完成",
-            "failed": "失败",
-            "cancelled": "已取消",
-            "draft": "待执行",
+            "running": current_text("dashboard.run_status.running").format(percent=percent),
+            "queued": current_text("dashboard.run_status.queued"),
+            "paused": current_text("dashboard.run_status.paused").format(percent=percent),
+            "completed": current_text("dashboard.run_status.completed"),
+            "partial": current_text("dashboard.run_status.partial"),
+            "failed": current_text("dashboard.run_status.failed"),
+            "cancelled": current_text("dashboard.run_status.cancelled"),
+            "draft": current_text("dashboard.run_status.draft"),
         }
         return mapping.get(status.casefold(), status)
 
@@ -649,11 +663,11 @@ class DashboardPage(WorkspacePage):
     def _schedule_text(schedule: dict) -> str:
         next_run = schedule.get("next_run_at")
         if next_run:
-            return f"下次执行：{DashboardPage._format_datetime(next_run)}"
+            return current_text("dashboard.schedule.next_run").format(time=DashboardPage._format_datetime(next_run))
         rule = schedule.get("rule") or {}
         hour = int(rule.get("hour", 0) or 0)
         minute = int(rule.get("minute", 0) or 0)
-        return f"计划执行：{hour:02d}:{minute:02d}"
+        return current_text("dashboard.schedule.planned").format(time=f"{hour:02d}:{minute:02d}")
 
     @staticmethod
     def _clear_layout(layout) -> None:
