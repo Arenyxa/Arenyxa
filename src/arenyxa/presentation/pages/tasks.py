@@ -28,6 +28,7 @@ from arenyxa.domain.enums import TaskStatus
 from arenyxa.application.future_callbacks import WeakMethodFutureCallback
 from arenyxa.application.reliability import PreflightRequest
 from arenyxa.domain.models import CleanerStep, FieldSpec, RequestSpec, Run, Task
+from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.widgets import PageHeader, set_table_header_resize_mode
 
@@ -36,7 +37,7 @@ class TaskEditor(QDialog):
     def __init__(self, task: Task | None = None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.task = task
-        self.setWindowTitle("编辑采集任务" if task else "新建采集任务")
+        self.setWindowTitle(current_text("tasks.editor.edit_title" if task else "tasks.editor.new_title"))
         self.resize(760, 620)
         layout = QVBoxLayout(self)
         tabs = QTabWidget()
@@ -47,7 +48,7 @@ class TaskEditor(QDialog):
         self.name = QLineEdit(task.name if task else "")
         self.url = QTextEdit()
         self.url.setMaximumHeight(110)
-        self.url.setPlaceholderText("每行一个 URL；多个 URL 将按并发策略同时抓取")
+        self.url.setPlaceholderText(current_text("tasks.editor.urls_placeholder"))
         existing_urls = [request.url for request in task.requests] if task and task.requests else ["https://example.com"]
         self.url.setPlainText("\n".join(existing_urls))
         self.method = QComboBox()
@@ -66,24 +67,24 @@ class TaskEditor(QDialog):
         self.parser.addItems(["auto", "html", "json", "xml"])
         if task:
             self.parser.setCurrentText(task.parser_hint)
-        request_form.addRow("任务名称", self.name)
-        request_form.addRow("目标 URL（每行一个）", self.url)
-        request_form.addRow("HTTP 方法", self.method)
-        request_form.addRow("Headers (JSON)", self.headers)
-        request_form.addRow("请求正文", self.body)
-        request_form.addRow("解析类型", self.parser)
-        tabs.addTab(request_tab, "请求")
+        request_form.addRow(current_text("tasks.editor.name"), self.name)
+        request_form.addRow(current_text("tasks.editor.urls"), self.url)
+        request_form.addRow(current_text("tasks.editor.method"), self.method)
+        request_form.addRow(current_text("tasks.editor.headers"), self.headers)
+        request_form.addRow(current_text("tasks.editor.body"), self.body)
+        request_form.addRow(current_text("tasks.editor.parser"), self.parser)
+        tabs.addTab(request_tab, current_text("tasks.editor.request_tab"))
 
         fields_tab = QWidget()
         fields_layout = QVBoxLayout(fields_tab)
         self.fields = QTableWidget(0, 7)
         self.fields.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.fields.setHorizontalHeaderLabels(["名称", "选择器", "类型", "目标", "属性", "多值", "必填"])
+        self.fields.setHorizontalHeaderLabels([current_text(key) for key in ("tasks.fields.name", "tasks.fields.selector", "tasks.fields.type", "tasks.fields.target", "tasks.fields.attribute", "tasks.fields.multiple", "tasks.fields.required")])
         set_table_header_resize_mode(self.fields, 1, QHeaderView.ResizeMode.Stretch)
         fields_layout.addWidget(self.fields)
         buttons = QHBoxLayout()
-        add = QPushButton("添加字段")
-        remove = QPushButton("删除字段")
+        add = QPushButton(current_text("tasks.editor.add_field"))
+        remove = QPushButton(current_text("tasks.editor.remove_field"))
         buttons.addWidget(add)
         buttons.addWidget(remove)
         buttons.addStretch()
@@ -92,7 +93,7 @@ class TaskEditor(QDialog):
         remove.clicked.connect(
             lambda: self.fields.removeRow(self.fields.currentRow()) if self.fields.currentRow() >= 0 else None
         )
-        tabs.addTab(fields_tab, "字段抽取")
+        tabs.addTab(fields_tab, current_text("tasks.editor.fields_tab"))
         for spec in task.fields if task else [FieldSpec("title", "title", cleaners=[CleanerStep("trim")])]:
             self._add_field(spec)
 
@@ -126,7 +127,7 @@ class TaskEditor(QDialog):
         try:
             headers = json.loads(self.headers.toPlainText() or "{}")
             if not isinstance(headers, dict):
-                raise TypeError("Headers 必须是 JSON 对象。")
+                raise TypeError(current_text("tasks.editor.headers_must_be_object"))
             task = self.build_task(headers)
             errors = task.validate()
             if errors:
@@ -203,17 +204,17 @@ class TasksPage(WorkspacePage):
         super().__init__(context, theme, motion, parent)
         layout = page_layout(self)
         toolbar = QHBoxLayout()
-        toolbar.addWidget(PageHeader("抓取任务", "Task 定义与 Run 事实分离，历史运行保留配置快照"), 1)
+        toolbar.addWidget(PageHeader(source_text("tasks.page.title"), source_text("tasks.page.subtitle"), title_key="tasks.page.title", subtitle_key="tasks.page.subtitle"), 1)
         self.search = QLineEdit()
-        self.search.setPlaceholderText("搜索名称、标签或 URL")
+        self.search.setPlaceholderText(source_text("tasks.search.placeholder")); self.search.setProperty("i18n_key_placeholder", "tasks.search.placeholder")
         self.search.setMaximumWidth(320)
-        create = QPushButton("新建任务")
+        create = QPushButton(source_text("tasks.action.create")); create.setProperty("i18n_key_text", "tasks.action.create")
         create.setProperty("primary", True)
         toolbar.addWidget(self.search)
         toolbar.addWidget(create)
         layout.addLayout(toolbar)
         self.table = QTableWidget(0, 6)
-        self.table.setHorizontalHeaderLabels(["任务", "URL", "状态", "字段", "更新时间", "操作"])
+        self._set_table_headers()
         set_table_header_resize_mode(self.table, 0, QHeaderView.ResizeMode.ResizeToContents)
         set_table_header_resize_mode(self.table, 1, QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -225,6 +226,23 @@ class TasksPage(WorkspacePage):
         self.search.textChanged.connect(self.refresh)
         self.table.cellDoubleClicked.connect(lambda row, _column: self.edit_task(row))
         self.runProgress.connect(self._show_run_progress)
+
+    def _set_table_headers(self) -> None:
+        self.table.setHorizontalHeaderLabels([
+            current_text(key)
+            for key in (
+                "tasks.table.task",
+                "tasks.table.url",
+                "tasks.table.status",
+                "tasks.table.fields",
+                "tasks.table.updated",
+                "tasks.table.actions",
+            )
+        ])
+
+    def refresh_localized_previews(self) -> None:
+        self._set_table_headers()
+        self.refresh()
 
     def activated(self) -> None:
         self.refresh()
@@ -240,7 +258,7 @@ class TasksPage(WorkspacePage):
                     task.requests[0].url + (f"  (+{len(task.requests) - 1})" if len(task.requests) > 1 else "")
                     if task.requests else ""
                 ),
-                task.status.value,
+                current_text(f"tasks.status.{task.status.value}"),
                 str(len(task.fields)),
                 task.updated_at[:19],
             ]
@@ -250,9 +268,9 @@ class TasksPage(WorkspacePage):
             buttons = QHBoxLayout(actions)
             buttons.setContentsMargins(2, 2, 2, 2)
             buttons.setSpacing(4)
-            run = QPushButton("运行")
-            preview = QPushButton("预览")
-            edit = QPushButton("编辑")
+            run = QPushButton(current_text("tasks.action.run"))
+            preview = QPushButton(current_text("tasks.action.preview"))
+            edit = QPushButton(current_text("tasks.action.edit"))
             buttons.addWidget(run)
             buttons.addWidget(preview)
             buttons.addWidget(edit)
@@ -260,7 +278,7 @@ class TasksPage(WorkspacePage):
             preview.clicked.connect(lambda _checked=False, task=task: self.run_task(task, True))
             edit.clicked.connect(lambda _checked=False, task=task: self.open_editor(task))
             self.table.setCellWidget(row, 5, actions)
-        self.inspectorChanged.emit("任务列表", {"count": len(tasks), "query": self.search.text()})
+        self.inspectorChanged.emit(current_text("tasks.inspector.list"), {"count": len(tasks), "query": self.search.text()})
 
     def create_task(self) -> None:
         self.open_editor(None)
@@ -275,7 +293,7 @@ class TasksPage(WorkspacePage):
             saved = editor.build_task()
             saved.status = TaskStatus.READY
             self.context.store.save_task(saved)
-            self.statusMessage.emit(f"已保存任务：{saved.name}")
+            self.statusMessage.emit(current_text("tasks.status.saved").format(name=saved.name))
             self.refresh()
 
     def run_task(self, task: Task, preview: bool) -> None:
@@ -303,20 +321,35 @@ class TasksPage(WorkspacePage):
                     risks = ", ".join(preflight.risks) or "capacity"
                     choice = QMessageBox.warning(
                         self,
-                        "执行前资源评估",
-                        f"该任务被评估为高资源风险（{risks}）。预计磁盘上界约 {preflight.estimated_disk_bytes_high / (1024**3):.2f} GiB，"
-                        f"峰值 RAM 约 {preflight.estimated_peak_ram_bytes / (1024**3):.2f} GiB。继续运行？",
+                        current_text("tasks.preflight.title"),
+                        current_text("tasks.preflight.high_risk").format(
+                            risks=risks,
+                            disk=f"{preflight.estimated_disk_bytes_high / (1024**3):.2f}",
+                            ram=f"{preflight.estimated_peak_ram_bytes / (1024**3):.2f}",
+                        ),
                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
                     )
                     if choice != QMessageBox.StandardButton.Yes:
-                        self.statusMessage.emit("已根据执行前资源评估取消启动；任务定义未修改。")
+                        self.statusMessage.emit(current_text("tasks.preflight.cancelled"))
                         return
             handle = self.context.runner.submit(task, self._run_progress, preview=preview)
             concurrency = self.context.runner.concurrency_snapshot()
+            action_text = current_text("tasks.status.preview_started" if preview else "tasks.status.run_started")
+            concurrency_text = current_text("tasks.status.concurrency").format(
+                request_limit=concurrency.get("request_limit", concurrency["request_workers"]),
+                request_workers=concurrency["request_workers"],
+                per_host=concurrency["per_host_workers"],
+            )
+            preflight_text = "" if preflight is None else current_text("tasks.status.preflight").format(level=preflight.risk_level)
             self.statusMessage.emit(
-                f"已{'预览' if preview else '启动'}：{task.name} · {len(task.requests)} URL · "
-                f"并发预算 {concurrency.get('request_limit', concurrency['request_workers'])}/{concurrency['request_workers']} / 单域名 {concurrency['per_host_workers']} · {handle.run.id}"
-                + ("" if preflight is None else f" · Preflight {preflight.risk_level}")
+                current_text("tasks.status.started").format(
+                    action=action_text,
+                    name=task.name,
+                    urls=len(task.requests),
+                    concurrency=concurrency_text,
+                    run_id=handle.run.id,
+                    preflight=preflight_text,
+                )
             )
             self.context.nextgen.activity.publish("run", f"Started {task.name}", details={"run_id": handle.run.id, "task_id": task.id, "preview": preview})
             handle.future.add_done_callback(
@@ -327,7 +360,7 @@ class TasksPage(WorkspacePage):
                 )
             )
         except Exception as exc:                                          
-            QMessageBox.critical(self, "无法启动", str(exc))
+            QMessageBox.critical(self, current_text("tasks.error.start_failed"), str(exc))
 
     def _publish_run_completion(self, run: Run, name: str, _future: Any) -> None:
         self.context.nextgen.activity.publish(
@@ -346,5 +379,10 @@ class TasksPage(WorkspacePage):
 
     def _show_run_progress(self, run: Run) -> None:
         self.statusMessage.emit(
-            f"{run.stage} · {run.completed_units}/{run.total_units or '?'} · {run.status.value}"
+            current_text("tasks.status.progress").format(
+                stage=run.stage,
+                completed=run.completed_units,
+                total=run.total_units or "?",
+                status=current_text(f"tasks.run_status.{run.status.value}"),
+            )
         )

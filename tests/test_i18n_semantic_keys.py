@@ -15,6 +15,7 @@ from arenyxa.qt_compat.QtWidgets import QComboBox, QLabel, QTabWidget, QWidget
 
 from arenyxa.application.experience import EXPERIENCE_PROFILES
 from arenyxa.application.general_user import GeneralUserIntentRouter
+from arenyxa.domain.enums import RunStatus, TaskStatus
 from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.language import LanguageManager
 
@@ -32,11 +33,13 @@ MIGRATED_UI_FILES = (
     ROOT / "src/arenyxa/presentation/pages/dashboard.py",
     ROOT / "src/arenyxa/presentation/pages/dashboard_widgets.py",
     ROOT / "src/arenyxa/presentation/pages/task_center.py",
+    ROOT / "src/arenyxa/presentation/pages/tasks.py",
+    ROOT / "src/arenyxa/presentation/pages/data.py",
 )
 CATALOG_LOCALES = ("en_US", "zh_CN", "fr_FR", "de_DE", "ja_JP")
 CJK = re.compile(r"[\u3400-\u9fff]")
 KEY = re.compile(
-    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|dashboard|task_center)\.[A-Za-z0-9_.]+)(?:"|\')'
+    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|dashboard|task_center|tasks|data|search|version)\.[A-Za-z0-9_.]+)(?:"|\')'
 )
 
 
@@ -59,6 +62,10 @@ def _referenced_keys() -> set[str]:
             keys.add(f"{prefix}.step.{index}")
         if workflow.fallback_note:
             keys.add(f"{prefix}.fallback")
+    for status in TaskStatus:
+        keys.add(f"tasks.status.{status.value}")
+    for status in RunStatus:
+        keys.add(f"tasks.run_status.{status.value}")
     return keys
 
 
@@ -114,6 +121,12 @@ def test_task_center_workflow_catalogs_cover_router_workflows() -> None:
         assert f"{prefix}.summary" in required
         for index, _step in enumerate(workflow.steps):
             assert f"{prefix}.step.{index}" in required
+
+
+def test_task_and_run_status_display_keys_cover_enum_values() -> None:
+    required = _referenced_keys()
+    assert {f"tasks.status.{status.value}" for status in TaskStatus} <= required
+    assert {f"tasks.run_status.{status.value}" for status in RunStatus} <= required
 
 
 def test_semantic_catalog_helpers_follow_active_locale(qapp) -> None:
