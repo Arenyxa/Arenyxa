@@ -649,5 +649,6 @@
   "version.compare.title": "比较",
   "version.compare.select_two": "请选择两个 Revision。",
   "version.compare.running": "正在后台比较两个 Revision…",
-  "version.compare.failed": "Revision 比较失败：{message}"
+  "version.compare.failed": "Revision 比较失败：{message}",
+  "tasks.editor.headers": "Headers（JSON）"
 }
