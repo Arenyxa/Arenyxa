@@ -27,6 +27,8 @@ The following high-visibility surfaces no longer embed Chinese user-facing copy 
 - Personalization theme-card metadata
 - Network Analysis / capture controls / Replay / TLS / DNS / Professional Analysis / PCAP and process-monitor messaging
 - Studio tooling / Project Python / Marketplace / Compatibility / Portability / Autopilot
+- Dashboard / metrics / task queue / schedules / local-index statistics
+- Task Center / Simple Mode / guided workflows / runtime-capability guidance
 
 Their user-facing copy is now sourced from semantic catalog keys under the `welcome.*` and `personalization.*` namespaces.
 
