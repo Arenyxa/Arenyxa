@@ -191,8 +191,9 @@ class TaskCenterPage(WorkspacePage):
     def refresh_localized_previews(self) -> None:
         if self._last_workflow_id:
             self._show_workflow(self.router.get(self._last_workflow_id))
-        elif not self.guide.toPlainText().strip():
+        else:
             self.guide.setPlainText(current_text("task_center.guide.initial"))
+        self.refresh_capabilities()
 
 
 __all__ = ["TaskCenterPage"]
