@@ -649,5 +649,6 @@
   "version.compare.title": "Compare",
   "version.compare.select_two": "Select two Revisions.",
   "version.compare.running": "Comparing two Revisions in the background…",
-  "version.compare.failed": "Revision comparison failed: {message}"
+  "version.compare.failed": "Revision comparison failed: {message}",
+  "tasks.editor.headers": "Headers (JSON)"
 }
