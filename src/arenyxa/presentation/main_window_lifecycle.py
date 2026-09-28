@@ -154,6 +154,9 @@ class MainWindowLifecycleMixin:
         current = self.pages.get(self.current_page_id)
         if isinstance(current, QWidget):
             self.language.translate_tree(current)
+            refresh_localized = getattr(current, "refresh_localized_previews", None)
+            if callable(refresh_localized):
+                refresh_localized()
         self.ui_scale.scale_tree(self.nav)
         if isinstance(current, QWidget):
             self.ui_scale.scale_tree(current)
