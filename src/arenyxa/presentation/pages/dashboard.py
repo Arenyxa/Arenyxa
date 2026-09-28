@@ -89,9 +89,6 @@ class DashboardPage(WorkspacePage):
                 spark,
             )
             card.title.setProperty("i18n_key_text", title_key)
-            if value_source.startswith("dashboard."):
-                card.value.setProperty("i18n_key_text", value_source)
-            card.detail.setProperty("i18n_key_text", detail_key)
             self.metric_cards[key] = card
             self.grid.addWidget(card, 0, index * 2, 1, 2)
 
@@ -260,6 +257,11 @@ class DashboardPage(WorkspacePage):
         callback = getattr(window, "navigate", None)
         if callable(callback):
             callback(page_id)
+
+    def refresh_localized_previews(self) -> None:
+        self.capture_gauge.label = current_text("dashboard.capture.overall_progress")
+        self.capture_gauge.update()
+        self.activated()
 
     def activated(self) -> None:
         metrics = self.context.store.dashboard_metrics()
