@@ -555,5 +555,6 @@
   "task_center.workflow.open_project.step.0": "Choose a project",
   "task_center.workflow.open_project.step.1": "Verify integrity",
   "task_center.workflow.open_project.step.2": "Read the manifest",
-  "task_center.workflow.open_project.step.3": "Open the workspace"
+  "task_center.workflow.open_project.step.3": "Open the workspace",
+  "dashboard.stats.file_types": "File types"
 }
