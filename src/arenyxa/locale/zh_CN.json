@@ -555,5 +555,6 @@
   "task_center.workflow.open_project.step.0": "选择项目",
   "task_center.workflow.open_project.step.1": "完整性验证",
   "task_center.workflow.open_project.step.2": "读取 Manifest",
-  "task_center.workflow.open_project.step.3": "打开工作区"
+  "task_center.workflow.open_project.step.3": "打开工作区",
+  "dashboard.stats.file_types": "文件类型"
 }
