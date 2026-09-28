@@ -70,7 +70,7 @@ class TaskEditor(QDialog):
         request_form.addRow(current_text("tasks.editor.name"), self.name)
         request_form.addRow(current_text("tasks.editor.urls"), self.url)
         request_form.addRow(current_text("tasks.editor.method"), self.method)
-        request_form.addRow("Headers (JSON)", self.headers)
+        request_form.addRow(current_text("tasks.editor.headers"), self.headers)
         request_form.addRow(current_text("tasks.editor.body"), self.body)
         request_form.addRow(current_text("tasks.editor.parser"), self.parser)
         tabs.addTab(request_tab, current_text("tasks.editor.request_tab"))
