@@ -36,8 +36,9 @@ The following high-visibility surfaces no longer embed Chinese user-facing copy 
 - Terminal & Packet Console / Logs / mode selection
 - Advanced Platform / Plugins / analysis tabs / database adapter
 - Automation Center / Flow Designer / Visual Graph / Execution Inspector
+- Enterprise Identity / RBAC / Vault / Enrollment / Coordinator / Governance / Distributed Operations
 
-Their user-facing copy is now sourced from semantic catalog keys under stable page/domain namespaces such as `welcome.*`, `personalization.*`, `settings.*`, `network.*`, `studio.*`, `studio_intelligence.*`, `dashboard.*`, `task_center.*`, `tasks.*`, `data.*`, and `visualization.*`.
+Their user-facing copy is now sourced from semantic catalog keys under stable page/domain namespaces such as `welcome.*`, `personalization.*`, `settings.*`, `network.*`, `studio.*`, `studio_intelligence.*`, `dashboard.*`, `task_center.*`, `tasks.*`, `data.*`, `visualization.*`, `tools_*.*`, and `enterprise.*`.
 
 ## Regression protection
 
