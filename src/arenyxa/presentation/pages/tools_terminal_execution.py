@@ -134,7 +134,7 @@ class ConsoleValidationMixin:
         if profile == "quick":
             manager = getattr(self.context, "developer_access", None)
             if manager is None:
-                self.output.appendPlainText("官方开发者授权组件当前不可用。")
+                self.output.appendPlainText(current_text("terminal.developer.backend_unavailable"))
                 return
             try:
                 manager.require("stress_test", "stress-test/quick")
@@ -178,7 +178,7 @@ class ConsoleValidationMixin:
             )
             return
         if self._developer_test_running:
-            self.output.appendPlainText("已有开发者验证任务正在运行，请等待完成后再启动新的测试。")
+            self.output.appendPlainText(current_text("terminal.validation.already_running"))
             return
         if not self._official_developer_high_risk_gate(
             "fault_injection", f"fault-injection/{scenario}", current_text("terminal.validation.fault_title"),
