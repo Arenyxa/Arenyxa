@@ -31,8 +31,10 @@ The following high-visibility surfaces no longer embed Chinese user-facing copy 
 - Task Center / Simple Mode / guided workflows / runtime-capability guidance
 - Tasks / Task Editor / preflight resource messaging / task and run status display
 - Data / Search / Dataset Revision / streaming export
+- Studio Intelligence / SmartPath / Blueprint / Selector / HTTP / Protocol / Quality / Recorder / Debugger
+- Data Visualization Studio / chart assets / PNG export
 
-Their user-facing copy is now sourced from semantic catalog keys under the `welcome.*` and `personalization.*` namespaces.
+Their user-facing copy is now sourced from semantic catalog keys under stable page/domain namespaces such as `welcome.*`, `personalization.*`, `settings.*`, `network.*`, `studio.*`, `studio_intelligence.*`, `dashboard.*`, `task_center.*`, `tasks.*`, `data.*`, and `visualization.*`.
 
 ## Regression protection
 
@@ -44,4 +46,4 @@ Their user-facing copy is now sourced from semantic catalog keys under the `welc
 
 ## Remaining migration work
 
-The public release is v0.1; the preserved internal engineering baseline is v8.2.0. Legacy business pages still contain compatibility phrase mappings and hard-coded UI text that are translated through the existing `translate_tree` compatibility path. The next migration targets are remaining operational surfaces such as Enterprise and any residual Proxy/Recovery or auxiliary tool copy not already catalog-backed. Migration should continue incrementally by page and should not internationalize machine identifiers, database keys, protocol/event codes, permission identifiers, or persisted enum values.
+The public release is v0.1; the preserved internal engineering baseline is v8.2.0. Legacy business pages still contain compatibility phrase mappings and hard-coded UI text that are translated through the existing `translate_tree` compatibility path. The next migration targets are residual operational and advanced-tool surfaces not already catalog-backed. Migration should continue incrementally by page and should not internationalize machine identifiers, database keys, protocol/event codes, permission identifiers, or persisted enum values.

@@ -5,7 +5,7 @@ from arenyxa.application.autopilot_validation import AutopilotProductionValidato
 import json
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 from arenyxa.qt_compat.QtCore import QTimer
 from arenyxa.qt_compat.QtWidgets import (
@@ -34,8 +34,27 @@ from arenyxa.domain.enums import CaptureSource
 from arenyxa.domain.models import NetworkEvent, RequestSpec, RetryPolicy, Workflow, WorkflowNode
 from arenyxa.infrastructure.atomic_io import atomic_write_json
 from arenyxa.presentation.background import run_background
+from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.widgets import PageHeader
+
+
+_TWidget = TypeVar("_TWidget", bound=QWidget)
+
+
+def _i18n_widget(widget: _TWidget, key: str) -> _TWidget:
+    widget.setProperty("i18n_key_text", key)
+    return widget
+
+
+def _i18n_label(key: str) -> QLabel:
+    return _i18n_widget(QLabel(source_text(key)), key)
+
+
+def _i18n_placeholder(widget: QLineEdit, key: str) -> QLineEdit:
+    widget.setPlaceholderText(source_text(key))
+    widget.setProperty("i18n_key_placeholder", key)
+    return widget
 
 
 class StudioIntelligenceMixin:
@@ -43,15 +62,15 @@ class StudioIntelligenceMixin:
         tab = QWidget(); layout = QVBoxLayout(tab)
         row = QHBoxLayout()
         self.smart_url = QLineEdit("https://example.com")
-        self.smart_url.setPlaceholderText("授权分析 URL")
+        self.smart_url.setPlaceholderText(source_text("studio_intelligence.common.authorized_url")); self.smart_url.setProperty("i18n_key_placeholder", "studio_intelligence.common.authorized_url")
         self.smart_session = QComboBox(); self.smart_session.setMinimumWidth(260)
-        self.smart_analyze = QPushButton("Analyze SmartPath 2.0"); self.smart_analyze.setProperty("primary", True)
-        self.smart_bridge = QPushButton("Top API → HTTP Builder")
-        self.smart_workflow = QPushButton("Top API → Workflow")
-        row.addWidget(QLabel("URL")); row.addWidget(self.smart_url, 1); row.addWidget(QLabel("Capture")); row.addWidget(self.smart_session); row.addWidget(self.smart_analyze); row.addWidget(self.smart_bridge); row.addWidget(self.smart_workflow)
+        self.smart_analyze = _i18n_widget(QPushButton(source_text("studio_intelligence.smartpath.analyze")), "studio_intelligence.smartpath.analyze"); self.smart_analyze.setProperty("primary", True)
+        self.smart_bridge = _i18n_widget(QPushButton(source_text("studio_intelligence.smartpath.to_http")), "studio_intelligence.smartpath.to_http")
+        self.smart_workflow = _i18n_widget(QPushButton(source_text("studio_intelligence.smartpath.to_workflow")), "studio_intelligence.smartpath.to_workflow")
+        row.addWidget(_i18n_label("studio_intelligence.common.url")); row.addWidget(self.smart_url, 1); row.addWidget(_i18n_label("studio_intelligence.common.capture")); row.addWidget(self.smart_session); row.addWidget(self.smart_analyze); row.addWidget(self.smart_bridge); row.addWidget(self.smart_workflow)
         self.smart_output = self._editor(True)
         layout.addLayout(row); layout.addWidget(self.smart_output, 1)
-        self.tabs.addTab(tab, "SmartPath & Data Sources")
+        self._add_i18n_tab(tab, "studio_intelligence.tab.smartpath")
         self.smart_analyze.clicked.connect(self.run_smartpath)
         self.smart_bridge.clicked.connect(self.bridge_top_api_to_http)
         self.smart_workflow.clicked.connect(self.bridge_top_api_to_workflow)
@@ -72,7 +91,7 @@ class StudioIntelligenceMixin:
             self._last_smartpath = payload
             self.context.nextgen.activity.publish("web-intelligence", f"Web Intelligence analyzed {url or 'capture'}", details={"engine": result.recommended_engine, "confidence": result.confidence})
             return self._last_smartpath
-        self._async(worker, self.smart_output, "Analyze SmartPath 2.0完成")
+        self._async(worker, self.smart_output, current_text("studio_intelligence.smartpath.completed"))
 
     def bridge_top_api_to_http(self) -> None:
         try:
@@ -89,7 +108,7 @@ class StudioIntelligenceMixin:
             if preferred is None:
                 preferred = next((event for event in events if event.url and ("/api/" in event.url or "graphql" in event.url.casefold())), None)
             if preferred is None:
-                raise ValueError("当前 Capture 中没有找到可转换的 API 请求。")
+                raise ValueError(current_text("studio_intelligence.smartpath.no_api"))
             candidate = self.context.nextgen.web_intelligence.classify_endpoint(preferred)
             spec = self.context.nextgen.context_bridge.event_to_request(preferred, include_sensitive=False)
             if candidate is not None:
@@ -100,9 +119,9 @@ class StudioIntelligenceMixin:
             self.http_query.setPlainText(json.dumps(spec.query, ensure_ascii=False, indent=2))
             self.http_cookies.setPlainText("{}")
             self.tabs.setCurrentIndex(3)
-            self.statusMessage.emit("已将捕获 API 安全转换到 HTTP Builder；敏感 query/header/cookie 不会复制原值。")
+            self.statusMessage.emit(current_text("studio_intelligence.smartpath.http_converted"))
         except Exception as exc:
-            QMessageBox.warning(self, "Context Bridge", str(exc))
+            QMessageBox.warning(self, current_text("studio_intelligence.context_bridge.title"), str(exc))
 
     def bridge_top_api_to_workflow(self) -> None:
         try:
@@ -110,28 +129,28 @@ class StudioIntelligenceMixin:
             candidates = self.context.nextgen.web_intelligence.replay_candidates(events)
             safe = next((item for item in candidates if item.safe_to_replay), None)
             if safe is None:
-                raise ValueError("当前 Capture 没有可自动转换的安全幂等 API；敏感或非幂等请求必须人工审查。")
+                raise ValueError(current_text("studio_intelligence.smartpath.no_safe_api"))
             preferred = next((event for event in events if event.id == safe.event_id), None)
             if preferred is None:
-                raise ValueError("Capture 候选已失效，请刷新捕获会话。")
+                raise ValueError(current_text("studio_intelligence.smartpath.candidate_stale"))
             workflow = self.context.nextgen.web_intelligence.event_to_workflow(preferred, require_safe=True)
             self.smart_output.setPlainText(json.dumps(asdict(workflow), ensure_ascii=False, indent=2, default=str))
-            self.statusMessage.emit("安全 API 已转换为 Workflow；敏感材料未复制，非幂等请求不会自动转换。")
+            self.statusMessage.emit(current_text("studio_intelligence.smartpath.workflow_converted"))
         except Exception as exc:
-            QMessageBox.warning(self, "Web Intelligence → Workflow", str(exc))
+            QMessageBox.warning(self, current_text("studio_intelligence.smartpath.workflow_title"), str(exc))
 
     def _build_blueprint_tab(self) -> None:
         tab = QWidget(); layout = QVBoxLayout(tab)
         row = QHBoxLayout()
         self.blueprint_url = QLineEdit("https://example.com")
-        self.blueprint_url.setPlaceholderText("授权分析 URL")
+        self.blueprint_url.setPlaceholderText(source_text("studio_intelligence.common.authorized_url")); self.blueprint_url.setProperty("i18n_key_placeholder", "studio_intelligence.common.authorized_url")
         self.blueprint_session = QComboBox(); self.blueprint_session.setMinimumWidth(260)
-        self.blueprint_run = QPushButton("Analyze → Explain → Blueprint"); self.blueprint_run.setProperty("primary", True)
-        self.blueprint_to_debugger = QPushButton("Workflow → Debugger")
-        row.addWidget(QLabel("URL")); row.addWidget(self.blueprint_url, 1); row.addWidget(QLabel("Capture")); row.addWidget(self.blueprint_session); row.addWidget(self.blueprint_run); row.addWidget(self.blueprint_to_debugger)
+        self.blueprint_run = _i18n_widget(QPushButton(source_text("studio_intelligence.blueprint.analyze")), "studio_intelligence.blueprint.analyze"); self.blueprint_run.setProperty("primary", True)
+        self.blueprint_to_debugger = _i18n_widget(QPushButton(source_text("studio_intelligence.blueprint.to_debugger")), "studio_intelligence.blueprint.to_debugger")
+        row.addWidget(_i18n_label("studio_intelligence.common.url")); row.addWidget(self.blueprint_url, 1); row.addWidget(_i18n_label("studio_intelligence.common.capture")); row.addWidget(self.blueprint_session); row.addWidget(self.blueprint_run); row.addWidget(self.blueprint_to_debugger)
         self.blueprint_output = self._editor(True)
-        layout.addLayout(row); layout.addWidget(QLabel("Explainable decision trace · engine cost/stability estimates · fallback chain · starter workflow")); layout.addWidget(self.blueprint_output, 1)
-        self.tabs.addTab(tab, "Explainable Blueprint")
+        layout.addLayout(row); layout.addWidget(_i18n_label("studio_intelligence.blueprint.hint")); layout.addWidget(self.blueprint_output, 1)
+        self._add_i18n_tab(tab, "studio_intelligence.tab.blueprint")
         self.blueprint_run.clicked.connect(self.run_blueprint)
         self.blueprint_to_debugger.clicked.connect(self.blueprint_workflow_to_debugger)
 
@@ -145,11 +164,11 @@ class StudioIntelligenceMixin:
             self._last_blueprint = payload
             self.context.nextgen.activity.publish("intelligence-blueprint", f"Blueprint analyzed {url or 'capture'}", details={"engine": blueprint.recommended_engine, "confidence": blueprint.confidence, "risks": len(blueprint.risk_flags)})
             return payload
-        self._async(worker, self.blueprint_output, "Explainable Blueprint 分析完成")
+        self._async(worker, self.blueprint_output, current_text("studio_intelligence.blueprint.completed"))
 
     def blueprint_workflow_to_debugger(self) -> None:
         if not self._last_blueprint:
-            QMessageBox.information(self, "Explainable Blueprint", "请先生成 Blueprint。")
+            QMessageBox.information(self, current_text("studio_intelligence.blueprint.title"), current_text("studio_intelligence.blueprint.generate_first"))
             return
         workflow = self._last_blueprint.get("workflow")
         if not isinstance(workflow, dict):
@@ -157,20 +176,20 @@ class StudioIntelligenceMixin:
         compact = {"name": workflow.get("name", "Blueprint Workflow"), "id": workflow.get("id", "blueprint"), "nodes": workflow.get("nodes", [])}
         self.debug_workflow.setPlainText(json.dumps(compact, ensure_ascii=False, indent=2))
         self.tabs.setCurrentWidget(self.tabs.widget(7))
-        self.statusMessage.emit("Blueprint Workflow 已发送到 Workflow Debugger。")
+        self.statusMessage.emit(current_text("studio_intelligence.blueprint.sent_to_debugger"))
 
     def _build_selector_tab(self) -> None:
         tab = QWidget(); layout = QVBoxLayout(tab)
         row = QHBoxLayout()
         self.selector_type = QComboBox(); self.selector_type.addItems(["css", "xpath"])
         self.selector_value = QLineEdit("title")
-        self.selector_analyze = QPushButton("Analyze / Generate Candidates")
-        self.selector_heal = QPushButton("Self-Heal")
+        self.selector_analyze = _i18n_widget(QPushButton(source_text("studio_intelligence.selector.analyze")), "studio_intelligence.selector.analyze")
+        self.selector_heal = _i18n_widget(QPushButton(source_text("studio_intelligence.selector.heal")), "studio_intelligence.selector.heal")
         row.addWidget(self.selector_type); row.addWidget(self.selector_value, 1); row.addWidget(self.selector_analyze); row.addWidget(self.selector_heal)
         self.selector_html = self._editor(False, "<html><head><title>Arenyxa</title></head><body><button data-testid='submit'>Run</button></body></html>")
         self.selector_output = self._editor(True)
-        layout.addLayout(row); layout.addWidget(QLabel("HTML / DOM Snapshot")); layout.addWidget(self.selector_html, 1); layout.addWidget(QLabel("Results")); layout.addWidget(self.selector_output, 1)
-        self.tabs.addTab(tab, "Selector Studio")
+        layout.addLayout(row); layout.addWidget(_i18n_label("studio_intelligence.selector.snapshot")); layout.addWidget(self.selector_html, 1); layout.addWidget(_i18n_label("studio_intelligence.common.results")); layout.addWidget(self.selector_output, 1)
+        self._add_i18n_tab(tab, "studio_intelligence.tab.selector")
         self.selector_analyze.clicked.connect(self.run_selector)
         self.selector_heal.clicked.connect(self.heal_selector)
 
@@ -181,28 +200,28 @@ class StudioIntelligenceMixin:
             self.selector_output.setPlainText(json.dumps(result, ensure_ascii=False, indent=2))
             self.context.nextgen.activity.publish("selector", "Selector analyzed", details={"matches": result.get("matches", 0)})
         except Exception as exc:
-            QMessageBox.warning(self, "Selector Studio", str(exc))
+            QMessageBox.warning(self, current_text("studio_intelligence.selector.title"), str(exc))
 
     def heal_selector(self) -> None:
         if not self._last_selector_fingerprint:
-            QMessageBox.information(self, "Selector Studio", "请先在旧 DOM 上执行一次分析以保存元素指纹。")
+            QMessageBox.information(self, current_text("studio_intelligence.selector.title"), current_text("studio_intelligence.selector.analyze_first"))
             return
         try:
             result = [asdict(item) for item in self.context.nextgen.selector.heal(self.selector_html.toPlainText(), SelectorFingerprint(**self._last_selector_fingerprint))]
             self.selector_output.setPlainText(json.dumps(result, ensure_ascii=False, indent=2))
             self.context.nextgen.activity.publish("selector-heal", "Selector self-heal completed", details={"candidates": len(result)})
         except Exception as exc:
-            QMessageBox.warning(self, "Selector Self-Heal", str(exc))
+            QMessageBox.warning(self, current_text("studio_intelligence.selector.heal_title"), str(exc))
 
     def _build_http_tab(self) -> None:
         tab = QWidget(); layout = QVBoxLayout(tab)
         row = QHBoxLayout()
         self.http_method = QComboBox(); self.http_method.addItems(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
         self.http_url = QLineEdit("https://example.com")
-        self.http_send = QPushButton("Send + Assertions"); self.http_send.setProperty("primary", True)
+        self.http_send = _i18n_widget(QPushButton(source_text("studio_intelligence.http.send")), "studio_intelligence.http.send"); self.http_send.setProperty("primary", True)
         self.http_target = QComboBox(); self.http_target.addItems(["curl", "python", "httpx", "fetch", "axios", "powershell", "playwright"])
-        self.http_generate = QPushButton("Generate Code")
-        self.http_workflow = QPushButton("Request → Workflow")
+        self.http_generate = _i18n_widget(QPushButton(source_text("studio_intelligence.http.generate_code")), "studio_intelligence.http.generate_code")
+        self.http_workflow = _i18n_widget(QPushButton(source_text("studio_intelligence.http.to_workflow")), "studio_intelligence.http.to_workflow")
         row.addWidget(self.http_method); row.addWidget(self.http_url, 1); row.addWidget(self.http_send); row.addWidget(self.http_target); row.addWidget(self.http_generate); row.addWidget(self.http_workflow)
 
         details = QTabWidget()
@@ -214,11 +233,21 @@ class StudioIntelligenceMixin:
         self.http_variables = self._editor(False, '{\n  "base_url": "https://example.com"\n}')
         self.http_actions = self._editor(False, '[\n  {"action":"set_header","name":"X-Arenyxa-Test","value":"1"}\n]')
         self.http_assertions = self._editor(False, '[\n  {"kind":"status_between","expected":[200,399]}\n]')
-        for label, editor in (("Headers", self.http_headers), ("Query", self.http_query), ("Cookies", self.http_cookies), ("Body", self.http_body), ("Options", self.http_options), ("Variables", self.http_variables), ("Pre-request Actions", self.http_actions), ("Assertions", self.http_assertions)):
-            page = QWidget(); page_layout_ = QVBoxLayout(page); page_layout_.addWidget(editor); details.addTab(page, label)
+        for index, (key, editor) in enumerate((
+            ("studio_intelligence.http.headers", self.http_headers),
+            ("studio_intelligence.http.query", self.http_query),
+            ("studio_intelligence.http.cookies", self.http_cookies),
+            ("studio_intelligence.http.body", self.http_body),
+            ("studio_intelligence.http.options", self.http_options),
+            ("studio_intelligence.http.variables", self.http_variables),
+            ("studio_intelligence.http.pre_request", self.http_actions),
+            ("studio_intelligence.http.assertions", self.http_assertions),
+        )):
+            page = QWidget(); page_layout_ = QVBoxLayout(page); page_layout_.addWidget(editor)
+            details.addTab(page, source_text(key)); details.setProperty(f"i18n_tab_key_{index}", key)
         self.http_output = self._editor(True)
         layout.addLayout(row); layout.addWidget(details, 1); layout.addWidget(self.http_output, 1)
-        self.tabs.addTab(tab, "HTTP Request Builder")
+        self._add_i18n_tab(tab, "studio_intelligence.tab.http")
         self.http_send.clicked.connect(self.send_http)
         self.http_generate.clicked.connect(self.generate_http_code)
         self.http_workflow.clicked.connect(self.http_to_workflow)
@@ -245,19 +274,19 @@ class StudioIntelligenceMixin:
         try:
             spec = self._request_spec(); assertions = [RequestAssertion(**item) for item in self._json(self.http_assertions, [])]
         except Exception as exc:
-            QMessageBox.warning(self, "HTTP Request Builder", str(exc)); return
+            QMessageBox.warning(self, current_text("studio_intelligence.http.title"), str(exc)); return
         def worker():
             checked = self.context.nextgen.request.send_with_assertions(spec, assertions)
             response = checked["response"]; self._last_response = response
             self.context.nextgen.activity.publish("http", f"{spec.method} {spec.url}", level="info" if checked["passed"] else "warning", details={"status": response.status, "elapsed_ms": response.elapsed_ms, "assertions_passed": checked["passed"]})
             return {"status": response.status, "final_url": response.final_url, "elapsed_ms": round(response.elapsed_ms, 2), "headers": response.headers, "assertions": checked["assertions"], "assertions_passed": checked["passed"], "body_preview": response.body.decode(response.encoding, errors="replace")[:100_000]}
-        self._async(worker, self.http_output, "HTTP 请求完成")
+        self._async(worker, self.http_output, current_text("studio_intelligence.http.completed"))
 
     def generate_http_code(self) -> None:
         try:
             self.http_output.setPlainText(self.context.nextgen.request.generator.generate(self._request_spec(), self.http_target.currentText()))
         except Exception as exc:
-            QMessageBox.warning(self, "Code Generator", str(exc))
+            QMessageBox.warning(self, current_text("studio_intelligence.http.code_generator_title"), str(exc))
 
     def http_to_workflow(self) -> None:
         try:
@@ -266,17 +295,17 @@ class StudioIntelligenceMixin:
             self.portable_output.setPlainText(document)
             self.tabs.setCurrentIndex(14)
             self.context.nextgen.activity.publish("context-bridge", "HTTP Request converted to portable Workflow", details={"schema":"arenyxa.workflow/v1"})
-            self.statusMessage.emit("HTTP Request 已转换为可审阅 Portable Workflow。")
+            self.statusMessage.emit(current_text("studio_intelligence.http.workflow_converted"))
         except Exception as exc:
-            QMessageBox.warning(self, "Context Bridge", str(exc))
+            QMessageBox.warning(self, current_text("studio_intelligence.context_bridge.title"), str(exc))
 
     def _build_protocol_tab(self) -> None:
         tab = QWidget(); layout = QVBoxLayout(tab)
-        row = QHBoxLayout(); self.protocol_session = QComboBox(); self.protocol_analyze = QPushButton("Analyze GraphQL / WebSocket / SSE")
+        row = QHBoxLayout(); self.protocol_session = QComboBox(); self.protocol_analyze = _i18n_widget(QPushButton(source_text("studio_intelligence.protocol.analyze")), "studio_intelligence.protocol.analyze")
         row.addWidget(self.protocol_session, 1); row.addWidget(self.protocol_analyze)
         self.protocol_output = self._editor(True)
         layout.addLayout(row); layout.addWidget(self.protocol_output, 1)
-        self.tabs.addTab(tab, "Protocol Inspector")
+        self._add_i18n_tab(tab, "studio_intelligence.tab.protocol")
         self.protocol_analyze.clicked.connect(self.run_protocols)
 
     def run_protocols(self) -> None:
@@ -284,28 +313,28 @@ class StudioIntelligenceMixin:
         def worker():
             events = self._capture_events(session)
             return {"graphql": self.context.nextgen.protocols.graphql(events), "websocket": self.context.nextgen.protocols.websocket(events), "sse": self.context.nextgen.protocols.sse(events)}
-        self._async(worker, self.protocol_output, "协议分析完成")
+        self._async(worker, self.protocol_output, current_text("studio_intelligence.protocol.completed"))
 
     def _build_quality_tab(self) -> None:
         tab = QWidget(); layout = QVBoxLayout(tab)
         self.quality_input = self._editor(False, '[\n  {"name":"A","price":10},\n  {"name":"B","price":12},\n  {"name":"B","price":12}\n]')
-        row=QHBoxLayout(); button = QPushButton("Analyze Quality & Schema"); self.quality_clean=QPushButton("Clean / Deduplicate")
-        self.quality_rules=QLineEdit('{"defaults":{},"type_coercions":{},"trim_strings":true,"deduplicate":true}'); self.quality_rules.setPlaceholderText("Cleaning rules JSON")
+        row=QHBoxLayout(); button = _i18n_widget(QPushButton(source_text("studio_intelligence.quality.analyze")), "studio_intelligence.quality.analyze"); self.quality_clean=_i18n_widget(QPushButton(source_text("studio_intelligence.quality.clean")), "studio_intelligence.quality.clean")
+        self.quality_rules=QLineEdit('{"defaults":{},"type_coercions":{},"trim_strings":true,"deduplicate":true}'); self.quality_rules.setPlaceholderText(source_text("studio_intelligence.quality.rules_placeholder")); self.quality_rules.setProperty("i18n_key_placeholder", "studio_intelligence.quality.rules_placeholder")
         row.addWidget(button); row.addWidget(self.quality_clean); row.addWidget(self.quality_rules,1)
         self.quality_output = self._editor(True)
         layout.addWidget(self.quality_input, 1); layout.addLayout(row); layout.addWidget(self.quality_output, 1)
-        self.tabs.addTab(tab, "Data Quality Studio")
+        self._add_i18n_tab(tab, "studio_intelligence.tab.quality")
         button.clicked.connect(self.run_quality); self.quality_clean.clicked.connect(self.clean_quality)
 
     def run_quality(self) -> None:
         try:
             records = self._json(self.quality_input, [])
-            if not isinstance(records, list) or any(not isinstance(item, dict) for item in records): raise ValueError("输入必须是 JSON object 数组。")
+            if not isinstance(records, list) or any(not isinstance(item, dict) for item in records): raise ValueError(current_text("studio_intelligence.quality.array_required"))
             result = self.context.nextgen.quality.analyze(records)
             self.quality_output.setPlainText(json.dumps(result, ensure_ascii=False, indent=2))
             self.context.nextgen.activity.publish("quality", "Data quality analyzed", details={"records": len(records), "score": result["quality_score"]})
         except Exception as exc:
-            QMessageBox.warning(self, "Data Quality Studio", str(exc))
+            QMessageBox.warning(self, current_text("studio_intelligence.quality.title"), str(exc))
 
     def clean_quality(self) -> None:
         try:
@@ -313,20 +342,20 @@ class StudioIntelligenceMixin:
             result=self.context.nextgen.quality.clean(records,deduplicate=bool(rules.get("deduplicate",True)),defaults=rules.get("defaults",{}),type_coercions=rules.get("type_coercions",{}),trim_strings=bool(rules.get("trim_strings",True)))
             self.quality_input.setPlainText(json.dumps(result["records"],ensure_ascii=False,indent=2)); self.quality_output.setPlainText(json.dumps({k:v for k,v in result.items() if k!="records"},ensure_ascii=False,indent=2))
             self.context.nextgen.activity.publish("quality-clean","Data cleaned",details={"input":result["input_count"],"output":result["output_count"],"changes":result["changes"]})
-        except Exception as exc: QMessageBox.warning(self,"Data Quality Studio",str(exc))
+        except Exception as exc: QMessageBox.warning(self,current_text("studio_intelligence.quality.title"),str(exc))
 
     def _build_recorder_tab(self) -> None:
         tab = QWidget(); layout = QVBoxLayout(tab)
         self.recorder_input = self._editor(False, '[\n  {"kind":"goto","url":"https://example.com"},\n  {"kind":"click","selector":"button[data-testid=submit]"}\n]')
-        row = QHBoxLayout(); self.recorder_lang = QComboBox(); self.recorder_lang.addItems(["python", "javascript"]); self.recorder_generate = QPushButton("Generate Workflow + Playwright")
-        self.recorder_run = QPushButton("Run Headless")
+        row = QHBoxLayout(); self.recorder_lang = QComboBox(); self.recorder_lang.addItems(["python", "javascript"]); self.recorder_generate = _i18n_widget(QPushButton(source_text("studio_intelligence.recorder.generate")), "studio_intelligence.recorder.generate")
+        self.recorder_run = _i18n_widget(QPushButton(source_text("studio_intelligence.recorder.run_headless")), "studio_intelligence.recorder.run_headless")
         self.recorder_live_url = QLineEdit("https://example.com"); self.recorder_live_url.setMinimumWidth(220)
         self.recorder_live_seconds = QSpinBox(); self.recorder_live_seconds.setRange(5, 900); self.recorder_live_seconds.setValue(30); self.recorder_live_seconds.setSuffix(" s")
-        self.recorder_live = QPushButton("Record Live Browser")
+        self.recorder_live = _i18n_widget(QPushButton(source_text("studio_intelligence.recorder.record_live")), "studio_intelligence.recorder.record_live")
         row.addWidget(self.recorder_lang); row.addWidget(self.recorder_generate); row.addWidget(self.recorder_run); row.addWidget(self.recorder_live_url); row.addWidget(self.recorder_live_seconds); row.addWidget(self.recorder_live); row.addStretch()
         self.recorder_output = self._editor(True)
-        layout.addWidget(QLabel("Recorder events JSON")); layout.addWidget(self.recorder_input, 1); layout.addLayout(row); layout.addWidget(self.recorder_output, 1)
-        self.tabs.addTab(tab, "Browser Recorder 2.0")
+        layout.addWidget(_i18n_label("studio_intelligence.recorder.events_json")); layout.addWidget(self.recorder_input, 1); layout.addLayout(row); layout.addWidget(self.recorder_output, 1)
+        self._add_i18n_tab(tab, "studio_intelligence.tab.recorder")
         self.recorder_generate.clicked.connect(self.run_recorder)
         self.recorder_run.clicked.connect(self.execute_recording)
         self.recorder_live.clicked.connect(self.record_live_browser)
@@ -339,32 +368,32 @@ class StudioIntelligenceMixin:
             self.recorder_output.setPlainText(json.dumps({"workflow": asdict(workflow), "playwright": code}, ensure_ascii=False, indent=2))
             self.context.nextgen.activity.publish("recorder", "Browser recording converted", details={"actions": len(actions)})
         except Exception as exc:
-            QMessageBox.warning(self, "Browser Recorder", str(exc))
+            QMessageBox.warning(self, current_text("studio_intelligence.recorder.title"), str(exc))
 
     def execute_recording(self) -> None:
         try:
             actions = [BrowserAction(**item) for item in self._json(self.recorder_input, [])]
         except Exception as exc:
-            QMessageBox.warning(self, "Browser Recorder", str(exc)); return
+            QMessageBox.warning(self, current_text("studio_intelligence.recorder.title"), str(exc)); return
         def worker():
             events = self.context.nextgen.recorder.execute_playwright(actions, headless=True)
             self.context.nextgen.activity.publish("recorder-run", "Browser recording executed", details={"actions": len(actions)})
             return events
-        self._async(worker, self.recorder_output, "Browser Recorder 执行完成")
+        self._async(worker, self.recorder_output, current_text("studio_intelligence.recorder.executed"))
 
     def record_live_browser(self) -> None:
         url = self.recorder_live_url.text().strip(); seconds = self.recorder_live_seconds.value()
-        self.recorder_output.setPlainText("Starting interactive Chromium recorder… Password values are never captured.")
+        self.recorder_output.setPlainText(current_text("studio_intelligence.recorder.starting_live"))
         def worker():
             actions = self.context.nextgen.recorder.record_live(url, duration_seconds=seconds, headless=False)
             self.context.nextgen.activity.publish("recorder-live", "Interactive browser recording completed", details={"actions": len(actions), "duration_seconds": seconds})
             return [asdict(item) for item in actions]
         def completed(value: object) -> None:
             self.recorder_input.setPlainText(json.dumps(value, ensure_ascii=False, indent=2, default=str))
-            self.recorder_output.setPlainText(f"Recorded {len(value) if isinstance(value, list) else 0} actions. You can now generate Workflow / Playwright code.")
-            self.statusMessage.emit("Browser Recorder 实时录制完成")
+            self.recorder_output.setPlainText(current_text("studio_intelligence.recorder.recorded").format(count=len(value) if isinstance(value, list) else 0))
+            self.statusMessage.emit(current_text("studio_intelligence.recorder.live_completed"))
         def failed(message: str) -> None:
-            self.recorder_output.setPlainText(message); self.statusMessage.emit("实时录制失败")
+            self.recorder_output.setPlainText(message); self.statusMessage.emit(current_text("studio_intelligence.recorder.live_failed"))
         run_background(worker, completed, failed)
 
     def _build_debugger_tab(self) -> None:
@@ -373,11 +402,11 @@ class StudioIntelligenceMixin:
         self.debug_workflow = self._editor(False, json.dumps(default_workflow, ensure_ascii=False, indent=2))
         self.debug_inputs = self._editor(False, '[{"title":"Arenyxa"},{"title":""}]')
         self.debug_scopes = self._editor(False, '{"project":{"base_url":"https://example.com"},"workflow":{"page":1},"run":{"timestamp":"preview"}}')
-        row = QHBoxLayout(); self.debug_breakpoints = QLineEdit("validate"); self.debug_prepare = QPushButton("Prepare"); self.debug_step = QPushButton("Step"); self.debug_continue = QPushButton("Continue"); self.debug_resolve = QPushButton("Resolve Variables")
-        row.addWidget(QLabel("Breakpoints")); row.addWidget(self.debug_breakpoints, 1); row.addWidget(self.debug_prepare); row.addWidget(self.debug_step); row.addWidget(self.debug_continue); row.addWidget(self.debug_resolve)
+        row = QHBoxLayout(); self.debug_breakpoints = QLineEdit("validate"); self.debug_prepare = _i18n_widget(QPushButton(source_text("studio_intelligence.debugger.prepare")), "studio_intelligence.debugger.prepare"); self.debug_step = _i18n_widget(QPushButton(source_text("studio_intelligence.debugger.step")), "studio_intelligence.debugger.step"); self.debug_continue = _i18n_widget(QPushButton(source_text("studio_intelligence.debugger.continue")), "studio_intelligence.debugger.continue"); self.debug_resolve = _i18n_widget(QPushButton(source_text("studio_intelligence.debugger.resolve")), "studio_intelligence.debugger.resolve")
+        row.addWidget(_i18n_label("studio_intelligence.debugger.breakpoints")); row.addWidget(self.debug_breakpoints, 1); row.addWidget(self.debug_prepare); row.addWidget(self.debug_step); row.addWidget(self.debug_continue); row.addWidget(self.debug_resolve)
         self.debug_output = self._editor(True)
-        layout.addWidget(self.debug_workflow, 1); layout.addWidget(QLabel("Inputs")); layout.addWidget(self.debug_inputs); layout.addWidget(QLabel("Variable scopes (secret.* resolves via Secrets Vault)")); layout.addWidget(self.debug_scopes); layout.addLayout(row); layout.addWidget(self.debug_output, 1)
-        self.tabs.addTab(tab, "Workflow Debugger")
+        layout.addWidget(self.debug_workflow, 1); layout.addWidget(_i18n_label("studio_intelligence.debugger.inputs")); layout.addWidget(self.debug_inputs); layout.addWidget(_i18n_label("studio_intelligence.debugger.scopes")); layout.addWidget(self.debug_scopes); layout.addLayout(row); layout.addWidget(self.debug_output, 1)
+        self._add_i18n_tab(tab, "studio_intelligence.tab.debugger")
         self.debug_prepare.clicked.connect(self.prepare_debugger); self.debug_step.clicked.connect(self.step_debugger); self.debug_continue.clicked.connect(self.continue_debugger); self.debug_resolve.clicked.connect(self.resolve_debug_variables)
 
     def _workflow_from_json(self) -> Workflow:
@@ -390,7 +419,7 @@ class StudioIntelligenceMixin:
         try:
             snapshot = self._debugger.prepare(self._workflow_from_json(), self._json(self.debug_inputs, []), [item.strip() for item in self.debug_breakpoints.text().split(",") if item.strip()])
             self.debug_output.setPlainText(json.dumps(asdict(snapshot), ensure_ascii=False, indent=2))
-        except Exception as exc: QMessageBox.warning(self, "Workflow Debugger", str(exc))
+        except Exception as exc: QMessageBox.warning(self, current_text("studio_intelligence.debugger.title"), str(exc))
 
     def resolve_debug_variables(self) -> None:
         try:
@@ -398,12 +427,12 @@ class StudioIntelligenceMixin:
             scopes=self._json(self.debug_scopes,{})
             resolved=self.context.nextgen.variables.resolve(raw,scopes,self.context.nextgen.vault.get)
             self.debug_output.setPlainText(json.dumps(resolved,ensure_ascii=False,indent=2))
-        except Exception as exc: QMessageBox.warning(self,"Workflow Variables",str(exc))
+        except Exception as exc: QMessageBox.warning(self,current_text("studio_intelligence.debugger.variables_title"),str(exc))
 
     def step_debugger(self) -> None:
         try: self.debug_output.setPlainText(json.dumps(asdict(self._debugger.step(ignore_breakpoint=True)), ensure_ascii=False, indent=2))
-        except Exception as exc: QMessageBox.warning(self, "Workflow Debugger", str(exc))
+        except Exception as exc: QMessageBox.warning(self, current_text("studio_intelligence.debugger.title"), str(exc))
 
     def continue_debugger(self) -> None:
         try: self.debug_output.setPlainText(json.dumps(asdict(self._debugger.continue_run()), ensure_ascii=False, indent=2))
-        except Exception as exc: QMessageBox.warning(self, "Workflow Debugger", str(exc))
+        except Exception as exc: QMessageBox.warning(self, current_text("studio_intelligence.debugger.title"), str(exc))
