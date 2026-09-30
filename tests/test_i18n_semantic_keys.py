@@ -35,11 +35,13 @@ MIGRATED_UI_FILES = (
     ROOT / "src/arenyxa/presentation/pages/task_center.py",
     ROOT / "src/arenyxa/presentation/pages/tasks.py",
     ROOT / "src/arenyxa/presentation/pages/data.py",
+    ROOT / "src/arenyxa/presentation/pages/studio_intelligence.py",
+    ROOT / "src/arenyxa/presentation/pages/visualization.py",
 )
 CATALOG_LOCALES = ("en_US", "zh_CN", "fr_FR", "de_DE", "ja_JP")
 CJK = re.compile(r"[\u3400-\u9fff]")
 KEY = re.compile(
-    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|dashboard|task_center|tasks|data|search|version)\.[A-Za-z0-9_.]+)(?:"|\')'
+    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|dashboard|task_center|tasks|data|search|version|intelligence|visualization)\.[A-Za-z0-9_.]+)(?:"|\')'
 )
 
 
@@ -49,6 +51,7 @@ def _referenced_keys() -> set[str]:
         text = path.read_text(encoding="utf-8")
         keys.update(KEY.findall(text))
     keys.discard("settings.json")
+    keys.discard("visualization.png")
     for profile in EXPERIENCE_PROFILES:
         keys.add(f"welcome.profile.{profile.id}.title")
         keys.add(f"welcome.profile.{profile.id}.summary")
@@ -127,6 +130,21 @@ def test_task_and_run_status_display_keys_cover_enum_values() -> None:
     required = _referenced_keys()
     assert {f"tasks.status.{status.value}" for status in TaskStatus} <= required
     assert {f"tasks.run_status.{status.value}" for status in RunStatus} <= required
+
+
+def test_visualization_chart_labels_preserve_machine_values() -> None:
+    source = (ROOT / "src/arenyxa/presentation/pages/visualization.py").read_text(
+        encoding="utf-8"
+    )
+    for key, value in (
+        ("visualization.chart.line", "Line"),
+        ("visualization.chart.bar", "Bar"),
+        ("visualization.chart.pie", "Pie"),
+        ("visualization.chart.heatmap", "Heatmap"),
+        ("visualization.chart.timeline", "Timeline"),
+        ("visualization.chart.map", "Map"),
+    ):
+        assert f'("{key}", "{value}")' in source
 
 
 def test_semantic_catalog_helpers_follow_active_locale(qapp) -> None:
