@@ -41,11 +41,13 @@ MIGRATED_UI_FILES = (
     ROOT / "src/arenyxa/presentation/pages/tools_console.py",
     ROOT / "src/arenyxa/presentation/pages/tools_platform.py",
     ROOT / "src/arenyxa/presentation/pages/tools_automation.py",
+    ROOT / "src/arenyxa/presentation/pages/tools_terminal_execution.py",
+    ROOT / "src/arenyxa/presentation/pages/tools_terminal_workspace.py",
 )
 CATALOG_LOCALES = ("en_US", "zh_CN", "fr_FR", "de_DE", "ja_JP")
 CJK = re.compile(r"[\u3400-\u9fff]")
 KEY = re.compile(
-    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|studio_intelligence|dashboard|task_center|tasks|data|search|version|visualization|tools_console|tools_logs|tools_platform|tools_plugins|tools_automation|tools_workflow)\.[A-Za-z0-9_.]+)(?:"|\')'
+    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|studio_intelligence|dashboard|task_center|tasks|data|search|version|visualization|tools_console|tools_logs|tools_platform|tools_plugins|tools_automation|tools_workflow|terminal)\.[A-Za-z0-9_.]+)(?:"|\')'
 )
 
 
@@ -176,6 +178,41 @@ def test_workflow_edge_display_keys_preserve_machine_values() -> None:
     )
     assert '("tools_workflow.edge.normal", "normal")' in source
     assert '("tools_workflow.edge.failure", "failure")' in source
+
+
+def test_terminal_runtime_keeps_command_machine_syntax_stable() -> None:
+    execution = (ROOT / "src/arenyxa/presentation/pages/tools_terminal_execution.py").read_text(
+        encoding="utf-8"
+    )
+    workspace = (ROOT / "src/arenyxa/presentation/pages/tools_terminal_workspace.py").read_text(
+        encoding="utf-8"
+    )
+    for token in (
+        "quick",
+        "standard",
+        "extreme",
+        "transient",
+        "recoverable",
+        "configuration",
+        "permission",
+        "corruption",
+        "fatal",
+        "all",
+    ):
+        assert token in execution
+    for token in (
+        "sql",
+        "setenv",
+        "unsetenv",
+        "which",
+        "timeout",
+        "events",
+        "test-all",
+        "stress-test",
+        "fault-injection",
+        "stdin-secret",
+    ):
+        assert token in workspace
 
 
 def test_task_center_workflow_catalogs_cover_router_workflows() -> None:
