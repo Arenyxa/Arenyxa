@@ -134,7 +134,11 @@ class MainWindowLifecycleMixin:
         self.open_data_button.setText(self.language.text("top.open_data"))
         self.capture_button.setText(self.language.text("top.capture"))
         self.status_text.setText(self.language.text("status.ready"))
-        self.inspector_title.setText(self.language.text("inspector.title"))
+        if not bool(getattr(self, "_inspector_context_active", False)):
+            self.inspector_title.setText(self.language.text("shell.inspector.title"))
+            self.inspector_content.setPlainText(self.language.text("shell.inspector.empty"))
+        if not self.live_progress.isVisible():
+            self.live_progress.setFormat(self.language.text("shell.progress.idle"))
         self._update_inspector_button()
         settings_page = self.pages.get("settings")
         if isinstance(settings_page, SettingsPage):
@@ -167,10 +171,10 @@ class MainWindowLifecycleMixin:
     def open_project(self, project_path: Path) -> None:
         try:
             manifest = self.context.projects.validate(project_path)
-            self.show_status(f"项目已验证：{manifest.name} {manifest.version}")
+            self.show_status(self.language.text("shell.project.verified").format(name=manifest.name, version=manifest.version))
             self.update_inspector(".arenyxa Project", manifest)
         except Exception as exc:                                                                     
-            QMessageBox.critical(self, "项目无法打开", str(exc))
+            QMessageBox.critical(self, self.language.text("shell.project.open_failed_title"), str(exc))
 
     def restore_window_state(self) -> None:
         settings = QSettings(str(self.context.paths.root / "window.ini"), QSettings.Format.IniFormat)
@@ -208,8 +212,8 @@ class MainWindowLifecycleMixin:
         if active and not self._repair_exit_requested:
             choice = QMessageBox.question(
                 self,
-                "安全关闭",
-                f"仍有 {len(active)} 个后台任务。停止任务并退出？",
+                self.language.text("shell.close.title"),
+                self.language.text("shell.close.active_tasks").format(count=len(active)),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             )
             if choice != QMessageBox.StandardButton.Yes:
