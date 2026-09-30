@@ -785,6 +785,6 @@ class ConsoleCommandMixin:
             self.output.appendPlainText(current_text("terminal.validation.terms_required"))
             return False
         if self._developer_test_running:
-            self.output.appendPlainText("已有开发者验证任务正在运行，请等待完成后再启动新的测试。")
+            self.output.appendPlainText(current_text("terminal.validation.already_running"))
             return False
         return True
