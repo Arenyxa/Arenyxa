@@ -49,8 +49,6 @@ class ChartCanvas(QWidget):
         painter.fillRect(self.rect(), QColor(tokens.surface))
         painter.setPen(QColor(tokens.text))
         if not self.records or not self.x_field:
-            app = QApplication.instance()
-            locale = str(app.property("arenyxa_locale") or "zh_CN") if app is not None else "zh_CN"
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, current_text("visualization.canvas.empty"))
             return
         bounds = QRectF(self.rect()).adjusted(64, 38, -34, -56)
@@ -66,7 +64,7 @@ class ChartCanvas(QWidget):
     def _grouped(self) -> list[tuple[str, float]]:
         grouped: dict[str, float] = collections.defaultdict(float)
         for record in self.records:
-            key = str(record.get(self.x_field, "(empty)"))
+            key = str(record.get(self.x_field, current_text("visualization.common.empty")))
             raw = record.get(self.y_field, 1) if self.y_field else 1
             try:
                 grouped[key] += float(raw)
