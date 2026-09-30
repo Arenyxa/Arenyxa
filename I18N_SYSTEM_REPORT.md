@@ -34,6 +34,7 @@ The following high-visibility surfaces no longer embed Chinese user-facing copy 
 - Studio Intelligence / SmartPath / Blueprint / Selector / HTTP / Protocol / Quality / Recorder / Debugger
 - Data Visualization Studio / chart assets / PNG export
 - Terminal & Packet Console / Logs / mode selection
+- Terminal Execution / developer validation / external commands / Persistent Shell builtins
 - Advanced Platform / Plugins / analysis tabs / database adapter
 - Automation Center / Flow Designer / Visual Graph / Execution Inspector
 
@@ -49,4 +50,4 @@ Their user-facing copy is now sourced from semantic catalog keys under stable pa
 
 ## Remaining migration work
 
-The public release is v0.1; the preserved internal engineering baseline is v8.2.0. Legacy business pages still contain compatibility phrase mappings and hard-coded UI text that are translated through the existing `translate_tree` compatibility path. The next migration targets are the remaining terminal execution/workspace surfaces and any residual operational pages not already catalog-backed. Migration should continue incrementally by page and should not internationalize machine identifiers, database keys, protocol/event codes, permission identifiers, or persisted enum values.
+The public release is v0.1; the preserved internal engineering baseline is v8.2.0. Legacy business pages still contain compatibility phrase mappings and hard-coded UI text that are translated through the existing `translate_tree` compatibility path. The next migration targets are residual operational pages not already catalog-backed. Migration should continue incrementally by page and should not internationalize machine identifiers, database keys, protocol/event codes, permission identifiers, or persisted enum values.
