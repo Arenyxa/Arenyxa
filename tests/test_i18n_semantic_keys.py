@@ -41,11 +41,24 @@ MIGRATED_UI_FILES = (
     ROOT / "src/arenyxa/presentation/pages/tools_console.py",
     ROOT / "src/arenyxa/presentation/pages/tools_platform.py",
     ROOT / "src/arenyxa/presentation/pages/tools_automation.py",
+    ROOT / "src/arenyxa/presentation/pages/enterprise.py",
+    ROOT / "src/arenyxa/presentation/pages/enterprise_identity_actions.py",
+    ROOT / "src/arenyxa/presentation/pages/enterprise_distributed_actions.py",
 )
 CATALOG_LOCALES = ("en_US", "zh_CN", "fr_FR", "de_DE", "ja_JP")
 CJK = re.compile(r"[\u3400-\u9fff]")
+ENTERPRISE_MACHINE_IDENTIFIERS = {
+    "enterprise.account.manage",
+    "enterprise.audit.read",
+    "enterprise.coordinator.manage",
+    "enterprise.device.manage",
+    "enterprise.enrollment.manage",
+    "enterprise.remote_ops",
+    "enterprise.vault.manage",
+    "enterprise.workspace.manage",
+}
 KEY = re.compile(
-    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|studio_intelligence|dashboard|task_center|tasks|data|search|version|visualization|tools_console|tools_logs|tools_platform|tools_plugins|tools_automation|tools_workflow)\.[A-Za-z0-9_.]+)(?:"|\')'
+    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|studio_intelligence|dashboard|task_center|tasks|data|search|version|visualization|tools_console|tools_logs|tools_platform|tools_plugins|tools_automation|tools_workflow|enterprise)\.[A-Za-z0-9_.]+)(?:"|\')'
 )
 
 
@@ -56,6 +69,7 @@ def _referenced_keys() -> set[str]:
         keys.update(KEY.findall(text))
     keys.discard("settings.json")
     keys.discard("visualization.png")
+    keys.difference_update(ENTERPRISE_MACHINE_IDENTIFIERS)
     for profile in EXPERIENCE_PROFILES:
         keys.add(f"welcome.profile.{profile.id}.title")
         keys.add(f"welcome.profile.{profile.id}.summary")
@@ -176,6 +190,21 @@ def test_workflow_edge_display_keys_preserve_machine_values() -> None:
     )
     assert '("tools_workflow.edge.normal", "normal")' in source
     assert '("tools_workflow.edge.failure", "failure")' in source
+
+
+def test_enterprise_resource_kind_display_does_not_replace_machine_value() -> None:
+    source = (ROOT / "src/arenyxa/presentation/pages/enterprise_distributed_actions.py").read_text(
+        encoding="utf-8"
+    )
+    for key, value in (
+        ("enterprise.resource_kind.workflow", "workflow"),
+        ("enterprise.resource_kind.dataset", "dataset"),
+        ("enterprise.resource_kind.capture", "capture"),
+        ("enterprise.resource_kind.schedule", "schedule"),
+        ("enterprise.resource_kind.worker", "worker"),
+        ("enterprise.resource_kind.project", "project"),
+    ):
+        assert f'("{key}", "{value}")' in source
 
 
 def test_task_center_workflow_catalogs_cover_router_workflows() -> None:
