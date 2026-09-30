@@ -207,6 +207,21 @@ def test_enterprise_resource_kind_display_does_not_replace_machine_value() -> No
         assert f'("{key}", "{value}")' in source
 
 
+def test_shell_inspector_localization_does_not_overwrite_dynamic_context() -> None:
+    main_source = (ROOT / "src/arenyxa/presentation/main_window.py").read_text(encoding="utf-8")
+    nav_source = (ROOT / "src/arenyxa/presentation/main_window_navigation.py").read_text(
+        encoding="utf-8"
+    )
+    lifecycle_source = (ROOT / "src/arenyxa/presentation/main_window_lifecycle.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'setProperty("shellInspectorEmpty", True)' in main_source
+    assert 'setProperty("i18n_key_text", None)' in nav_source
+    assert 'setProperty("shellInspectorEmpty", False)' in nav_source
+    assert 'property("shellInspectorEmpty")' in lifecycle_source
+    assert 'current_text("shell.inspector.empty")' in lifecycle_source
+
+
 def test_task_center_workflow_catalogs_cover_router_workflows() -> None:
     required = _referenced_keys()
     for workflow in GeneralUserIntentRouter().workflows():
