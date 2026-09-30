@@ -57,7 +57,6 @@ from arenyxa.infrastructure.http_client import HttpFetcher
 from arenyxa.presentation.background import run_background
 from arenyxa.presentation.flow_graph import FlowGraphCanvas
 from arenyxa.presentation.i18n_runtime import current_text
-from arenyxa.presentation.language import resolve_system_locale
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.widgets import MiniBars, PageHeader, set_table_header_stretch_last, ScrollSafeComboBox
 
@@ -516,13 +515,6 @@ class ConsoleCommandMixin:
         for handler in handlers:
             if handler(name, command, parts):
                 return
-
-    def _terminal_locale(self) -> str:
-        configured = str(getattr(getattr(self.context, "settings", None), "locale", "system") or "system")
-        if configured == "system":
-            environment = os.environ.get("ARENYXA_LANGUAGE", "").strip()
-            return environment or resolve_system_locale()
-        return configured
 
     def _builtin_help_text(self) -> str:
         """Return terminal help in the application locale."""
