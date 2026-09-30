@@ -527,7 +527,6 @@ class MainWindow(MainWindowNavigationMixin, MainWindowOperationsMixin, MainWindo
         inspector_header = QHBoxLayout()
         inspector_header.setDirection(QBoxLayout.Direction.LeftToRight)
         self.inspector_title = QLabel(self.language.text("shell.inspector.title"))
-        self.inspector_title.setProperty("i18n_key_text", "shell.inspector.title")
         self.inspector_title.setProperty("section", True)
         close_inspector = QPushButton("×")
         close_inspector.setFixedSize(30, 30)
@@ -539,6 +538,7 @@ class MainWindow(MainWindowNavigationMixin, MainWindowOperationsMixin, MainWindo
         self.inspector_content = QPlainTextEdit()
         self.inspector_content.setReadOnly(True)
         self.inspector_content.setPlainText(self.language.text("shell.inspector.empty"))
+        self._inspector_context_active = False
         inspector_layout.addWidget(self.inspector_content, 1)
         root.addWidget(self.inspector)
 
