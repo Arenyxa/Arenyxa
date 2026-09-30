@@ -33,8 +33,9 @@ The following high-visibility surfaces no longer embed Chinese user-facing copy 
 - Data / Search / Dataset Revision / streaming export
 - Studio Intelligence / SmartPath / Blueprint / Selector / HTTP / Protocol / Quality / Recorder / Debugger
 - Data Visualization Studio / chart assets / PNG export
+- Enterprise Identity / RBAC / Vault / Enrollment / Coordinator / Governance / Distributed Operations
 
-Their user-facing copy is now sourced from semantic catalog keys under stable page/domain namespaces such as `welcome.*`, `personalization.*`, `settings.*`, `network.*`, `studio.*`, `studio_intelligence.*`, `dashboard.*`, `task_center.*`, `tasks.*`, `data.*`, and `visualization.*`.
+Their user-facing copy is now sourced from semantic catalog keys under stable page/domain namespaces such as `welcome.*`, `personalization.*`, `settings.*`, `network.*`, `studio.*`, `studio_intelligence.*`, `dashboard.*`, `task_center.*`, `tasks.*`, `data.*`, `visualization.*`, and `enterprise.*`.
 
 ## Regression protection
 
