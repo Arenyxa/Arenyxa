@@ -428,7 +428,7 @@ class ConsoleCommandMixin:
             else:
                 self.command.setText(common)
             self.command.setCursorPosition(len(self.command.text()))
-        self.output.appendPlainText("Completions: " + "  ".join(candidates[:32]))
+        self.output.appendPlainText(current_text("tools_terminal.completion.prefix") + "  ".join(candidates[:32]))
 
     def _refresh_cwd(self) -> None:
         cwd = self.context.terminal.cwd
@@ -469,9 +469,9 @@ class ConsoleCommandMixin:
         try:
             sent = self.context.terminal.send_input(payload)
         except ValueError as exc:
-            self.output.appendPlainText(f"stdin-secret failed: {exc}")
+            self.output.appendPlainText(current_text("tools_terminal.stdin.secret_failed").format(error=exc))
         else:
-            self.output.appendPlainText("[secret stdin sent]" if sent else "The active process cannot receive standard input.")
+            self.output.appendPlainText("[secret stdin sent]" if sent else current_text("tools_terminal.stdin.not_accepted"))
         finally:
             self._secret_stdin_pending = False
             self.prompt.setText("Arenyxa>")
@@ -488,9 +488,9 @@ class ConsoleCommandMixin:
             return
         if command.casefold() == "stdin-secret":
             self._secret_stdin_pending = True
-            self.prompt.setText("Secret stdin>")
+            self.prompt.setText(current_text("tools_terminal.stdin.secret_prompt"))
             self._update_secret_input_mode("")
-            self.output.appendPlainText("[secure stdin mode: next input is masked and is not stored in history]")
+            self.output.appendPlainText(current_text("tools_terminal.stdin.secure_mode_notice"))
             return
         if command.casefold().startswith("stdin-secret "):
             safe_command = "stdin-secret <redacted>"
@@ -767,7 +767,7 @@ class ConsoleCommandMixin:
             else:
                 self.output.appendPlainText(str(value))
         def failed(message: str) -> None:
-            self.output.appendPlainText(f"Arenyxa CLI failed: {message}")
+            self.output.appendPlainText(current_text("tools_terminal.control_plane.failed").format(message=message))
         run_background(worker, completed, failed)
 
     def _send_persistent_command(self, command: str, mode: TerminalMode) -> None:
@@ -788,9 +788,9 @@ class ConsoleCommandMixin:
         try:
             sent = self.context.terminal.send_input(command)
         except ValueError as exc:
-            self.output.appendPlainText(f"Shell input failed: {exc}")
+            self.output.appendPlainText(current_text("tools_terminal.persistent.input_failed").format(error=exc))
             return
-        self.output.appendPlainText("[sent to persistent shell]" if sent else "Persistent shell is not accepting input.")
+        self.output.appendPlainText("[sent to persistent shell]" if sent else current_text("tools_terminal.persistent.not_accepting_input"))
 
     def _developer_validation_authorized(self) -> bool:
         if self._root_workstation_active():
