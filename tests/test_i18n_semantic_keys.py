@@ -38,11 +38,14 @@ MIGRATED_UI_FILES = (
     ROOT / "src/arenyxa/presentation/pages/studio.py",
     ROOT / "src/arenyxa/presentation/pages/studio_intelligence.py",
     ROOT / "src/arenyxa/presentation/pages/visualization.py",
+    ROOT / "src/arenyxa/presentation/pages/tools_console.py",
+    ROOT / "src/arenyxa/presentation/pages/tools_platform.py",
+    ROOT / "src/arenyxa/presentation/pages/tools_automation.py",
 )
 CATALOG_LOCALES = ("en_US", "zh_CN", "fr_FR", "de_DE", "ja_JP")
 CJK = re.compile(r"[\u3400-\u9fff]")
 KEY = re.compile(
-    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|studio_intelligence|dashboard|task_center|tasks|data|search|version|visualization)\.[A-Za-z0-9_.]+)(?:"|\')'
+    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|studio_intelligence|dashboard|task_center|tasks|data|search|version|visualization|tools_console|tools_logs|tools_platform|tools_plugins|tools_automation|tools_workflow)\.[A-Za-z0-9_.]+)(?:"|\')'
 )
 
 
@@ -147,6 +150,32 @@ def test_visualization_chart_display_keys_preserve_machine_values() -> None:
         ("visualization.chart.map", "Map"),
     ):
         assert f'("{key}", "{value}")' in source
+
+
+def test_console_mode_display_keys_preserve_machine_values() -> None:
+    source = (ROOT / "src/arenyxa/presentation/pages/tools_console.py").read_text(
+        encoding="utf-8"
+    )
+    for key, value in (
+        ("tools_console.mode.arenyxa", "arenyxa"),
+        ("tools_console.mode.direct", "TerminalMode.DIRECT.value"),
+        ("tools_console.mode.powershell", "TerminalMode.POWERSHELL.value"),
+        ("tools_console.mode.powershell_session", "TerminalMode.POWERSHELL_SESSION.value"),
+        ("tools_console.mode.cmd", "TerminalMode.CMD.value"),
+        ("tools_console.mode.cmd_session", "TerminalMode.CMD_SESSION.value"),
+        ("tools_console.mode.python", "TerminalMode.PYTHON.value"),
+        ("tools_console.mode.python_repl", "TerminalMode.PYTHON_SESSION.value"),
+    ):
+        assert key in source
+        assert value in source
+
+
+def test_workflow_edge_display_keys_preserve_machine_values() -> None:
+    source = (ROOT / "src/arenyxa/presentation/pages/tools_automation.py").read_text(
+        encoding="utf-8"
+    )
+    assert '("tools_workflow.edge.normal", "normal")' in source
+    assert '("tools_workflow.edge.failure", "failure")' in source
 
 
 def test_task_center_workflow_catalogs_cover_router_workflows() -> None:
