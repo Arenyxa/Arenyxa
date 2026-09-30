@@ -44,6 +44,8 @@ MIGRATED_UI_FILES = (
     ROOT / "src/arenyxa/presentation/pages/enterprise.py",
     ROOT / "src/arenyxa/presentation/pages/enterprise_identity_actions.py",
     ROOT / "src/arenyxa/presentation/pages/enterprise_distributed_actions.py",
+    ROOT / "src/arenyxa/presentation/pages/tools_terminal_execution.py",
+    ROOT / "src/arenyxa/presentation/pages/tools_terminal_workspace.py",
 )
 CATALOG_LOCALES = ("en_US", "zh_CN", "fr_FR", "de_DE", "ja_JP")
 CJK = re.compile(r"[\u3400-\u9fff]")
@@ -58,7 +60,7 @@ ENTERPRISE_MACHINE_IDENTIFIERS = {
     "enterprise.workspace.manage",
 }
 KEY = re.compile(
-    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|studio_intelligence|dashboard|task_center|tasks|data|search|version|visualization|tools_console|tools_logs|tools_platform|tools_plugins|tools_automation|tools_workflow|enterprise)\.[A-Za-z0-9_.]+)(?:"|\')'
+    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|studio_intelligence|dashboard|task_center|tasks|data|search|version|visualization|tools_console|tools_logs|tools_platform|tools_plugins|tools_automation|tools_workflow|enterprise|tools_terminal)\.[A-Za-z0-9_.]+)(?:"|\')'
 )
 
 
@@ -205,6 +207,29 @@ def test_enterprise_resource_kind_display_does_not_replace_machine_value() -> No
         ("enterprise.resource_kind.project", "project"),
     ):
         assert f'("{key}", "{value}")' in source
+
+
+def test_terminal_workspace_display_keys_preserve_machine_values() -> None:
+    source = (ROOT / "src/arenyxa/presentation/pages/tools_terminal_workspace.py").read_text(
+        encoding="utf-8"
+    )
+    for key, value in (
+        ("tools_terminal.workspace.mode.powershell", "TerminalMode.POWERSHELL_SESSION.value"),
+        ("tools_terminal.workspace.mode.cmd", "TerminalMode.CMD_SESSION.value"),
+        ("tools_terminal.workspace.mode.python", "TerminalMode.PYTHON_SESSION.value"),
+        ("tools_terminal.workspace.pane.primary", '"primary"'),
+        ("tools_terminal.workspace.pane.secondary", '"secondary"'),
+        ("tools_terminal.workspace.pane.bottom", '"bottom"'),
+    ):
+        assert key in source
+        assert value in source
+
+
+def test_terminal_help_is_catalog_backed() -> None:
+    source = (ROOT / "src/arenyxa/presentation/pages/tools_terminal_workspace.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'return current_text("tools_terminal.help.text")' in source
 
 
 def test_task_center_workflow_catalogs_cover_router_workflows() -> None:
