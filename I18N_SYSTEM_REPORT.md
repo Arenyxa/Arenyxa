@@ -37,8 +37,9 @@ The following high-visibility surfaces no longer embed Chinese user-facing copy 
 - Advanced Platform / Plugins / analysis tabs / database adapter
 - Automation Center / Flow Designer / Visual Graph / Execution Inspector
 - Enterprise Identity / RBAC / Vault / Enrollment / Coordinator / Governance / Distributed Operations
+- Terminal execution / persistent Shell workspace / builtins / high-risk command confirmations
 
-Their user-facing copy is now sourced from semantic catalog keys under stable page/domain namespaces such as `welcome.*`, `personalization.*`, `settings.*`, `network.*`, `studio.*`, `studio_intelligence.*`, `dashboard.*`, `task_center.*`, `tasks.*`, `data.*`, `visualization.*`, `tools_*.*`, and `enterprise.*`.
+Their user-facing copy is now sourced from semantic catalog keys under stable page/domain namespaces such as `welcome.*`, `personalization.*`, `settings.*`, `network.*`, `studio.*`, `studio_intelligence.*`, `dashboard.*`, `task_center.*`, `tasks.*`, `data.*`, `visualization.*`, `tools_*.*`, `tools_terminal.*`, and `enterprise.*`.
 
 ## Regression protection
 
@@ -50,4 +51,4 @@ Their user-facing copy is now sourced from semantic catalog keys under stable pa
 
 ## Remaining migration work
 
-The public release is v0.1; the preserved internal engineering baseline is v8.2.0. Legacy business pages still contain compatibility phrase mappings and hard-coded UI text that are translated through the existing `translate_tree` compatibility path. The next migration targets are the remaining terminal execution/workspace surfaces and any residual operational pages not already catalog-backed. Migration should continue incrementally by page and should not internationalize machine identifiers, database keys, protocol/event codes, permission identifiers, or persisted enum values.
+The public release is v0.1; the preserved internal engineering baseline is v8.2.0. Legacy business pages still contain compatibility phrase mappings and hard-coded UI text that are translated through the existing `translate_tree` compatibility path. The next migration targets are any residual operational pages not already catalog-backed. Migration should continue incrementally by page and should not internationalize machine identifiers, database keys, protocol/event codes, permission identifiers, or persisted enum values.
