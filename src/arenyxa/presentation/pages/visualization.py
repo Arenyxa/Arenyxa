@@ -7,7 +7,6 @@ from typing import Any
 from arenyxa.qt_compat.QtCore import QLineF, QPointF, QRectF, Qt
 from arenyxa.qt_compat.QtGui import QColor, QPainter, QPainterPath, QPen
 from arenyxa.qt_compat.QtWidgets import (
-    QApplication,
     QComboBox,
     QFileDialog,
     QHBoxLayout,
@@ -20,7 +19,7 @@ from arenyxa.qt_compat.QtWidgets import (
 
 from arenyxa.domain.models import new_id, utc_now
 from arenyxa.presentation.background import run_background
-from arenyxa.presentation.language import literal_for_locale
+from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.widgets import PageHeader, ScrollSafeComboBox
 
@@ -52,7 +51,7 @@ class ChartCanvas(QWidget):
         if not self.records or not self.x_field:
             app = QApplication.instance()
             locale = str(app.property("arenyxa_locale") or "zh_CN") if app is not None else "zh_CN"
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, literal_for_locale("选择 Run 与字段生成可视化", locale))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, current_text("visualization.canvas.empty"))
             return
         bounds = QRectF(self.rect()).adjusted(64, 38, -34, -56)
         if self.chart_type == "Pie":
@@ -216,29 +215,43 @@ class VisualizationPage(WorkspacePage):
         layout = page_layout(self)
         layout.addWidget(
             PageHeader(
-                "Data Visualization Studio", "结果、数据库查询或 Dataset Revision → 图表资产 → PNG/报告数据"
+                source_text("visualization.page.title"),
+                source_text("visualization.page.subtitle"),
+                title_key="visualization.page.title",
+                subtitle_key="visualization.page.subtitle",
             )
         )
         controls = QHBoxLayout()
         self.run = ScrollSafeComboBox()
         self.run.setMinimumWidth(260)
         self.chart_type = QComboBox()
-        self.chart_type.addItems(["Line", "Bar", "Pie", "Heatmap", "Timeline", "Map"])
+        for index, (key, value) in enumerate((
+            ("visualization.chart.line", "Line"),
+            ("visualization.chart.bar", "Bar"),
+            ("visualization.chart.pie", "Pie"),
+            ("visualization.chart.heatmap", "Heatmap"),
+            ("visualization.chart.timeline", "Timeline"),
+            ("visualization.chart.map", "Map"),
+        )):
+            self.chart_type.addItem(source_text(key), value)
+            self.chart_type.setProperty(f"i18n_item_key_{index}", key)
         self.x_field = QComboBox()
         self.y_field = QComboBox()
         self.name = QLineEdit("Visualization")
-        render = QPushButton("渲染")
+        render = QPushButton(source_text("visualization.action.render")); render.setProperty("i18n_key_text", "visualization.action.render")
         render.setProperty("primary", True)
-        save = QPushButton("保存资产")
-        export = QPushButton("导出 PNG")
-        for label, control in (
-            ("Run", self.run),
-            ("Chart", self.chart_type),
-            ("X", self.x_field),
-            ("Y", self.y_field),
-            ("Name", self.name),
+        save = QPushButton(source_text("visualization.action.save")); save.setProperty("i18n_key_text", "visualization.action.save")
+        export = QPushButton(source_text("visualization.action.export_png")); export.setProperty("i18n_key_text", "visualization.action.export_png")
+        for key, control in (
+            ("visualization.label.run", self.run),
+            ("visualization.label.chart", self.chart_type),
+            ("visualization.label.x", self.x_field),
+            ("visualization.label.y", self.y_field),
+            ("visualization.label.name", self.name),
         ):
-            controls.addWidget(QLabel(label))
+            label = QLabel(source_text(key))
+            label.setProperty("i18n_key_text", key)
+            controls.addWidget(label)
             controls.addWidget(control)
         controls.addWidget(render)
         controls.addWidget(save)
@@ -258,11 +271,15 @@ class VisualizationPage(WorkspacePage):
         self.run.blockSignals(True)
         self.run.clear()
         for run in self.context.store.list_runs(limit=500):
-            self.run.addItem(f"{run['created_at'][:19]} · {run['result_count']} rows", run["id"])
+            self.run.addItem(current_text("visualization.run.item").format(created=run["created_at"][:19], count=run["result_count"]), run["id"])
             if run["id"] == selected:
                 self.run.setCurrentIndex(self.run.count() - 1)
         self.run.blockSignals(False)
         self.load_fields()
+
+    def refresh_localized_previews(self) -> None:
+        self.activated()
+        self.canvas.update()
 
     def load_fields(self) -> None:
         run_id = self.run.currentData()
@@ -272,9 +289,9 @@ class VisualizationPage(WorkspacePage):
             self.records = []
             for combo in (self.x_field, self.y_field):
                 combo.clear()
-            self.canvas.configure(self.chart_type.currentText(), [], "", "")
+            self.canvas.configure(str(self.chart_type.currentData() or "Bar"), [], "", "")
             return
-        self.statusMessage.emit("正在后台加载可视化数据…")
+        self.statusMessage.emit(current_text("visualization.status.loading"))
 
         def completed(value: object) -> None:
             if token != self._load_token:
@@ -289,11 +306,11 @@ class VisualizationPage(WorkspacePage):
             self.inspectorChanged.emit(
                 "Visualization Dataset", {"run_id": run_id, "loaded": len(self.records), "fields": fields}
             )
-            self.statusMessage.emit(f"已加载 {len(self.records):,} 条可视化记录")
+            self.statusMessage.emit(current_text("visualization.status.loaded").format(count=f"{len(self.records):,}"))
 
         def failed(message: str) -> None:
             if token == self._load_token:
-                QMessageBox.warning(self, "可视化数据加载失败", message)
+                QMessageBox.warning(self, current_text("visualization.error.load_failed_title"), message)
 
         run_background(
             lambda: list(islice(self.context.store.iter_results(run_id, page_size=1000), 10_000)),
@@ -303,29 +320,29 @@ class VisualizationPage(WorkspacePage):
 
     def render_chart(self) -> None:
         self.canvas.configure(
-            self.chart_type.currentText(),
+            str(self.chart_type.currentData() or "Bar"),
             self.records,
             self.x_field.currentText(),
             self.y_field.currentText(),
         )
-        self.statusMessage.emit(f"已渲染 {self.chart_type.currentText()} · {len(self.records):,} records")
+        self.statusMessage.emit(current_text("visualization.status.rendered").format(chart=self.chart_type.currentText(), count=f"{len(self.records):,}"))
 
     def save_asset(self) -> None:
         asset = {
             "id": new_id("visual"),
             "name": self.name.text().strip() or "Visualization",
             "dataset_ref": self.run.currentData(),
-            "chart_type": self.chart_type.currentText(),
+            "chart_type": str(self.chart_type.currentData() or "Bar"),
             "config": {"x": self.x_field.currentText(), "y": self.y_field.currentText(), "limit": 10000},
             "created_at": utc_now(),
             "schema_version": 6,
         }
         self.context.store.save_visualization(asset)
-        self.statusMessage.emit(f"已保存图表资产：{asset['name']}")
+        self.statusMessage.emit(current_text("visualization.status.saved").format(name=asset["name"]))
 
     def export_png(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
-            self, "导出图表", str(self.context.paths.exports / "visualization.png"), "PNG (*.png)"
+            self, current_text("visualization.export.title"), str(self.context.paths.exports / "visualization.png"), "PNG (*.png)"
         )
         if path and not self.canvas.grab().save(path, "PNG"):
-            QMessageBox.warning(self, "导出失败", "无法写入 PNG。")
+            QMessageBox.warning(self, current_text("visualization.export.failed_title"), current_text("visualization.export.failed_message"))
