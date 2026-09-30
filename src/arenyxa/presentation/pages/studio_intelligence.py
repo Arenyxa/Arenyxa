@@ -431,8 +431,8 @@ class StudioIntelligenceMixin:
 
     def step_debugger(self) -> None:
         try: self.debug_output.setPlainText(json.dumps(asdict(self._debugger.step(ignore_breakpoint=True)), ensure_ascii=False, indent=2))
-        except Exception as exc: QMessageBox.warning(self, "Workflow Debugger", str(exc))
+        except Exception as exc: QMessageBox.warning(self, current_text("studio_intelligence.debugger.title"), str(exc))
 
     def continue_debugger(self) -> None:
         try: self.debug_output.setPlainText(json.dumps(asdict(self._debugger.continue_run()), ensure_ascii=False, indent=2))
-        except Exception as exc: QMessageBox.warning(self, "Workflow Debugger", str(exc))
+        except Exception as exc: QMessageBox.warning(self, current_text("studio_intelligence.debugger.title"), str(exc))
