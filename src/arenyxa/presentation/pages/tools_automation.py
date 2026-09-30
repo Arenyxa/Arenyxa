@@ -8,7 +8,7 @@ from collections import deque
 from dataclasses import asdict
 from datetime import datetime
 from arenyxa.compat import UTC
-from typing import ClassVar
+from typing import ClassVar, TypeVar
 
 from arenyxa.qt_compat.QtCore import Qt, QTimer, Signal
 from arenyxa.qt_compat.QtGui import QFont, QKeyEvent, QTextCursor
@@ -59,6 +59,7 @@ from arenyxa.domain.errors import ArenyxaError
 from arenyxa.domain.models import RequestSpec, Workflow, WorkflowNode, new_id
 from arenyxa.infrastructure.http_client import HttpFetcher
 from arenyxa.presentation.background import run_background
+from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.flow_graph import FlowGraphCanvas
 from arenyxa.presentation.pages.tools_terminal_workspace import ConsoleCommandMixin, TerminalWorkspaceMixin
 from arenyxa.presentation.pages.tools_terminal_execution import ConsoleExternalProcessMixin, ConsoleValidationMixin
@@ -67,6 +68,16 @@ from arenyxa.presentation.widgets import MiniBars, PageHeader, set_table_header_
 
 
 LOGGER = logging.getLogger(__name__)
+_TWidget = TypeVar("_TWidget", bound=QWidget)
+
+
+def _i18n_widget(widget: _TWidget, key: str) -> _TWidget:
+    widget.setProperty("i18n_key_text", key)
+    return widget
+
+
+def _i18n_label(key: str) -> QLabel:
+    return _i18n_widget(QLabel(source_text(key)), key)
 
 
 class AutomationPage(WorkspacePage):
@@ -74,19 +85,36 @@ class AutomationPage(WorkspacePage):
         super().__init__(context, theme, motion, parent)
         layout = page_layout(self)
         header = QHBoxLayout()
-        header.addWidget(PageHeader("Automation Center", "Timezone-aware schedules, resumable enablement and traceable failure policy"), 1)
-        add = QPushButton("新建计划")
+        header.addWidget(PageHeader(source_text("tools_automation.page.title"), source_text("tools_automation.page.subtitle"), title_key="tools_automation.page.title", subtitle_key="tools_automation.page.subtitle"), 1)
+        add = _i18n_widget(QPushButton(source_text("tools_automation.action.new_schedule")), "tools_automation.action.new_schedule")
         add.setProperty("primary", True)
         header.addWidget(add)
         layout.addLayout(header)
         self.table = QTableWidget(0, 6)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-        self.table.setHorizontalHeaderLabels(["任务", "规则", "时区", "下一次", "启用", "ID"])
+        self._set_schedule_headers()
         set_table_header_stretch_last(self.table, True)
         layout.addWidget(self.table, 1)
         self._schedule_run_lock = threading.Lock()
         self._schedule_run_handles = {}
         add.clicked.connect(self.add_schedule)
+
+    def _set_schedule_headers(self) -> None:
+        self.table.setHorizontalHeaderLabels([
+            current_text(key)
+            for key in (
+                "tools_automation.table.task",
+                "tools_automation.table.rule",
+                "tools_automation.table.timezone",
+                "tools_automation.table.next_run",
+                "tools_automation.table.enabled",
+                "tools_automation.table.id",
+            )
+        ])
+
+    def refresh_localized_previews(self) -> None:
+        self._set_schedule_headers()
+        self.refresh()
 
     def activated(self) -> None:
         self.refresh()
@@ -100,20 +128,20 @@ class AutomationPage(WorkspacePage):
                 json.dumps(schedule["rule"], ensure_ascii=False),
                 schedule["timezone"],
                 schedule.get("next_run_at") or "",
-                "是" if schedule["enabled"] else "否",
+                current_text("tools_automation.common.yes" if schedule["enabled"] else "tools_automation.common.no"),
                 schedule["id"],
             ]
             for column, value in enumerate(values):
                 self.table.setItem(row, column, QTableWidgetItem(str(value)))
-        self.inspectorChanged.emit("自动化", {"schedule_count": len(rows)})
+        self.inspectorChanged.emit(current_text("tools_automation.inspector"), {"schedule_count": len(rows)})
 
     def add_schedule(self) -> None:
         tasks = self.context.store.list_tasks()
         if not tasks:
-            QMessageBox.information(self, "自动化", "请先创建任务。")
+            QMessageBox.information(self, current_text("tools_automation.page.title"), current_text("tools_automation.no_tasks"))
             return
         dialog = QDialog(self)
-        dialog.setWindowTitle("新建计划")
+        dialog.setWindowTitle(current_text("tools_automation.action.new_schedule"))
         form = QFormLayout(dialog)
         task_box = QComboBox()
         for task in tasks:
@@ -128,9 +156,9 @@ class AutomationPage(WorkspacePage):
         )
         controls.accepted.connect(dialog.accept)
         controls.rejected.connect(dialog.reject)
-        form.addRow("任务", task_box)
-        form.addRow("间隔（分钟）", interval)
-        form.addRow("时区", timezone)
+        form.addRow(current_text("tools_automation.form.task"), task_box)
+        form.addRow(current_text("tools_automation.form.interval_minutes"), interval)
+        form.addRow(current_text("tools_automation.form.timezone"), timezone)
         form.addRow(controls)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
@@ -184,13 +212,15 @@ class WorkflowPage(WorkspacePage):
         header = QHBoxLayout()
         header.addWidget(
             PageHeader(
-                "Flow Designer",
-                "HTTP/Browser/API → Parse → Clean → Validate → Database/Search/Visualization",
+                source_text("tools_workflow.page.title"),
+                source_text("tools_workflow.page.subtitle"),
+                title_key="tools_workflow.page.title",
+                subtitle_key="tools_workflow.page.subtitle",
             ),
             1,
         )
-        save = QPushButton("保存工作流")
-        run = QPushButton("运行")
+        save = _i18n_widget(QPushButton(source_text("tools_workflow.action.save")), "tools_workflow.action.save")
+        run = _i18n_widget(QPushButton(source_text("tools_workflow.action.run")), "tools_workflow.action.run")
         run.setProperty("primary", True)
         header.addWidget(save)
         header.addWidget(run)
@@ -228,22 +258,22 @@ class WorkflowPage(WorkspacePage):
         self.inputs = QPlainTextEdit('[{"title":"Arenyxa","status":200},{"title":"","status":404}]')
         self.output = QPlainTextEdit()
         self.output.setReadOnly(True)
-        direct_layout.addWidget(QLabel("输入 JSON 数组"))
+        direct_layout.addWidget(_i18n_label("tools_workflow.direct.input"))
         direct_layout.addWidget(self.inputs)
-        direct_layout.addWidget(QLabel("执行结果"))
+        direct_layout.addWidget(_i18n_label("tools_workflow.direct.output"))
         direct_layout.addWidget(self.output)
-        self.flow_tabs.addTab(direct_tab, "Direct Test")
+        direct_index = self.flow_tabs.addTab(direct_tab, source_text("tools_workflow.tab.direct")); self.flow_tabs.setProperty(f"i18n_tab_key_{direct_index}", "tools_workflow.tab.direct")
 
         graph_tab = QWidget()
         graph_layout = QVBoxLayout(graph_tab)
         graph_layout.setContentsMargins(0, 0, 0, 0)
         graph_controls = QHBoxLayout()
-        self.graph_sync_button = QPushButton("Sync Raw → Graph")
-        self.graph_add_button = QPushButton("Add Node")
-        self.graph_remove_button = QPushButton("Remove Node")
-        self.graph_connect_button = QPushButton("Connect")
-        self.graph_disconnect_button = QPushButton("Disconnect")
-        self.graph_auto_layout_button = QPushButton("Auto Layout")
+        self.graph_sync_button = _i18n_widget(QPushButton(source_text("tools_workflow.graph.sync")), "tools_workflow.graph.sync")
+        self.graph_add_button = _i18n_widget(QPushButton(source_text("tools_workflow.graph.add")), "tools_workflow.graph.add")
+        self.graph_remove_button = _i18n_widget(QPushButton(source_text("tools_workflow.graph.remove")), "tools_workflow.graph.remove")
+        self.graph_connect_button = _i18n_widget(QPushButton(source_text("tools_workflow.graph.connect")), "tools_workflow.graph.connect")
+        self.graph_disconnect_button = _i18n_widget(QPushButton(source_text("tools_workflow.graph.disconnect")), "tools_workflow.graph.disconnect")
+        self.graph_auto_layout_button = _i18n_widget(QPushButton(source_text("tools_workflow.graph.auto_layout")), "tools_workflow.graph.auto_layout")
         for button in (
             self.graph_sync_button, self.graph_add_button, self.graph_remove_button,
             self.graph_connect_button, self.graph_disconnect_button, self.graph_auto_layout_button,
@@ -258,31 +288,31 @@ class WorkflowPage(WorkspacePage):
         graph_scroll.setWidget(self.graph_canvas)
         self.graph_node_detail = QPlainTextEdit()
         self.graph_node_detail.setReadOnly(True)
-        self.graph_node_detail.setPlaceholderText("Select a node to inspect its Arenyxa graph definition.")
+        self.graph_node_detail.setPlaceholderText(source_text("tools_workflow.graph.node_placeholder")); self.graph_node_detail.setProperty("i18n_key_placeholder", "tools_workflow.graph.node_placeholder")
         graph_split.addWidget(graph_scroll)
         graph_split.addWidget(self.graph_node_detail)
         graph_split.setSizes([520, 180])
         graph_layout.addWidget(graph_split, 1)
-        self.flow_tabs.addTab(graph_tab, "Visual Graph")
+        graph_index = self.flow_tabs.addTab(graph_tab, source_text("tools_workflow.tab.graph")); self.flow_tabs.setProperty(f"i18n_tab_key_{graph_index}", "tools_workflow.tab.graph")
 
         inspector_tab = QWidget()
         inspector_layout = QVBoxLayout(inspector_tab)
         inspector_layout.setContentsMargins(0, 0, 0, 0)
         inspect_row = QHBoxLayout()
         self.execution_id = QLineEdit()
-        self.execution_id.setPlaceholderText("Persisted workflow execution ID")
-        self.inspect_execution_button = QPushButton("Inspect Execution")
+        self.execution_id.setPlaceholderText(source_text("tools_workflow.execution.id_placeholder")); self.execution_id.setProperty("i18n_key_placeholder", "tools_workflow.execution.id_placeholder")
+        self.inspect_execution_button = _i18n_widget(QPushButton(source_text("tools_workflow.execution.inspect")), "tools_workflow.execution.inspect")
         self.inspect_execution_button.setProperty("primary", True)
-        self.trace_execution_button = QPushButton("Runtime Trace")
-        self.step_plan_button = QPushButton("Step Plan")
+        self.trace_execution_button = _i18n_widget(QPushButton(source_text("tools_workflow.execution.trace")), "tools_workflow.execution.trace")
+        self.step_plan_button = _i18n_widget(QPushButton(source_text("tools_workflow.execution.step_plan")), "tools_workflow.execution.step_plan")
         inspect_row.addWidget(self.execution_id, 1)
         inspect_row.addWidget(self.inspect_execution_button)
         inspect_row.addWidget(self.trace_execution_button)
         inspect_row.addWidget(self.step_plan_button)
         debug_row = QHBoxLayout()
         self.debug_breakpoints = QLineEdit()
-        self.debug_breakpoints.setPlaceholderText("Safe debugger breakpoints, comma-separated node IDs")
-        self.safe_debug_button = QPushButton("Safe Debug")
+        self.debug_breakpoints.setPlaceholderText(source_text("tools_workflow.debug.breakpoints_placeholder")); self.debug_breakpoints.setProperty("i18n_key_placeholder", "tools_workflow.debug.breakpoints_placeholder")
+        self.safe_debug_button = _i18n_widget(QPushButton(source_text("tools_workflow.debug.safe")), "tools_workflow.debug.safe")
         self.safe_debug_button.setProperty("primary", True)
         debug_row.addWidget(self.debug_breakpoints, 1)
         debug_row.addWidget(self.safe_debug_button)
@@ -292,7 +322,7 @@ class WorkflowPage(WorkspacePage):
         inspector_layout.addLayout(inspect_row)
         inspector_layout.addLayout(debug_row)
         self.execution_trace_table = QTableWidget(0, 9)
-        self.execution_trace_table.setHorizontalHeaderLabels(["Node", "Kind", "State", "Lane", "Input", "Output", "Errors", "Pressure", "Health"])
+        self._set_execution_trace_headers()
         self.execution_trace_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.execution_trace_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         set_table_header_stretch_last(self.execution_trace_table, True)
@@ -301,7 +331,7 @@ class WorkflowPage(WorkspacePage):
         trace_split.addWidget(self.execution_inspector_output)
         trace_split.setSizes([360, 300])
         inspector_layout.addWidget(trace_split, 1)
-        self.flow_tabs.addTab(inspector_tab, "Execution Inspector")
+        inspector_index = self.flow_tabs.addTab(inspector_tab, source_text("tools_workflow.tab.inspector")); self.flow_tabs.setProperty(f"i18n_tab_key_{inspector_index}", "tools_workflow.tab.inspector")
         right_layout.addWidget(self.flow_tabs, 1)
         splitter.addWidget(self.definition)
         splitter.addWidget(right)
@@ -328,6 +358,25 @@ class WorkflowPage(WorkspacePage):
         self.definition.textChanged.connect(self._schedule_graph_sync)
         self.sync_graph_from_raw()
 
+    def _set_execution_trace_headers(self) -> None:
+        self.execution_trace_table.setHorizontalHeaderLabels([
+            current_text(key)
+            for key in (
+                "tools_workflow.trace.node",
+                "tools_workflow.trace.kind",
+                "tools_workflow.trace.state",
+                "tools_workflow.trace.lane",
+                "tools_workflow.trace.input",
+                "tools_workflow.trace.output",
+                "tools_workflow.trace.errors",
+                "tools_workflow.trace.pressure",
+                "tools_workflow.trace.health",
+            )
+        ])
+
+    def refresh_localized_previews(self) -> None:
+        self._set_execution_trace_headers()
+
     def _schedule_graph_sync(self) -> None:
         if not self._graph_syncing:
             self._graph_refresh_timer.start()
@@ -348,11 +397,11 @@ class WorkflowPage(WorkspacePage):
                 )
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
             self._graph_model = None
-            self.graph_node_detail.setPlainText(f"Raw Workflow JSON is not graph-ready yet: {exc}")
+            self.graph_node_detail.setPlainText(current_text("tools_workflow.graph.not_ready").format(error=exc))
 
     def _commit_graph_to_raw(self) -> None:
         if self._graph_model is None:
-            raise RuntimeError("Visual Graph is not synchronized with a valid workflow")
+            raise RuntimeError(current_text("tools_workflow.graph.not_synchronized"))
         payload = self._graph_model.snapshot()
         self._graph_syncing = True
         try:
@@ -372,12 +421,12 @@ class WorkflowPage(WorkspacePage):
         if self._graph_model is None:
             self.sync_graph_from_raw()
         if self._graph_model is None:
-            QMessageBox.warning(self, "Visual Graph", "Fix the Raw Workflow JSON before editing the graph.")
+            QMessageBox.warning(self, current_text("tools_workflow.graph.title"), current_text("tools_workflow.graph.fix_raw_first"))
             return
-        node_id, ok = QInputDialog.getText(self, "Add Node", "Node ID:")
+        node_id, ok = QInputDialog.getText(self, current_text("tools_workflow.graph.add"), current_text("tools_workflow.graph.node_id"))
         if not ok or not node_id.strip():
             return
-        kind, ok = QInputDialog.getText(self, "Add Node", "Node kind:", text="map")
+        kind, ok = QInputDialog.getText(self, current_text("tools_workflow.graph.add"), current_text("tools_workflow.graph.node_kind"), text="map")
         if not ok or not kind.strip():
             return
         try:
@@ -386,14 +435,14 @@ class WorkflowPage(WorkspacePage):
             self.graph_canvas.select_node(node_id.strip())
             self.graph_node_selected(node_id.strip())
         except (KeyError, RuntimeError, TypeError, ValueError) as exc:
-            QMessageBox.warning(self, "Visual Graph", str(exc))
+            QMessageBox.warning(self, current_text("tools_workflow.graph.title"), str(exc))
 
     def graph_remove_node(self) -> None:
         if self._graph_model is None:
             return
         node_id = self.graph_canvas.selected_node()
         if not node_id:
-            QMessageBox.information(self, "Visual Graph", "Select a node first.")
+            QMessageBox.information(self, current_text("tools_workflow.graph.title"), current_text("tools_workflow.graph.select_node"))
             return
         try:
             self._graph_model.remove_node(node_id)
@@ -401,65 +450,78 @@ class WorkflowPage(WorkspacePage):
             self._commit_graph_to_raw()
             self.graph_node_detail.clear()
         except (KeyError, RuntimeError, TypeError, ValueError) as exc:
-            QMessageBox.warning(self, "Visual Graph", str(exc))
+            QMessageBox.warning(self, current_text("tools_workflow.graph.title"), str(exc))
 
     def _graph_edge_dialog(self, title: str) -> tuple[str, str, str] | None:
         if self._graph_model is None:
             return None
         node_ids = [str(row["id"]) for row in self._graph_model.snapshot()["nodes"]]
         if len(node_ids) < 2:
-            QMessageBox.information(self, "Visual Graph", "At least two nodes are required.")
+            QMessageBox.information(self, current_text("tools_workflow.graph.title"), current_text("tools_workflow.graph.two_nodes_required"))
             return None
-        source, ok = QInputDialog.getItem(self, title, "Source node:", node_ids, 0, False)
+        source, ok = QInputDialog.getItem(self, title, current_text("tools_workflow.graph.source_node"), node_ids, 0, False)
         if not ok:
             return None
         target_choices = [item for item in node_ids if item != source]
-        target, ok = QInputDialog.getItem(self, title, "Target node:", target_choices, 0, False)
+        target, ok = QInputDialog.getItem(self, title, current_text("tools_workflow.graph.target_node"), target_choices, 0, False)
         if not ok:
             return None
-        edge_type, ok = QInputDialog.getItem(self, title, "Edge type:", ["normal", "failure"], 0, False)
+        edge_options = (
+            ("tools_workflow.edge.normal", "normal"),
+            ("tools_workflow.edge.failure", "failure"),
+        )
+        edge_labels = [current_text(key) for key, _value in edge_options]
+        edge_label, ok = QInputDialog.getItem(
+            self,
+            title,
+            current_text("tools_workflow.graph.edge_type"),
+            edge_labels,
+            0,
+            False,
+        )
         if not ok:
             return None
+        edge_type = edge_options[edge_labels.index(edge_label)][1]
         return str(source), str(target), str(edge_type)
 
     def graph_connect_nodes(self) -> None:
-        edge = self._graph_edge_dialog("Connect Nodes")
+        edge = self._graph_edge_dialog(current_text("tools_workflow.graph.connect_nodes"))
         if edge is None or self._graph_model is None:
             return
         try:
             self._graph_model.connect(edge[0], edge[1], edge_type=edge[2])
             self._commit_graph_to_raw()
         except (KeyError, RuntimeError, TypeError, ValueError) as exc:
-            QMessageBox.warning(self, "Visual Graph", str(exc))
+            QMessageBox.warning(self, current_text("tools_workflow.graph.title"), str(exc))
 
     def graph_disconnect_nodes(self) -> None:
-        edge = self._graph_edge_dialog("Disconnect Nodes")
+        edge = self._graph_edge_dialog(current_text("tools_workflow.graph.disconnect_nodes"))
         if edge is None or self._graph_model is None:
             return
         try:
             self._graph_model.disconnect(edge[0], edge[1], edge_type=edge[2])
             self._commit_graph_to_raw()
         except (KeyError, RuntimeError, TypeError, ValueError) as exc:
-            QMessageBox.warning(self, "Visual Graph", str(exc))
+            QMessageBox.warning(self, current_text("tools_workflow.graph.title"), str(exc))
 
     def inspect_execution(self) -> None:
         execution_id = self.execution_id.text().strip()
         if not execution_id:
-            QMessageBox.information(self, "Flow Designer", "Enter a persisted workflow execution ID first.")
+            QMessageBox.information(self, current_text("tools_workflow.page.title"), current_text("tools_workflow.execution.id_required"))
             return
         try:
             result = WorkflowExecutionInspector(self.context.store).inspect(execution_id)
             self.execution_inspector_output.setPlainText(
                 json.dumps(result.snapshot(), ensure_ascii=False, indent=2, default=str)
             )
-            self.statusMessage.emit(f"Flow execution inspected: {execution_id}")
+            self.statusMessage.emit(current_text("tools_workflow.execution.inspected").format(execution_id=execution_id))
         except (KeyError, RuntimeError, TypeError, ValueError) as exc:
-            QMessageBox.warning(self, "Execution Inspector", str(exc))
+            QMessageBox.warning(self, current_text("tools_workflow.execution.inspector_title"), str(exc))
 
     def trace_execution(self) -> None:
         execution_id = self.execution_id.text().strip()
         if not execution_id:
-            QMessageBox.information(self, "Flow Designer", "Enter a persisted workflow execution ID first.")
+            QMessageBox.information(self, current_text("tools_workflow.page.title"), current_text("tools_workflow.execution.id_required"))
             return
         try:
             payload = WorkflowRuntimeTrace(self.context.store).trace(execution_id)
@@ -474,20 +536,20 @@ class WorkflowPage(WorkspacePage):
                 ]
                 for column, value in enumerate(values):
                     self.execution_trace_table.setItem(row_index, column, QTableWidgetItem(str(value)))
-            self.statusMessage.emit(f"Flow runtime trace loaded: {execution_id}")
+            self.statusMessage.emit(current_text("tools_workflow.execution.trace_loaded").format(execution_id=execution_id))
         except (KeyError, RuntimeError, TypeError, ValueError) as exc:
-            QMessageBox.warning(self, "Runtime Trace", str(exc))
+            QMessageBox.warning(self, current_text("tools_workflow.execution.trace_title"), str(exc))
 
     def step_plan(self) -> None:
         execution_id = self.execution_id.text().strip()
         if not execution_id:
-            QMessageBox.information(self, "Flow Designer", "Enter a persisted workflow execution ID first.")
+            QMessageBox.information(self, current_text("tools_workflow.page.title"), current_text("tools_workflow.execution.id_required"))
             return
         try:
             payload = WorkflowRuntimeTrace(self.context.store).step_plan(execution_id)
             self.execution_inspector_output.setPlainText(json.dumps(payload, ensure_ascii=False, indent=2, default=str))
         except (KeyError, RuntimeError, TypeError, ValueError) as exc:
-            QMessageBox.warning(self, "Step Plan", str(exc))
+            QMessageBox.warning(self, current_text("tools_workflow.execution.step_plan"), str(exc))
 
 
     def safe_debug(self) -> None:
@@ -495,7 +557,7 @@ class WorkflowPage(WorkspacePage):
             workflow = self._workflow()
             raw_inputs = json.loads(self.inputs.toPlainText())
             if not isinstance(raw_inputs, list) or any(not isinstance(item, dict) for item in raw_inputs):
-                raise ValueError("Direct Test input must be a JSON array of objects")
+                raise ValueError(current_text("tools_workflow.direct.array_required"))
             breakpoints = [
                 value.strip() for value in self.debug_breakpoints.text().split(",") if value.strip()
             ]
@@ -509,7 +571,7 @@ class WorkflowPage(WorkspacePage):
                 f"Safe Debug {report['state']}: {report['steps_executed']} steps"
             )
         except (ArenyxaError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
-            QMessageBox.warning(self, "Safe Debug", str(exc))
+            QMessageBox.warning(self, current_text("tools_workflow.debug.safe"), str(exc))
 
     def _workflow(self) -> Workflow:
         raw = json.loads(self.definition.toPlainText())
@@ -523,8 +585,9 @@ class WorkflowPage(WorkspacePage):
             operations = getattr(self.context, "enterprise_operations", None)
             if operations is not None and operations.binding("workflow", workflow.id) is not None:
                 approval_id, ok = QInputDialog.getText(
-                    self, "Enterprise 变更审批",
-                    "该 Workflow 已纳入 Enterprise Governance。请输入已批准的 Approval ID：",
+                    self,
+                    current_text("tools_workflow.enterprise.approval_title"),
+                    current_text("tools_workflow.enterprise.approval_prompt"),
                 )
                 if not ok:
                     return
@@ -533,9 +596,9 @@ class WorkflowPage(WorkspacePage):
                     correlation_id=f"workflow-publish:{workflow.id}",
                 )
             self.context.store.save_workflow(asdict(workflow))
-            self.statusMessage.emit(f"工作流已保存：{workflow.name}")
+            self.statusMessage.emit(current_text("tools_workflow.status.saved").format(name=workflow.name))
         except Exception as exc:                                               
-            QMessageBox.warning(self, "工作流无效", str(exc))
+            QMessageBox.warning(self, current_text("tools_workflow.error.invalid"), str(exc))
 
     def run_workflow(self) -> None:
         try:
@@ -550,7 +613,10 @@ class WorkflowPage(WorkspacePage):
             result = self.context.workflows.execute(workflow, inputs)
             self.output.setPlainText(json.dumps(asdict(result), ensure_ascii=False, indent=2, default=str))
             self.statusMessage.emit(
-                f"Workflow 完成：{len(result.outputs)} outputs · {len(result.errors)} errors"
+                current_text("tools_workflow.status.completed").format(
+                    outputs=len(result.outputs),
+                    errors=len(result.errors),
+                )
             )
         except Exception as exc:                                                              
-            QMessageBox.warning(self, "Workflow 失败", str(exc))
+            QMessageBox.warning(self, current_text("tools_workflow.error.failed"), str(exc))
