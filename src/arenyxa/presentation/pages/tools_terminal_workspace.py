@@ -55,8 +55,8 @@ from arenyxa.application.workflow_graph import WorkflowGraphModel
 from arenyxa.domain.models import RequestSpec, Workflow, WorkflowNode, new_id
 from arenyxa.infrastructure.http_client import HttpFetcher
 from arenyxa.presentation.background import run_background
+from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.flow_graph import FlowGraphCanvas
-from arenyxa.presentation.language import resolve_system_locale
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.widgets import MiniBars, PageHeader, set_table_header_stretch_last, ScrollSafeComboBox
 
@@ -68,24 +68,40 @@ class TerminalWorkspaceMixin:
         layout = QVBoxLayout(holder)
         layout.setContentsMargins(0, 0, 0, 0)
         toolbar = QHBoxLayout()
-        toolbar.addWidget(QLabel("Session"))
+        session_label = QLabel(source_text("tools_terminal.workspace.session_label")); session_label.setProperty("i18n_key_text", "tools_terminal.workspace.session_label"); toolbar.addWidget(session_label)
         self.workspace_mode = ScrollSafeComboBox()
-        self.workspace_mode.addItem("PowerShell", TerminalMode.POWERSHELL_SESSION.value)
+        mode_items = [
+            ("tools_terminal.workspace.mode.powershell", TerminalMode.POWERSHELL_SESSION.value),
+        ]
         if os.name == "nt":
-            self.workspace_mode.addItem("CMD", TerminalMode.CMD_SESSION.value)
-        self.workspace_mode.addItem("Python REPL", TerminalMode.PYTHON_SESSION.value)
+            mode_items.append(("tools_terminal.workspace.mode.cmd", TerminalMode.CMD_SESSION.value))
+        mode_items.append(("tools_terminal.workspace.mode.python", TerminalMode.PYTHON_SESSION.value))
+        for index, (key, value) in enumerate(mode_items):
+            self.workspace_mode.addItem(source_text(key), value)
+            self.workspace_mode.setProperty(f"i18n_item_key_{index}", key)
         self.workspace_pane = ScrollSafeComboBox()
-        self.workspace_pane.addItem("Primary", "primary")
-        self.workspace_pane.addItem("Secondary", "secondary")
-        self.workspace_pane.addItem("Bottom", "bottom")
-        self.workspace_new = QPushButton("New Session")
+        for index, (key, value) in enumerate((
+            ("tools_terminal.workspace.pane.primary", "primary"),
+            ("tools_terminal.workspace.pane.secondary", "secondary"),
+            ("tools_terminal.workspace.pane.bottom", "bottom"),
+        )):
+            self.workspace_pane.addItem(source_text(key), value)
+            self.workspace_pane.setProperty(f"i18n_item_key_{index}", key)
+        self.workspace_new = QPushButton(source_text("tools_terminal.workspace.action.new"))
+        self.workspace_new.setProperty("i18n_key_text", "tools_terminal.workspace.action.new")
         self.workspace_new.setProperty("primary", True)
-        self.workspace_interrupt = QPushButton("Interrupt")
-        self.workspace_rename = QPushButton("Rename")
-        self.workspace_move = QPushButton("Move Pane")
-        self.workspace_resize = QPushButton("Resize")
-        self.workspace_stop = QPushButton("Stop")
-        self.workspace_close = QPushButton("Close")
+        self.workspace_interrupt = QPushButton(source_text("tools_terminal.workspace.action.interrupt"))
+        self.workspace_interrupt.setProperty("i18n_key_text", "tools_terminal.workspace.action.interrupt")
+        self.workspace_rename = QPushButton(source_text("tools_terminal.workspace.action.rename"))
+        self.workspace_rename.setProperty("i18n_key_text", "tools_terminal.workspace.action.rename")
+        self.workspace_move = QPushButton(source_text("tools_terminal.workspace.action.move"))
+        self.workspace_move.setProperty("i18n_key_text", "tools_terminal.workspace.action.move")
+        self.workspace_resize = QPushButton(source_text("tools_terminal.workspace.action.resize"))
+        self.workspace_resize.setProperty("i18n_key_text", "tools_terminal.workspace.action.resize")
+        self.workspace_stop = QPushButton(source_text("tools_terminal.workspace.action.stop"))
+        self.workspace_stop.setProperty("i18n_key_text", "tools_terminal.workspace.action.stop")
+        self.workspace_close = QPushButton(source_text("tools_terminal.workspace.action.close"))
+        self.workspace_close.setProperty("i18n_key_text", "tools_terminal.workspace.action.close")
         toolbar.addWidget(self.workspace_mode)
         toolbar.addWidget(self.workspace_pane)
         toolbar.addWidget(self.workspace_new)
@@ -118,10 +134,8 @@ class TerminalWorkspaceMixin:
         workspace_split.addWidget(self.workspace_bottom_tabs)
         workspace_split.setSizes([620, 260])
         layout.addWidget(workspace_split, 1)
-        note = QLabel(
-            "Arenyxa Shell Sessions are isolated persistent processes. They share the Projects boundary, "
-            "Developer authorization, output budgets and process-tree shutdown policy."
-        )
+        note = QLabel(source_text("tools_terminal.workspace.note"))
+        note.setProperty("i18n_key_text", "tools_terminal.workspace.note")
         note.setWordWrap(True)
         note.setProperty("muted", True)
         layout.addWidget(note)
@@ -142,13 +156,13 @@ class TerminalWorkspaceMixin:
 
     def _new_terminal_workspace_session(self) -> None:
         if not self._terminal_workspace_authorized():
-            QMessageBox.warning(self, "Developer Mode", "Enable Developer Mode and accept the Developer risk agreement first.")
+            QMessageBox.warning(self, current_text("tools_terminal.workspace.developer_mode_title"), current_text("tools_terminal.workspace.developer_mode_required"))
             return
         mode = str(self.workspace_mode.currentData())
         if mode in {TerminalMode.POWERSHELL_SESSION.value, TerminalMode.CMD_SESSION.value} and not bool(
             getattr(self.context.settings, "developer_direct_shell_enabled", False)
         ):
-            QMessageBox.warning(self, "Direct Shell", "PowerShell/CMD sessions require the Developer Mode Direct Shell setting.")
+            QMessageBox.warning(self, current_text("tools_terminal.workspace.direct_shell_title"), current_text("tools_terminal.workspace.direct_shell_required"))
             return
         pane = str(self.workspace_pane.currentData() or "primary")
         try:
@@ -158,7 +172,7 @@ class TerminalWorkspaceMixin:
             session_id = str(state["id"])
             self.context.terminal_workspace.start(session_id)
         except (OSError, RuntimeError, ValueError) as exc:
-            QMessageBox.warning(self, "Shell Session", str(exc))
+            QMessageBox.warning(self, current_text("tools_terminal.workspace.shell_session_title"), str(exc))
             return
         tab = QWidget()
         tab_layout = QVBoxLayout(tab)
@@ -169,8 +183,8 @@ class TerminalWorkspaceMixin:
         output.setMaximumBlockCount(self._log_tail_lines)
         send_row = QHBoxLayout()
         command = QLineEdit()
-        command.setPlaceholderText("Persistent session command")
-        send = QPushButton("Send")
+        command.setPlaceholderText(source_text("tools_terminal.workspace.command_placeholder")); command.setProperty("i18n_key_placeholder", "tools_terminal.workspace.command_placeholder")
+        send = QPushButton(source_text("tools_terminal.workspace.action.send")); send.setProperty("i18n_key_text", "tools_terminal.workspace.action.send")
         send.setProperty("primary", True)
         send_row.addWidget(command, 1)
         send_row.addWidget(send)
@@ -183,7 +197,7 @@ class TerminalWorkspaceMixin:
         command.returnPressed.connect(lambda sid=session_id: self._send_terminal_workspace_command(sid))
         host.setCurrentIndex(index)
         self._active_workspace_pane = pane
-        self.statusMessage.emit(f"Shell session created: {session_id}")
+        self.statusMessage.emit(current_text("tools_terminal.workspace.created").format(session_id=session_id))
 
     def _current_terminal_workspace_id(self) -> str | None:
         host = self._workspace_hosts.get(self._active_workspace_pane, self.workspace_primary_tabs)
@@ -214,7 +228,7 @@ class TerminalWorkspaceMixin:
             self.context.terminal_workspace.send(session_id, text)
             self.statusMessage.emit(f"{session_id}> {safe}")
         except (KeyError, OSError, RuntimeError, ValueError) as exc:
-            QMessageBox.warning(self, "Shell Session", str(exc))
+            QMessageBox.warning(self, current_text("tools_terminal.workspace.shell_session_title"), str(exc))
 
     def _refresh_terminal_workspace(self) -> None:
         live_ids = {str(item["id"]) for item in self.context.terminal_workspace.list()}
@@ -237,15 +251,15 @@ class TerminalWorkspaceMixin:
             return
         try:
             self.context.terminal_workspace.interrupt(session_id)
-            self.statusMessage.emit(f"Interrupt sent to {session_id}")
+            self.statusMessage.emit(current_text("tools_terminal.workspace.interrupt_sent").format(session_id=session_id))
         except (KeyError, OSError, RuntimeError, ValueError) as exc:
-            QMessageBox.warning(self, "Shell Session", str(exc))
+            QMessageBox.warning(self, current_text("tools_terminal.workspace.shell_session_title"), str(exc))
 
     def _rename_terminal_workspace_session(self) -> None:
         session_id = self._current_terminal_workspace_id()
         if not session_id:
             return
-        title, ok = QInputDialog.getText(self, "Rename Shell Session", "Session title")
+        title, ok = QInputDialog.getText(self, current_text("tools_terminal.workspace.rename_title"), current_text("tools_terminal.workspace.session_title_label"))
         if not ok or not title.strip():
             return
         try:
@@ -257,15 +271,28 @@ class TerminalWorkspaceMixin:
                     host.setTabText(index, f"{state['title']} · {session_id}")
                     break
         except (KeyError, ValueError) as exc:
-            QMessageBox.warning(self, "Shell Session", str(exc))
+            QMessageBox.warning(self, current_text("tools_terminal.workspace.shell_session_title"), str(exc))
 
     def _move_terminal_workspace_session(self) -> None:
         session_id = self._current_terminal_workspace_id()
         if not session_id:
             return
-        panes = ["primary", "secondary", "bottom"]
-        pane, ok = QInputDialog.getItem(self, "Move Shell Session", "Pane", panes, 0, False)
-        if ok and pane:
+        pane_options = (
+            ("tools_terminal.workspace.pane.primary", "primary"),
+            ("tools_terminal.workspace.pane.secondary", "secondary"),
+            ("tools_terminal.workspace.pane.bottom", "bottom"),
+        )
+        pane_labels = [current_text(key) for key, _value in pane_options]
+        pane_label, ok = QInputDialog.getItem(
+            self,
+            current_text("tools_terminal.workspace.move_title"),
+            current_text("tools_terminal.workspace.pane_label"),
+            pane_labels,
+            0,
+            False,
+        )
+        if ok and pane_label:
+            pane = pane_options[pane_labels.index(pane_label)][1]
             try:
                 self.context.terminal_workspace.move(session_id, pane)
                 widget = self._workspace_views[session_id][2]
@@ -280,24 +307,24 @@ class TerminalWorkspaceMixin:
                 index = destination.addTab(widget, title)
                 destination.setCurrentIndex(index)
                 self._active_workspace_pane = str(pane)
-                self.statusMessage.emit(f"{session_id} moved to {pane} pane")
+                self.statusMessage.emit(current_text("tools_terminal.workspace.moved").format(session_id=session_id, pane=current_text(f"tools_terminal.workspace.pane.{pane}")))
             except (KeyError, ValueError) as exc:
-                QMessageBox.warning(self, "Shell Session", str(exc))
+                QMessageBox.warning(self, current_text("tools_terminal.workspace.shell_session_title"), str(exc))
 
     def _resize_terminal_workspace_session(self) -> None:
         session_id = self._current_terminal_workspace_id()
         if not session_id:
             return
-        columns, ok = QInputDialog.getInt(self, "Resize Shell Session", "Columns", 120, 20, 1000)
+        columns, ok = QInputDialog.getInt(self, current_text("tools_terminal.workspace.resize_title"), current_text("tools_terminal.workspace.columns"), 120, 20, 1000)
         if not ok:
             return
-        rows, ok = QInputDialog.getInt(self, "Resize Shell Session", "Rows", 32, 5, 400)
+        rows, ok = QInputDialog.getInt(self, current_text("tools_terminal.workspace.resize_title"), current_text("tools_terminal.workspace.rows"), 32, 5, 400)
         if not ok:
             return
         try:
             self.context.terminal_workspace.resize(session_id, columns, rows)
         except (KeyError, OSError, RuntimeError, ValueError) as exc:
-            QMessageBox.warning(self, "Shell Session", str(exc))
+            QMessageBox.warning(self, current_text("tools_terminal.workspace.shell_session_title"), str(exc))
 
     def _stop_terminal_workspace_session(self) -> None:
         session_id = self._current_terminal_workspace_id()
