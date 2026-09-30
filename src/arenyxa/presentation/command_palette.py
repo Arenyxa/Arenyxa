@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from arenyxa.qt_compat.QtCore import Qt, QTimer
+from arenyxa.presentation.i18n_runtime import source_text
 from arenyxa.qt_compat.QtWidgets import (
     QAbstractItemView,
     QDialog,
@@ -24,13 +25,15 @@ class CommandPalette(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Command Palette")
+        self.setWindowTitle(source_text("shell.palette.title"))
+        self.setProperty("i18n_key_window_title", "shell.palette.title")
         self.setModal(True)
         self.resize(560, 430)
         self.commands = commands
         layout = QVBoxLayout(self)
         self.query = QLineEdit()
-        self.query.setPlaceholderText("输入命令或页面名称")
+        self.query.setPlaceholderText(source_text("shell.palette.placeholder"))
+        self.query.setProperty("i18n_key_placeholder", "shell.palette.placeholder")
         self.list = QListWidget()
         self.list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         layout.addWidget(self.query)
