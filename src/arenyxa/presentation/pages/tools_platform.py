@@ -59,6 +59,7 @@ from arenyxa.domain.errors import ArenyxaError
 from arenyxa.domain.models import RequestSpec, Workflow, WorkflowNode, new_id
 from arenyxa.infrastructure.http_client import HttpFetcher
 from arenyxa.presentation.background import run_background
+from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.flow_graph import FlowGraphCanvas
 from arenyxa.presentation.pages.tools_terminal_workspace import ConsoleCommandMixin, TerminalWorkspaceMixin
 from arenyxa.presentation.pages.tools_terminal_execution import ConsoleExternalProcessMixin, ConsoleValidationMixin
@@ -74,16 +75,16 @@ class AdvancedPlatformPage(WorkspacePage):
         super().__init__(context, theme, motion, parent)
         layout = page_layout(self)
         layout.addWidget(
-            PageHeader("Advanced Platform", "确定性执行规划、站点地图、API Map、性能与安全配置分析")
+            PageHeader(source_text("tools_platform.page.title"), source_text("tools_platform.page.subtitle"), title_key="tools_platform.page.title", subtitle_key="tools_platform.page.subtitle")
         )
         controls = QHBoxLayout()
         self.session = QComboBox()
         self.session.setMinimumWidth(300)
         self.url = QLineEdit("https://example.com")
-        self.url.setPlaceholderText("授权分析 URL")
-        self.analyze_button = QPushButton("运行分析")
+        self.url.setPlaceholderText(source_text("tools_platform.url_placeholder")); self.url.setProperty("i18n_key_placeholder", "tools_platform.url_placeholder")
+        self.analyze_button = QPushButton(source_text("tools_platform.action.analyze")); self.analyze_button.setProperty("i18n_key_text", "tools_platform.action.analyze")
         self.analyze_button.setProperty("primary", True)
-        controls.addWidget(QLabel("Capture"))
+        capture_label = QLabel(source_text("tools_platform.capture")); capture_label.setProperty("i18n_key_text", "tools_platform.capture"); controls.addWidget(capture_label)
         controls.addWidget(self.session)
         controls.addWidget(self.url, 1)
         controls.addWidget(self.analyze_button)
@@ -91,37 +92,39 @@ class AdvancedPlatformPage(WorkspacePage):
         self.tabs = QTabWidget()
         self.tab_indices: dict[str, int] = {}
         self.outputs: dict[str, QPlainTextEdit] = {}
-        for key, label in (
-            ("planner", "Execution Planner"),
-            ("map", "Website Intelligence"),
-            ("api", "API Map"),
-            ("performance", "Performance"),
-            ("security", "Security Center"),
-            ("compatibility", "Compatibility"),
+        for key, label_key in (
+            ("planner", "tools_platform.tab.planner"),
+            ("map", "tools_platform.tab.website"),
+            ("api", "tools_platform.tab.api_map"),
+            ("performance", "tools_platform.tab.performance"),
+            ("security", "tools_platform.tab.security"),
+            ("compatibility", "tools_platform.tab.compatibility"),
         ):
             editor = QPlainTextEdit()
             editor.setReadOnly(True)
             self.outputs[key] = editor
-            self.tab_indices[key] = self.tabs.addTab(editor, label)
+            index = self.tabs.addTab(editor, source_text(label_key))
+            self.tabs.setProperty(f"i18n_tab_key_{index}", label_key)
+            self.tab_indices[key] = index
         database_tab = QWidget()
         database_layout = QVBoxLayout(database_tab)
         database_form = QHBoxLayout()
         self.database_dsn = QLineEdit(str(context.paths.root / "external-data.db"))
-        self.database_dsn.setPlaceholderText("SQLite path or SQLAlchemy URL")
-        self.database_test_button = QPushButton("测试连接与能力")
+        self.database_dsn.setPlaceholderText(source_text("tools_platform.database.placeholder")); self.database_dsn.setProperty("i18n_key_placeholder", "tools_platform.database.placeholder")
+        self.database_test_button = QPushButton(source_text("tools_platform.database.test")); self.database_test_button.setProperty("i18n_key_text", "tools_platform.database.test")
         database_form.addWidget(self.database_dsn, 1)
         database_form.addWidget(self.database_test_button)
         self.database_output = QPlainTextEdit()
         self.database_output.setReadOnly(True)
         database_layout.addLayout(database_form)
         database_layout.addWidget(self.database_output, 1)
-        self.tab_indices["database"] = self.tabs.addTab(database_tab, "Database Adapter")
+        self.tab_indices["database"] = self.tabs.addTab(database_tab, source_text("tools_platform.tab.database")); self.tabs.setProperty(f"i18n_tab_key_{self.tab_indices['database']}", "tools_platform.tab.database")
         visualization = QWidget()
         visual_layout = QVBoxLayout(visualization)
         self.bars = MiniBars(theme)
-        visual_layout.addWidget(QLabel("Traffic by domain"))
+        traffic_label = QLabel(source_text("tools_platform.traffic_by_domain")); traffic_label.setProperty("i18n_key_text", "tools_platform.traffic_by_domain"); visual_layout.addWidget(traffic_label)
         visual_layout.addWidget(self.bars, 1)
-        self.tab_indices["visualization"] = self.tabs.addTab(visualization, "Visualization Studio")
+        self.tab_indices["visualization"] = self.tabs.addTab(visualization, source_text("tools_platform.tab.visualization")); self.tabs.setProperty(f"i18n_tab_key_{self.tab_indices['visualization']}", "tools_platform.tab.visualization")
         layout.addWidget(self.tabs, 1)
         self.analyze_button.clicked.connect(self.analyze)
         self.database_test_button.clicked.connect(self.test_database)
@@ -146,7 +149,8 @@ class AdvancedPlatformPage(WorkspacePage):
         session_id = self.session.currentData()
         target_url = self.url.text().strip()
         self.analyze_button.setEnabled(False)
-        self.statusMessage.emit("高级平台正在后台分析…")
+        self.statusMessage.emit(current_text("tools_platform.status.analyzing"))
+        api_warning = current_text("tools_platform.api_map.no_capture_warning")
 
         def analyze_data() -> dict:
             from arenyxa.domain.enums import CaptureSource
@@ -192,7 +196,7 @@ class AdvancedPlatformPage(WorkspacePage):
                     "endpoint_count": 0,
                     "source_event_count": len(events),
                     "endpoints": ApiMapper().analyze(events),
-                    "warnings": ["未选择捕获会话；当前 API Map 仅使用临时 NetworkEvent。"],
+                    "warnings": [api_warning],
                 }
             performance = PerformanceProfiler().summarize(events)
             security = SecurityAnalyzer().analyze(response) if response else []
@@ -217,11 +221,11 @@ class AdvancedPlatformPage(WorkspacePage):
                 )
             hosts = result["hosts"]
             self.bars.set_values([(str(host), float(count)) for host, count in list(hosts.items())[:12]])
-            self.statusMessage.emit("高级平台分析完成")
+            self.statusMessage.emit(current_text("tools_platform.status.completed"))
 
         def failed(message: str) -> None:
             self.analyze_button.setEnabled(True)
-            QMessageBox.warning(self, "分析失败", message)
+            QMessageBox.warning(self, current_text("tools_platform.error.analysis_failed"), message)
 
         run_background(analyze_data, completed, failed)
 
@@ -260,7 +264,7 @@ class PluginsPage(WorkspacePage):
     def __init__(self, context, theme, motion, parent=None) -> None:
         super().__init__(context, theme, motion, parent)
         layout = page_layout(self)
-        layout.addWidget(PageHeader("插件与沙箱", "Manifest、显式授权、子进程隔离、超时与输出预算"))
+        layout.addWidget(PageHeader(source_text("tools_plugins.page.title"), source_text("tools_plugins.page.subtitle"), title_key="tools_plugins.page.title", subtitle_key="tools_plugins.page.subtitle"))
         splitter = QSplitter()
         self.list = QListWidget()
         self.list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -282,7 +286,7 @@ class PluginsPage(WorkspacePage):
             state = "healthy" if health is None else health.state
             self.list.addItem(f"{manifest.name}\n{manifest.id} · {manifest.version} · {state}")
         self.inspectorChanged.emit(
-            "插件", {"count": len(self._plugins), "root": str(self.context.paths.plugins)}
+            current_text("tools_plugins.inspector"), {"count": len(self._plugins), "root": str(self.context.paths.plugins)}
         )
 
     def show_plugin(self, row: int) -> None:
@@ -293,7 +297,7 @@ class PluginsPage(WorkspacePage):
                     {
                         "manifest": asdict(manifest),
                         "path": str(path),
-                        "default": "disabled until explicit grant",
+                        "default": current_text("tools_plugins.default_disabled"),
                         "health": None if self._plugin_health.get(manifest.id) is None else asdict(self._plugin_health[manifest.id]),
                     },
                     ensure_ascii=False,
