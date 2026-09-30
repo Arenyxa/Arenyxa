@@ -394,7 +394,7 @@ class ConsoleCommandMixin:
             TerminalMode.PYTHON_SESSION.value: "import sys; print(sys.version)",
         }
         self.prompt.setText(prompts.get(value, "Arenyxa>"))
-        self.command.setPlaceholderText(placeholders.get(value, "输入命令"))
+        self.command.setPlaceholderText(placeholders.get(value, current_text("tools_terminal.command.placeholder_default")))
 
     def _complete_command(self) -> None:
         if bool(getattr(self, "_secret_stdin_pending", False)):
@@ -437,7 +437,7 @@ class ConsoleCommandMixin:
             shown = "." if str(relative) == "." else f".\\{relative}"
         except ValueError:
             shown = str(cwd)
-        self.cwd_label.setText(f"工作目录：{shown}  ·  Timeout {self.context.terminal.timeout_seconds:g}s")
+        self.cwd_label.setText(current_text("tools_terminal.cwd.summary").format(cwd=shown, timeout=f"{self.context.terminal.timeout_seconds:g}"))
         self.cwd_label.setToolTip(str(cwd))
 
     def _history_step(self, delta: int) -> None:
@@ -543,77 +543,9 @@ class ConsoleCommandMixin:
             if handler(name, command, parts):
                 return
 
-    def _terminal_locale(self) -> str:
-        configured = str(getattr(getattr(self.context, "settings", None), "locale", "system") or "system")
-        if configured == "system":
-            environment = os.environ.get("ARENYXA_LANGUAGE", "").strip()
-            return environment or resolve_system_locale()
-        return configured
-
     def _builtin_help_text(self) -> str:
-        """Return terminal help in the same locale selected by the application."""
-        english = self._terminal_locale().casefold().startswith("en")
-        if english:
-            return (
-                "Arenyxa Terminal-First Control Plane:\n"
-                "  task list/show/run                         Task query and execution (--json supported)\n"
-                "  run list/show/cancel/pause/resume/export  Run control and export\n"
-                "  capture start/browser/har-import/pcap-import  Live, browser, HAR and PCAP capture\n"
-                "  capture status/events/intelligence/alerts/stream-stats  Live intelligence and alerts\n"
-                "  packet summary/conversations/analytics    Packet Intelligence session analysis\n"
-                "  packet detect/hunt/protocols/fields       Detection, hunting and dynamic field discovery\n"
-                "  packet build                               Offline packet fixture/PCAP construction\n"
-                "  extraction analyze/dry-run/pick            Extraction Lab and web picking\n"
-                "  dataset list/show/revisions                Dataset queries\n"
-                "  flow list/show/executions/inspect-execution Flow Designer analysis\n"
-                "  proxy status/history/inspect/summary       Proxy control and Session analysis\n"
-                "  mitm flows/pending/resolve/export/replay-current  MITM Proxy control\n"
-                "  fleet status/workers/jobs/health           Fleet Control\n"
-                "  plugin list/health                          Plugin Runtime\n"
-                "  terminal capabilities/session-*             Shell capability and multi-session control\n"
-                "  Tab                                         Arenyxa command completion\n"
-                "  Append --json to professional commands for machine-readable output\n\n"
-                "Compatibility / Session Commands:\n"
-                "  help                              Show help\n"
-                "  clear                             Clear output\n"
-                "  history [n]                       Show session command history\n"
-                "  pwd / cd <path> / ls [path]       Project navigation\n"
-                "  status / paths / version          Runtime information\n"
-                "  stdin <text> / stdin-secret       Send process input; secure mode masks and omits secrets from history\n"
-                "  tasks [n] / runs [n] / captures [n]  Stored records\n"
-                "  test-all                          Isolated full feature validation\n"
-                "  stress-test [profile]             Performance stress validation\n"
-            )
-        return (
-            "Arenyxa Terminal-First Control Plane：\n"
-            "  task list/show/run                         任务查询与启动（支持 --json）\n"
-            "  run list/show/cancel/pause/resume/export  Run 控制与导出\n"
-            "  capture start/browser/har-import/pcap-import  实时、浏览器、HAR 与 PCAP 捕获\n"
-            "  capture status/events/intelligence/alerts/stream-stats  实时情报与告警\n"
-            "  packet summary/conversations/analytics    Packet Intelligence 会话分析\n"
-            "  packet detect/hunt/protocols/fields       检测、威胁狩猎与动态字段发现\n"
-            "  packet build                               离线数据包/PCAP 测试构造\n"
-            "  extraction analyze/dry-run/pick            Extraction Lab 与网页点选\n"
-            "  dataset list/show/revisions                Dataset 查询\n"
-            "  flow list/show/executions/inspect-execution Flow Designer 查询与执行分析\n"
-            "  proxy status/history/inspect/summary       Proxy 控制与 Session 分析\n"
-            "  mitm flows/pending/resolve/export/replay-current  MITM Proxy 控制\n"
-            "  fleet status/workers/jobs/health           Fleet Control\n"
-            "  plugin list/health                          Plugin Runtime\n"
-            "  terminal capabilities/session-*             Shell 能力探测与多会话控制\n"
-            "  Tab                                         Arenyxa 命令组/动作补全\n"
-            "  任意专业命令追加 --json 可输出机器可读 JSON\n\n"
-            "兼容 / 会话命令：\n"
-            "  help                              显示帮助\n"
-            "  clear                             清空输出\n"
-            "  history [n]                       显示命令历史\n"
-            "  pwd / cd <path> / ls [path]       项目目录导航\n"
-            "  status / paths / version          运行时信息\n"
-            "  stdin <text> / stdin-secret       发送进程输入；安全模式会隐藏且不记录密钥\n"
-            "  tasks [n] / runs [n] / captures [n]  已保存记录\n"
-            "  test-all                          隔离完整功能验证\n"
-            "  stress-test [profile]             性能压力验证\n"
-        )
+        """Return terminal help from the active semantic locale catalog."""
+        return current_text("tools_terminal.help.text")
 
     def _execute_builtin_core(self, name: str, command: str, parts: list[str]) -> bool:
         """Handle help, navigation, history, and process-input builtins."""
@@ -629,19 +561,21 @@ class ConsoleCommandMixin:
         if name in {"stdin", "stdin-secret"}:
             payload = command[len(parts[0]):].lstrip()
             if not payload:
-                self.output.appendPlainText(f"用法：{name} <text>")
+                self.output.appendPlainText(current_text("tools_terminal.usage.stdin").format(name=name))
                 return True
             try:
                 sent = self.context.terminal.send_input(payload)
             except ValueError as exc:
-                self.output.appendPlainText(f"{name} 失败：{exc}")
+                self.output.appendPlainText(current_text("tools_terminal.command.named_failed").format(name=name, error=exc))
             else:
                 label = "[secret stdin sent]" if name == "stdin-secret" else "[stdin sent]"
-                self.output.appendPlainText(label if sent else "当前进程无法接收标准输入。")
+                self.output.appendPlainText(label if sent else current_text("tools_terminal.stdin.not_accepted"))
             return True
         if name == "eof":
             self.output.appendPlainText(
-                "[stdin closed]" if self.context.terminal.close_input() else "当前进程没有可关闭的标准输入。"
+                "[stdin closed]"
+                if self.context.terminal.close_input()
+                else current_text("tools_terminal.stdin.no_open_input")
             )
             return True
         if name == "history":
@@ -658,7 +592,7 @@ class ConsoleCommandMixin:
             try:
                 changed = self.context.terminal.set_cwd(raw)
             except (OSError, ValueError) as exc:
-                self.output.appendPlainText(f"cd 失败：{exc}")
+                self.output.appendPlainText(current_text("tools_terminal.command.cd_failed").format(error=exc))
             else:
                 self.output.appendPlainText(str(changed))
                 self._refresh_cwd()
@@ -668,7 +602,7 @@ class ConsoleCommandMixin:
             try:
                 rows = self.context.terminal.list_directory(raw)
             except (OSError, ValueError) as exc:
-                self.output.appendPlainText(f"ls 失败：{exc}")
+                self.output.appendPlainText(current_text("tools_terminal.command.ls_failed").format(error=exc))
                 return True
             if not rows:
                 self.output.appendPlainText("<empty>")
@@ -687,18 +621,18 @@ class ConsoleCommandMixin:
         if name == "env":
             needle = parts[1] if len(parts) > 1 else ""
             rows = self.context.terminal.environment_items(needle)
-            self.output.appendPlainText("没有匹配的环境变量。" if not rows else "\n".join(f"{key}={value}" for key, value in rows))
+            self.output.appendPlainText(current_text("tools_terminal.environment.no_matches") if not rows else "\n".join(f"{key}={value}" for key, value in rows))
             return True
         if name == "setenv":
             payload = command[len(parts[0]):].strip()
             key, separator, value = payload.partition("=")
             if not separator:
-                self.output.appendPlainText("用法：setenv NAME=VALUE")
+                self.output.appendPlainText(current_text("tools_terminal.usage.setenv"))
                 return True
             try:
                 self.context.terminal.set_environment(key.strip(), value)
             except ValueError as exc:
-                self.output.appendPlainText(f"setenv 失败：{exc}")
+                self.output.appendPlainText(current_text("tools_terminal.environment.set_failed").format(error=exc))
             else:
                 shown = "<redacted>" if (
                     self.context.terminal.is_sensitive_environment_name(key.strip())
@@ -708,34 +642,34 @@ class ConsoleCommandMixin:
             return True
         if name == "unsetenv":
             if len(parts) != 2:
-                self.output.appendPlainText("用法：unsetenv NAME")
+                self.output.appendPlainText(current_text("tools_terminal.usage.unsetenv"))
                 return True
             try:
                 removed = self.context.terminal.unset_environment(parts[1])
             except ValueError as exc:
-                self.output.appendPlainText(f"unsetenv 失败：{exc}")
+                self.output.appendPlainText(current_text("tools_terminal.environment.unset_failed").format(error=exc))
             else:
-                self.output.appendPlainText("已删除。" if removed else "变量不存在。")
+                self.output.appendPlainText(current_text("tools_terminal.environment.removed") if removed else current_text("tools_terminal.environment.not_found"))
             return True
         if name == "which":
             if len(parts) != 2:
-                self.output.appendPlainText("用法：which <program>")
+                self.output.appendPlainText(current_text("tools_terminal.usage.which"))
             else:
-                self.output.appendPlainText(self.context.terminal.which(parts[1]) or "未找到。")
+                self.output.appendPlainText(self.context.terminal.which(parts[1]) or current_text("tools_terminal.common.not_found"))
             return True
         if name == "timeout":
             if len(parts) == 1:
                 self.output.appendPlainText(f"{self.context.terminal.timeout_seconds:g} seconds")
                 return True
             if len(parts) != 2:
-                self.output.appendPlainText("用法：timeout [1-3600]")
+                self.output.appendPlainText(current_text("tools_terminal.usage.timeout"))
                 return True
             try:
                 value = self.context.terminal.set_timeout(float(parts[1]))
             except (TypeError, ValueError) as exc:
-                self.output.appendPlainText(f"timeout 失败：{exc}")
+                self.output.appendPlainText(current_text("tools_terminal.timeout.failed").format(error=exc))
             else:
-                self.output.appendPlainText(f"外部命令超时设置为 {value:g} 秒。")
+                self.output.appendPlainText(current_text("tools_terminal.timeout.set").format(seconds=f"{value:g}"))
                 self._refresh_cwd()
             return True
         return False
@@ -788,7 +722,7 @@ class ConsoleCommandMixin:
             return True
         if name == "events":
             if len(parts) not in {2, 3}:
-                self.output.appendPlainText("用法：events <session_id> [1-10000]")
+                self.output.appendPlainText(current_text("tools_terminal.usage.events"))
                 return True
             limit = self._bounded_int(parts[2] if len(parts) == 3 else "1000", 1, 10000, "events")
             if limit is not None:
@@ -804,19 +738,19 @@ class ConsoleCommandMixin:
         """Handle developer validation, stress, and synthetic fault builtins."""
         if name == "test-all":
             if len(parts) != 1:
-                self.output.appendPlainText("用法：test-all")
+                self.output.appendPlainText(current_text("tools_terminal.usage.test_all"))
             else:
                 self._run_full_validation()
             return True
         if name == "stress-test":
             if len(parts) > 2:
-                self.output.appendPlainText("用法：stress-test [quick|standard|extreme]")
+                self.output.appendPlainText(current_text("tools_terminal.usage.stress_test"))
             else:
                 self._run_stress_validation(parts[1].casefold() if len(parts) == 2 else "standard")
             return True
         if name == "fault-injection":
             if len(parts) > 2:
-                self.output.appendPlainText("用法：fault-injection [transient|recoverable|configuration|permission|corruption|fatal|all]")
+                self.output.appendPlainText(current_text("tools_terminal.usage.fault_injection"))
             else:
                 self._run_fault_injection(parts[1].casefold() if len(parts) == 2 else "all")
             return True
@@ -838,18 +772,18 @@ class ConsoleCommandMixin:
 
     def _send_persistent_command(self, command: str, mode: TerminalMode) -> None:
         if self.context.terminal.active_mode != mode:
-            self.output.appendPlainText("当前已有另一个 Persistent Shell 正在运行；请先 stop。")
+            self.output.appendPlainText(current_text("tools_terminal.persistent.other_active"))
             return
         risk = self.context.terminal.detect_risk(command, mode)
         if risk:
             box = QMessageBox(self)
-            box.setWindowTitle("确认 Persistent Shell 高风险命令")
+            box.setWindowTitle(current_text("tools_terminal.persistent.risk_title"))
             box.setIcon(QMessageBox.Icon.Warning)
             box.setText(f"⚠ {risk}\n\n{self.context.terminal.redact_command(command)}")
             box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             box.setDefaultButton(QMessageBox.StandardButton.No)
             if box.exec() != QMessageBox.StandardButton.Yes:
-                self.output.appendPlainText("已取消。")
+                self.output.appendPlainText(current_text("tools_terminal.common.cancelled"))
                 return
         try:
             sent = self.context.terminal.send_input(command)
@@ -861,20 +795,17 @@ class ConsoleCommandMixin:
     def _developer_validation_authorized(self) -> bool:
         if self._root_workstation_active():
             if self._developer_test_running:
-                self.output.appendPlainText("已有开发者验证任务正在运行，请等待完成后再启动新的测试。")
+                self.output.appendPlainText(current_text("tools_terminal.validation.already_running"))
                 return False
             return True
         authorization = authorization_from_settings(self.context.settings)
         if not authorization.developer_mode:
-            self.output.appendPlainText("命令已锁定：请先在设置 → 高级设置中启用 Developer Mode。")
+            self.output.appendPlainText(current_text("tools_terminal.validation.developer_mode_required"))
             return False
         if not authorization.valid:
-            self.output.appendPlainText(
-                "命令已锁定：当前 Developer Mode 没有有效的风险协议与免责协议授权。"
-                "请关闭 Developer Mode 后重新启用，并完成双协议确认。"
-            )
+            self.output.appendPlainText(current_text("tools_terminal.validation.terms_required"))
             return False
         if self._developer_test_running:
-            self.output.appendPlainText("已有开发者验证任务正在运行，请等待完成后再启动新的测试。")
+            self.output.appendPlainText(current_text("tools_terminal.validation.already_running"))
             return False
         return True
