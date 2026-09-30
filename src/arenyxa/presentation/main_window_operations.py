@@ -90,9 +90,9 @@ class MainWindowOperationsMixin:
         generation = self._status_generation
                                                                                   
         lowered = message.casefold()
-        if any(token in message for token in ("失败", "错误")) or any(token in lowered for token in ("failed", "error")):
+        if any(token in message for token in ("\u5931\u8d25", "\u9519\u8bef")) or any(token in lowered for token in ("failed", "error")):
             self.motion.emphasize(self.status_text, MotionIntent.ERROR)
-        elif any(token in message for token in ("完成", "成功")) or any(token in lowered for token in ("completed", "success")):
+        elif any(token in message for token in ("\u5b8c\u6210", "\u6210\u529f")) or any(token in lowered for token in ("completed", "success")):
             self.motion.emphasize(self.status_text, MotionIntent.SUCCESS)
 
         def clear_if_current() -> None:
@@ -375,7 +375,7 @@ class MainWindowOperationsMixin:
                                                                                          
                                                
         self._repair_scan_in_progress = True
-        self.show_status("Repair Center 正在后台检查安装与运行状态…")
+        self.show_status(current_text("shell.repair.scanning"))
 
         def worker() -> object:
             from arenyxa.repair import append_feature_integration_findings
