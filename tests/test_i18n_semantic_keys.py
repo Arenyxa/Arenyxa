@@ -187,19 +187,12 @@ def test_terminal_runtime_keeps_command_machine_syntax_stable() -> None:
     workspace = (ROOT / "src/arenyxa/presentation/pages/tools_terminal_workspace.py").read_text(
         encoding="utf-8"
     )
-    for token in (
-        "quick",
-        "standard",
-        "extreme",
-        "transient",
-        "recoverable",
-        "configuration",
-        "permission",
-        "corruption",
-        "fatal",
-        "all",
-    ):
-        assert token in execution
+    assert "profile not in STRESS_PROFILES" in execution
+    assert 'profile == "quick"' in execution
+    assert (
+        'allowed = {"transient", "recoverable", "configuration", "permission", '
+        '"corruption", "fatal", "all"}'
+    ) in execution
     for token in (
         "sql",
         "setenv",
