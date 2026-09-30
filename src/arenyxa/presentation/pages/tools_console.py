@@ -59,6 +59,7 @@ from arenyxa.domain.errors import ArenyxaError
 from arenyxa.domain.models import RequestSpec, Workflow, WorkflowNode, new_id
 from arenyxa.infrastructure.http_client import HttpFetcher
 from arenyxa.presentation.background import run_background
+from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.flow_graph import FlowGraphCanvas
 from arenyxa.presentation.pages.tools_terminal_workspace import ConsoleCommandMixin, TerminalWorkspaceMixin
 from arenyxa.presentation.pages.tools_terminal_execution import ConsoleExternalProcessMixin, ConsoleValidationMixin
@@ -114,30 +115,41 @@ class ConsolePage(TerminalWorkspaceMixin, ConsoleCommandMixin, ConsoleValidation
         layout = page_layout(self)
         layout.addWidget(
             PageHeader(
-                "Terminal & Packet Console",
-                "Terminal-First Control Plane · Arenyxa CLI · Persistent PowerShell/CMD/Python · JSON automation",
+                source_text("tools_console.page.title"),
+                source_text("tools_console.page.subtitle"),
+                title_key="tools_console.page.title",
+                subtitle_key="tools_console.page.subtitle",
             )
         )
 
         toolbar = QHBoxLayout()
-        toolbar.addWidget(QLabel("模式"))
+        mode_label = QLabel(source_text("tools_console.mode.label")); mode_label.setProperty("i18n_key_text", "tools_console.mode.label"); toolbar.addWidget(mode_label)
         self.mode = ScrollSafeComboBox()
-        self.mode.addItem("Arenyxa CLI", "arenyxa")
-        self.mode.addItem("Direct Process", TerminalMode.DIRECT.value)
-        self.mode.addItem("PowerShell", TerminalMode.POWERSHELL.value)
-        self.mode.addItem("PowerShell Session", TerminalMode.POWERSHELL_SESSION.value)
+        mode_items = [
+            ("tools_console.mode.arenyxa", "arenyxa"),
+            ("tools_console.mode.direct", TerminalMode.DIRECT.value),
+            ("tools_console.mode.powershell", TerminalMode.POWERSHELL.value),
+            ("tools_console.mode.powershell_session", TerminalMode.POWERSHELL_SESSION.value),
+        ]
         if os.name == "nt":
-            self.mode.addItem("CMD", TerminalMode.CMD.value)
-            self.mode.addItem("CMD Session", TerminalMode.CMD_SESSION.value)
-        self.mode.addItem("Python", TerminalMode.PYTHON.value)
-        self.mode.addItem("Python REPL", TerminalMode.PYTHON_SESSION.value)
+            mode_items.extend((
+                ("tools_console.mode.cmd", TerminalMode.CMD.value),
+                ("tools_console.mode.cmd_session", TerminalMode.CMD_SESSION.value),
+            ))
+        mode_items.extend((
+            ("tools_console.mode.python", TerminalMode.PYTHON.value),
+            ("tools_console.mode.python_repl", TerminalMode.PYTHON_SESSION.value),
+        ))
+        for index, (key, value) in enumerate(mode_items):
+            self.mode.addItem(source_text(key), value)
+            self.mode.setProperty(f"i18n_item_key_{index}", key)
         toolbar.addWidget(self.mode)
         self.cwd_label = QLabel()
         self.cwd_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         toolbar.addWidget(self.cwd_label, 1)
-        self.stop_button = QPushButton("停止")
+        self.stop_button = QPushButton(source_text("tools_console.action.stop")); self.stop_button.setProperty("i18n_key_text", "tools_console.action.stop")
         self.stop_button.setEnabled(False)
-        self.clear_button = QPushButton("清屏")
+        self.clear_button = QPushButton(source_text("tools_console.action.clear")); self.clear_button.setProperty("i18n_key_text", "tools_console.action.clear")
         toolbar.addWidget(self.stop_button)
         toolbar.addWidget(self.clear_button)
         layout.addLayout(toolbar)
@@ -172,14 +184,16 @@ class ConsolePage(TerminalWorkspaceMixin, ConsoleCommandMixin, ConsoleValidation
         self._command_completer = completer
         self._refresh_completion_popup_theme()
         self.theme.changed.connect(self._refresh_completion_popup_theme)
-        self.execute_button = QPushButton("执行")
+        self.execute_button = QPushButton(source_text("tools_console.action.execute")); self.execute_button.setProperty("i18n_key_text", "tools_console.action.execute")
         self.execute_button.setProperty("primary", True)
         row.addWidget(self.prompt)
         row.addWidget(self.command, 1)
         row.addWidget(self.execute_button)
         main_layout.addLayout(row)
-        self.console_tabs.addTab(main_console, "Control Plane")
-        self.console_tabs.addTab(self._build_terminal_workspace(), "Shell Sessions")
+        self.console_tabs.addTab(main_console, source_text("tools_console.tab.control_plane"))
+        self.console_tabs.setProperty("i18n_tab_key_0", "tools_console.tab.control_plane")
+        self.console_tabs.addTab(self._build_terminal_workspace(), source_text("tools_console.tab.shell_sessions"))
+        self.console_tabs.setProperty("i18n_tab_key_1", "tools_console.tab.shell_sessions")
         layout.addWidget(self.console_tabs, 1)
 
         self._workspace_timer = QTimer(self)
@@ -204,9 +218,7 @@ class ConsolePage(TerminalWorkspaceMixin, ConsoleCommandMixin, ConsoleValidation
         self._mode_changed()
         self._refresh_cwd()
         self.output.appendPlainText(
-            f"Arenyxa V{__display_version__} Developer Console\n"
-            "输入 help 查看命令。外部执行模式需要 Developer Mode，并且每条命令都会确认。\n"
-            "工作目录可用 cd 持久切换，但被限制在 Arenyxa Projects 根目录内。"
+            current_text("tools_console.intro").format(version=__display_version__)
         )
 
 
@@ -241,8 +253,8 @@ class LogsPage(WorkspacePage):
         super().__init__(context, theme, motion, parent)
         layout = page_layout(self)
         header = QHBoxLayout()
-        header.addWidget(PageHeader("日志与诊断", "结构化 JSONL、轮转、稳定错误码、统一秘密脱敏"), 1)
-        refresh = QPushButton("刷新")
+        header.addWidget(PageHeader(source_text("tools_logs.page.title"), source_text("tools_logs.page.subtitle"), title_key="tools_logs.page.title", subtitle_key="tools_logs.page.subtitle"), 1)
+        refresh = QPushButton(source_text("tools_logs.action.refresh")); refresh.setProperty("i18n_key_text", "tools_logs.action.refresh")
         header.addWidget(refresh)
         layout.addLayout(header)
         self.output = QPlainTextEdit()
@@ -263,9 +275,9 @@ class LogsPage(WorkspacePage):
     def activated(self) -> None:
         path = self.context.paths.readable_log_file
         if not path.exists():
-            self.output.setPlainText("尚无日志事件。")
+            self.output.setPlainText(current_text("tools_logs.empty"))
             return
-        self.output.setPlainText("正在后台读取最近日志…")
+        self.output.setPlainText(current_text("tools_logs.loading"))
 
         def worker() -> tuple[str, int]:
 
@@ -277,10 +289,10 @@ class LogsPage(WorkspacePage):
             text, count = value if isinstance(value, tuple) and len(value) == 2 else ("", 0)
             self.output.setPlainText(str(text))
             self.output.moveCursor(self.output.textCursor().MoveOperation.End)
-            self.inspectorChanged.emit("日志", {"path": str(path), "visible_lines": int(count)})
+            self.inspectorChanged.emit(current_text("tools_logs.inspector"), {"path": str(path), "visible_lines": int(count)})
 
         run_background(
             worker,
             completed,
-            lambda message: self.output.setPlainText(f"日志读取失败：{message}"),
+            lambda message: self.output.setPlainText(current_text("tools_logs.failed").format(message=message)),
         )
