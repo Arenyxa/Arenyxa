@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from arenyxa.presentation.i18n_runtime import current_text
 from arenyxa.presentation.startup_motion_math import smootherstep, startup_progress_duration_ms
 from arenyxa.qt_compat.QtCore import QEventLoop, QTimer, Qt, Signal, QVariantAnimation
 from arenyxa.qt_compat.QtGui import QCloseEvent, QIcon, QPalette
@@ -24,35 +25,44 @@ from arenyxa.qt_compat.QtWidgets import (
 )
 
 
-_STARTUP_ACTIVITY_HINTS = {
-    "settings": "Reading durable preferences and runtime policy",
-    "Root workstation": "Verifying local Root binding, trust anchor, and device identity",
-    "performance": "Selecting bounded worker, request, and resource limits",
-    "database": "Opening SQLite storage and validating persistent schema",
-    "recovery": "Reconciling interrupted runs, captures, workflows, and schedules",
-    "resource governor": "Preparing CPU, memory, disk, browser, and concurrency governance",
-    "Security Kernel": "Loading local security foundation and capability enforcement",
-    "Developer and Root": "Loading trusted developer credentials and Root authority material",
-    "Enterprise": "Preparing identity vault, enrollment, governance, and distributed control",
-    "scheduler": "Restoring timers and background execution services",
-    "workflow": "Restoring workflow runtime, lineage, and dataset services",
-    "packet capture": "Preparing capture queues and live protocol intelligence",
-    "proxy": "Loading proxy, MITM, protocol plugins, and traffic automation",
-    "runtime supervisor": "Starting runtime health supervision",
-    "resilience": "Attaching recovery boundaries and platform control plane",
-    "navigation": "Preparing workspace navigation and command runtime",
-    "persisted schedules": "Validating and restoring saved schedules",
-    "Ready": "Startup complete · handing off to the main workspace",
+_STARTUP_ACTIVITY_KEYS = {
+    "settings": "settings",
+    "Root workstation": "root_workstation",
+    "performance": "performance",
+    "database": "database",
+    "recovery": "recovery",
+    "resource governor": "resource_governor",
+    "Security Kernel": "security_kernel",
+    "Developer and Root": "developer_root",
+    "Enterprise": "enterprise",
+    "scheduler": "scheduler",
+    "workflow": "workflow",
+    "packet capture": "packet_capture",
+    "proxy": "proxy",
+    "runtime supervisor": "runtime_supervisor",
+    "resilience": "resilience",
+    "navigation": "navigation",
+    "persisted schedules": "persisted_schedules",
+    "Ready": "ready",
 }
 
 
-def _startup_activity_hint(label: str) -> str:
-    text = str(label)
-    folded = text.casefold()
-    for needle, detail in _STARTUP_ACTIVITY_HINTS.items():
+def _startup_key(label: str) -> str | None:
+    folded = str(label).casefold()
+    for needle, key in _STARTUP_ACTIVITY_KEYS.items():
         if needle.casefold() in folded:
-            return detail
-    return "Preparing Arenyxa runtime components"
+            return key
+    return None
+
+
+def _startup_activity_hint(label: str) -> str:
+    key = _startup_key(label)
+    return current_text(f"shell.startup.hint.{key}") if key else current_text("shell.startup.hint.default")
+
+
+def _startup_state_text(label: str) -> str:
+    key = _startup_key(label)
+    return current_text(f"shell.startup.state.{key}") if key else str(label)
 
 
 class SplashPage(QWidget):
@@ -65,12 +75,12 @@ class SplashPage(QWidget):
         title = QLabel("Arenyxa")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("font-size:42px;font-weight:750;")
-        subtitle = QLabel("Ultimate Architecture · Secure Network Intelligence")
+        subtitle = QLabel(current_text("shell.startup.subtitle"))
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         subtitle.setStyleSheet("font-size:15px;")
-        self.state = QLabel("Environment check")
+        self.state = QLabel(current_text("shell.startup.environment_check"))
         self.state.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.activity = QLabel("Preparing Arenyxa runtime components")
+        self.activity = QLabel(current_text("shell.startup.hint.default"))
         self.activity.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.activity.setProperty("muted", True)
         self.activity.setStyleSheet("font-size:12px;opacity:0.82;")
@@ -115,14 +125,14 @@ class SplashPage(QWidget):
         layout.addStretch()
 
     def set_state(self, text: str, *, ready: bool = False) -> None:
-        self.state.setText(str(text))
+        self.state.setText(_startup_state_text(str(text)))
         self.activity.setText(_startup_activity_hint(str(text)))
         if ready:
             self.set_stage(100, text)
 
     def set_stage(self, percent: int, label: str) -> None:
         bounded = max(0, min(100, int(percent)))
-        self.state.setText(f"{bounded}% · {label}")
+        self.state.setText(f"{bounded}% · {_startup_state_text(label)}")
         self.activity.setText(_startup_activity_hint(label))
         target = max(self.progress.value(), bounded * self._progress_scale)
         if target <= self.progress.value():
@@ -205,44 +215,41 @@ class AuthenticationPage(QWidget):
         card.setObjectName("RootAuthorityChallenge")
         card.setMaximumWidth(760)
         layout = QVBoxLayout(card)
-        title = QLabel("Root Authority Challenge")
+        title = QLabel(current_text("shell.root.title"))
         title.setStyleSheet("font-size:28px;font-weight:700;")
-        detail = QLabel(
-            "Root Credential 与 Root Session 相互独立。本次进程必须重新完成 Owner Device Key challenge；"
-            "认证完成前不会创建 Main UI。"
-        )
+        detail = QLabel(current_text("shell.root.detail"))
         detail.setWordWrap(True)
         layout.addWidget(title)
         layout.addWidget(detail)
         form = QFormLayout()
-        self.device_identity = QLabel("Unknown")
-        self.tpm_status = QLabel("Unknown")
-        self.challenge_fingerprint = QLabel("Pending")
-        self.verification_state = QLabel("Waiting for Root Owner proof")
+        self.device_identity = QLabel(current_text("shell.common.unknown"))
+        self.tpm_status = QLabel(current_text("shell.common.unknown"))
+        self.challenge_fingerprint = QLabel(current_text("shell.common.pending"))
+        self.verification_state = QLabel(current_text("shell.root.waiting"))
         self.verification_state.setWordWrap(True)
-        form.addRow("Device Identity", self.device_identity)
-        form.addRow("TPM Status", self.tpm_status)
-        form.addRow("Challenge Fingerprint", self.challenge_fingerprint)
-        form.addRow("Verification State", self.verification_state)
+        form.addRow(current_text("shell.root.device_identity"), self.device_identity)
+        form.addRow(current_text("shell.root.tpm_status"), self.tpm_status)
+        form.addRow(current_text("shell.root.challenge_fingerprint"), self.challenge_fingerprint)
+        form.addRow(current_text("shell.root.verification_state"), self.verification_state)
         layout.addLayout(form)
         vault_row = QHBoxLayout()
         self.vault_path = QLineEdit()
-        self.vault_path.setPlaceholderText("Root Owner Device Key Vault (.aryxkey / .json)")
-        browse = QPushButton("Browse")
+        self.vault_path.setPlaceholderText(current_text("shell.root.vault_placeholder"))
+        browse = QPushButton(current_text("shell.common.browse"))
         browse.clicked.connect(self._browse)
         vault_row.addWidget(self.vault_path, 1)
         vault_row.addWidget(browse)
         layout.addLayout(vault_row)
         self.passphrase = QLineEdit()
         self.passphrase.setEchoMode(QLineEdit.EchoMode.Password)
-        self.passphrase.setPlaceholderText("Root Owner Device Key passphrase")
+        self.passphrase.setPlaceholderText(current_text("shell.root.passphrase_placeholder"))
         layout.addWidget(self.passphrase)
         actions = QHBoxLayout()
-        self.verify_button = QPushButton("Verify Root Owner")
+        self.verify_button = QPushButton(current_text("shell.root.verify"))
         self.verify_button.setProperty("primary", True)
         # A registered Root workstation is fail-closed.  There is no ordinary
         # desktop-session bypass after a failed Root Owner challenge.
-        self.continue_button = QPushButton("Continue normal session")
+        self.continue_button = QPushButton(current_text("shell.root.continue_normal"))
         self.continue_button.setVisible(False)
         self.continue_button.setEnabled(False)
         actions.addStretch()
@@ -265,21 +272,21 @@ class AuthenticationPage(QWidget):
         tpm_status: str,
         fingerprint: str,
     ) -> None:
-        self.device_identity.setText(device_identity or "Registered local device")
-        self.tpm_status.setText(tpm_status or "Not reported")
-        self.challenge_fingerprint.setText(fingerprint or "Pending challenge")
-        self.verification_state.setText("Waiting for Root Owner proof")
+        self.device_identity.setText(device_identity or current_text("shell.root.registered_device"))
+        self.tpm_status.setText(tpm_status or current_text("shell.root.not_reported"))
+        self.challenge_fingerprint.setText(fingerprint or current_text("shell.root.pending_challenge"))
+        self.verification_state.setText(current_text("shell.root.waiting"))
         self.verify_button.setEnabled(True)
         self.continue_button.setVisible(False)
         self.continue_button.setEnabled(False)
 
     def set_verifying(self) -> None:
         self.verify_button.setEnabled(False)
-        self.verification_state.setText("Verifying certificate chain and challenge signature…")
+        self.verification_state.setText(current_text("shell.root.verifying"))
 
     def set_authenticated(self) -> None:
         self.passphrase.clear()
-        self.verification_state.setText("Root Session active · authenticated / unexpired / not revoked")
+        self.verification_state.setText(current_text("shell.root.authenticated"))
 
     def set_failed(self, message: str) -> None:
         self.passphrase.clear()
@@ -287,16 +294,15 @@ class AuthenticationPage(QWidget):
         self.continue_button.setVisible(False)
         self.continue_button.setEnabled(False)
         self.verification_state.setText(
-            "Root authentication failed. This registered Root workstation remains locked; "
-            "retry with the bound Owner Device Key.\n" + str(message)[:512]
+            current_text("shell.root.failed").format(message=str(message)[:512])
         )
 
     def _browse(self) -> None:
         path, _selected_filter = QFileDialog.getOpenFileName(
             self,
-            "Select Root Owner Device Key Vault",
+            current_text("shell.root.select_vault"),
             str(Path(self.vault_path.text()).parent) if self.vault_path.text() else "",
-            "Arenyxa Owner Key Vault (*.aryxkey *.json);;JSON (*.json);;All Files (*)",
+            current_text("shell.root.vault_filter"),
         )
         if path:
             self.vault_path.setText(path)
@@ -305,7 +311,7 @@ class AuthenticationPage(QWidget):
         path = self.vault_path.text().strip()
         passphrase = self.passphrase.text()
         if not path or not passphrase:
-            self.set_failed("Select the Owner Device Key Vault and enter its passphrase.")
+            self.set_failed(current_text("shell.root.missing_credentials"))
             return
         self.set_verifying()
         self.verifyRequested.emit(path, passphrase)
@@ -332,12 +338,12 @@ class RecoveryPage(QWidget):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(64, 56, 64, 56)
-        title = QLabel("Arenyxa Startup Recovery")
+        title = QLabel(current_text("shell.recovery.title"))
         title.setStyleSheet("font-size:28px;font-weight:700;")
         self.message = QLabel()
         self.message.setWordWrap(True)
         self.message.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.continue_button = QPushButton("Continue to Arenyxa")
+        self.continue_button = QPushButton(current_text("shell.recovery.continue"))
         self.continue_button.setProperty("primary", True)
         self.continue_button.clicked.connect(self.continueRequested.emit)
         layout.addWidget(title)
