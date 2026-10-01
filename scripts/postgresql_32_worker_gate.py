@@ -56,7 +56,7 @@ def _warm_client_pool(queue: DurableDistributedQueue) -> int:
     condition = threading.Condition()
     release = threading.Event()
     entered = 0
-    failures: list[BaseException] = []
+    failures: list[Exception] = []
 
     def hold_connection() -> None:
         nonlocal entered
@@ -67,7 +67,7 @@ def _warm_client_pool(queue: DurableDistributedQueue) -> int:
                     condition.notify_all()
                 if not release.wait(timeout=30.0):
                     raise TimeoutError("timed out while holding PostgreSQL warm-up connection")
-        except BaseException as exc:
+        except Exception as exc:
             with condition:
                 failures.append(exc)
                 condition.notify_all()
@@ -81,11 +81,11 @@ def _warm_client_pool(queue: DurableDistributedQueue) -> int:
                 timeout=30.0,
             )
         release.set()
-        future_errors: list[BaseException] = []
+        future_errors: list[Exception] = []
         for future in futures:
             try:
                 future.result(timeout=30.0)
-            except BaseException as exc:
+            except Exception as exc:
                 future_errors.append(exc)
 
     if not ready or entered < target or failures or future_errors:
