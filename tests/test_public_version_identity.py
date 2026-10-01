@@ -74,6 +74,7 @@ def test_compatibility_contracts_follow_public_identity_without_resetting_protoc
 def test_product_copy_uses_public_v01_and_keeps_v82_internal_only() -> None:
     text = (ROOT / "src/arenyxa/presentation/product_copy.py").read_text(encoding="utf-8")
     assert "Arenyxa v0.1" in text
+    assert "GitHub 正式公开版本" in text
     assert "内部工程基线为 v8.2.0" in text
     assert "发行与包装版本为 0.1.0" in text
     assert "V8.2.0 稳定源码发行" not in text
