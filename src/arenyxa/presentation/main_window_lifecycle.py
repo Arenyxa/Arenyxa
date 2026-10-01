@@ -152,6 +152,8 @@ class MainWindowLifecycleMixin:
         for surface in (self.nav, self.topbar, self.inspector, self.statusBar()):
             if isinstance(surface, QWidget):
                 self.language.translate_tree(surface)
+        if bool(self.inspector_content.property("shellInspectorEmpty")):
+            self.inspector_content.setPlainText(current_text("shell.inspector.empty"))
         current = self.pages.get(self.current_page_id)
         if isinstance(current, QWidget):
             self.language.translate_tree(current)
