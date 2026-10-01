@@ -678,7 +678,9 @@ class MainWindowNavigationMixin:
         self.context.settings.save(self.context.paths.root / "settings.json")
 
     def update_inspector(self, title: str, data: object) -> None:
+        self.inspector_title.setProperty("i18n_key_text", None)
         self.inspector_title.setText(title)
+        self.inspector_content.setProperty("shellInspectorEmpty", False)
         try:
             text = json.dumps(data, ensure_ascii=False, indent=2, default=str)
         except (TypeError, ValueError):
