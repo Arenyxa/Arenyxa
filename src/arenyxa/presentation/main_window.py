@@ -535,7 +535,7 @@ class MainWindow(MainWindowNavigationMixin, MainWindowOperationsMixin, MainWindo
         inspector_layout.addLayout(inspector_header)
         self.inspector_content = QPlainTextEdit()
         self.inspector_content.setReadOnly(True)
-        self.inspector_content.setPlainText(source_text("shell.inspector.empty")); self.inspector_content.setProperty("i18n_key_plain_text", "shell.inspector.empty")
+        self.inspector_content.setPlainText(source_text("shell.inspector.empty")); self.inspector_content.setProperty("shellInspectorEmpty", True)
         inspector_layout.addWidget(self.inspector_content, 1)
         root.addWidget(self.inspector)
 
