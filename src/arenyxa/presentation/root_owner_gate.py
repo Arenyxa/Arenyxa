@@ -14,6 +14,7 @@ from arenyxa.domain.errors import ArenyxaError
 from arenyxa.qt_compat.QtCore import QEventLoop, QTimer, Qt
 from arenyxa.qt_compat.QtWidgets import QFileDialog, QInputDialog, QLineEdit, QMessageBox
 from arenyxa.presentation.background import run_background
+from arenyxa.presentation.i18n_runtime import current_text
 
 LOGGER = logging.getLogger(__name__)
 ROOT_AUTH_ERRORS = (ArenyxaError, OSError, RuntimeError, ValueError, TypeError, KeyError)
@@ -28,26 +29,17 @@ def _sync_root_capability_state(context: Any, manager: Any) -> None:
 
 
 def _security_message(status: Any) -> str:
-    base = (
-        "检测到此设备曾由 Root Owner 注册为 Arenyxa Root Workstation。\n\n"
-        "为保护根开发者权限，请验证 Root Owner 身份后继续。\n"
-        "本次启动不会从设备绑定自动恢复 Root 权限；未完成验证前，Arenyxa 主界面、"
-        "Developer Runtime 与 Root 能力全部保持锁定。\n\n"
-        "Developer Root Private Key 必须继续保持离线；此处仅验证受信任的 Root Owner Device Key。"
-    )
+    base = current_text("root_gate.owner.security_message")
     if bool(getattr(status, "locked", False)):
-        base += (
-            "\n\n此 Root Workstation 当前处于安全锁定状态。"
-            "只有成功完成 Root Owner 强认证才能解除锁定。"
-        )
+        base += current_text("root_gate.owner.security_locked_suffix")
     return base
 
 
 def _ask_to_authenticate(status: Any) -> bool:
     box = QMessageBox()
-    box.setWindowTitle("Arenyxa Root Owner 安全验证")
+    box.setWindowTitle(current_text("root_gate.owner.auth_window_title"))
     box.setIcon(QMessageBox.Icon.Warning if bool(getattr(status, "locked", False)) else QMessageBox.Icon.Information)
-    box.setText("检测到 Root Owner 工作站，请完成强制身份验证")
+    box.setText(current_text("root_gate.owner.auth_prompt"))
     box.setInformativeText(_security_message(status))
     box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
     box.setDefaultButton(QMessageBox.StandardButton.Yes)
@@ -58,11 +50,10 @@ def _ask_to_authenticate(status: Any) -> bool:
 def _notify_locked(reason: str) -> None:
     QMessageBox.critical(
         None,
-        "Arenyxa Root Workstation 已锁定",
-        "Root Owner 强认证未完成，Arenyxa 已进入 Root Security Lock 并将退出。\n\n"
-        "普通模式不会绕过此锁定。下次启动仍必须完成 Root Owner 强认证；"
-        "只有有效的 Root Owner Device Key 证明可以解除锁定。\n"
-        f"Security state: {reason or 'ROOT_OWNER_AUTH_REQUIRED'}",
+        current_text("root_gate.owner.locked_title"),
+        current_text("root_gate.owner.locked_message").format(
+            reason=reason or "ROOT_OWNER_AUTH_REQUIRED"
+        ),
     )
 
 
@@ -108,16 +99,16 @@ def _authenticate_owner_device(context: Any, manager: Any, vault_path: str, pass
 def _prompt_owner_secret(context: Any) -> tuple[str, str] | None:
     vault_path, _ = QFileDialog.getOpenFileName(
         None,
-        "选择 Root Owner Device Key Vault",
+        current_text("root_gate.owner.select_vault"),
         str(context.paths.root),
-        "Arenyxa Owner Key Vault (*.aryxkey *.json);;JSON (*.json);;All Files (*)",
+        current_text("root_gate.owner.vault_filter"),
     )
     if not vault_path:
         return None
     passphrase, ok = QInputDialog.getText(
         None,
-        "Root Owner 强认证",
-        "Root Owner Device Key 口令：",
+        current_text("root_gate.owner.passphrase_title"),
+        current_text("root_gate.owner.passphrase_prompt"),
         QLineEdit.EchoMode.Password,
     )
     if not ok or not passphrase:
@@ -176,10 +167,11 @@ def enforce_root_owner_startup_gate(context: Any) -> bool:
                 return False
             QMessageBox.warning(
                 None,
-                "Root Owner 验证失败",
-                "Root Owner 身份验证失败。Arenyxa 仍保持锁定。\n\n"
-                f"Root Security Lock 前剩余尝试次数：{remaining}\n"
-                f"Security code: {getattr(exc, 'code', type(exc).__name__)}",
+                current_text("root_gate.owner.failed_title"),
+                current_text("root_gate.owner.failed_message").format(
+                    remaining=remaining,
+                    code=getattr(exc, "code", type(exc).__name__),
+                ),
             )
         finally:
             passphrase = ""
@@ -213,17 +205,25 @@ def authenticate_root_owner_in_shell(context: Any, shell: Any) -> bool:
             LOGGER.exception("Root workstation identity probe failed")
     protector = getattr(getattr(manager, "root_workstation", None), "protector", None)
     tpm_status = (
-        f"{getattr(protector, 'name', 'protected-key')} available"
+        current_text("root_gate.owner.protector_available").format(
+            provider=getattr(protector, "name", "protected-key")
+        )
         if bool(getattr(getattr(manager, "root_workstation", None), "supported", False))
-        else "Protected key provider unavailable"
+        else current_text("root_gate.owner.protector_unavailable")
     )
     shell.show_authentication(
-        device_identity=str(getattr(binding, "owner_id", "") or "Registered Root Workstation"),
+        device_identity=str(
+            getattr(binding, "owner_id", "")
+            or current_text("root_gate.owner.registered_workstation")
+        ),
         tpm_status=tpm_status,
-        fingerprint=str(getattr(binding, "fingerprint", "") or "Pending challenge"),
+        fingerprint=str(
+            getattr(binding, "fingerprint", "")
+            or current_text("root_gate.owner.pending_challenge")
+        ),
     )
     if manager is None or not manager.ready:
-        shell.authentication_page.set_failed("Root trust backend unavailable.")
+        shell.authentication_page.set_failed(current_text("root_gate.owner.backend_unavailable"))
 
     loop = QEventLoop(shell)
     result = {"mode": "denied"}
@@ -231,7 +231,7 @@ def authenticate_root_owner_in_shell(context: Any, shell: Any) -> bool:
 
     def verify(vault_path: str, passphrase: str) -> None:
         if manager is None or not manager.ready:
-            authentication.set_failed("Root trust backend unavailable.")
+            authentication.set_failed(current_text("root_gate.owner.backend_unavailable"))
             return
 
         started = time.perf_counter()
