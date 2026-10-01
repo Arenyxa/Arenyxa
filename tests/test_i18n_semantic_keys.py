@@ -66,6 +66,21 @@ ENTERPRISE_MACHINE_IDENTIFIERS = {
     "enterprise.vault.manage",
     "enterprise.workspace.manage",
 }
+SHELL_MACHINE_IDENTIFIERS = {
+    "studio.autopilot",
+    "studio.blueprint",
+    "studio.compatibility",
+    "studio.debugger",
+    "studio.http",
+    "studio.live",
+    "studio.portability",
+    "studio.profiles",
+    "studio.recorder",
+    "studio.secrets",
+    "studio.selector",
+    "studio.smartpath",
+    "studio.workers",
+}
 KEY = re.compile(
     r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|studio_intelligence|dashboard|task_center|tasks|data|search|version|visualization|tools_console|tools_logs|tools_platform|tools_plugins|tools_automation|tools_workflow|enterprise|tools_terminal|shell)\.[A-Za-z0-9_.]+)(?:"|\')'
 )
@@ -79,6 +94,7 @@ def _referenced_keys() -> set[str]:
     keys.discard("settings.json")
     keys.discard("visualization.png")
     keys.difference_update(ENTERPRISE_MACHINE_IDENTIFIERS)
+    keys.difference_update(SHELL_MACHINE_IDENTIFIERS)
     for profile in EXPERIENCE_PROFILES:
         keys.add(f"welcome.profile.{profile.id}.title")
         keys.add(f"welcome.profile.{profile.id}.summary")
@@ -240,6 +256,13 @@ def test_terminal_help_is_catalog_backed() -> None:
         encoding="utf-8"
     )
     assert 'return current_text("tools_terminal.help.text")' in source
+
+
+def test_shell_navigation_machine_ids_remain_untranslated() -> None:
+    source = (ROOT / "src/arenyxa/presentation/main_window.py").read_text(encoding="utf-8")
+    for identifier in SHELL_MACHINE_IDENTIFIERS:
+        assert identifier in source
+        assert identifier not in _referenced_keys()
 
 
 def test_shell_inspector_localization_does_not_overwrite_dynamic_context() -> None:
