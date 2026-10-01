@@ -18,6 +18,7 @@ from arenyxa.application.general_user import GeneralUserIntentRouter
 from arenyxa.domain.enums import RunStatus, TaskStatus
 from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.language import LanguageManager
+from arenyxa.presentation.shell_window import _STARTUP_ACTIVITY_KEYS
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -95,6 +96,9 @@ def _referenced_keys() -> set[str]:
         keys.add(f"tasks.status.{status.value}")
     for status in RunStatus:
         keys.add(f"tasks.run_status.{status.value}")
+    for startup_key in set(_STARTUP_ACTIVITY_KEYS.values()):
+        keys.add(f"shell.startup.state.{startup_key}")
+        keys.add(f"shell.startup.hint.{startup_key}")
     return keys
 
 
@@ -251,6 +255,13 @@ def test_shell_inspector_localization_does_not_overwrite_dynamic_context() -> No
     assert 'setProperty("shellInspectorEmpty", False)' in nav_source
     assert 'property("shellInspectorEmpty")' in lifecycle_source
     assert 'current_text("shell.inspector.empty")' in lifecycle_source
+
+
+def test_shell_startup_dynamic_keys_are_catalog_backed() -> None:
+    required = _referenced_keys()
+    for startup_key in set(_STARTUP_ACTIVITY_KEYS.values()):
+        assert f"shell.startup.state.{startup_key}" in required
+        assert f"shell.startup.hint.{startup_key}" in required
 
 
 def test_task_center_workflow_catalogs_cover_router_workflows() -> None:
