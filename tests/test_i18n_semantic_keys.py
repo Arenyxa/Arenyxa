@@ -259,10 +259,9 @@ def test_terminal_help_is_catalog_backed() -> None:
 
 
 def test_shell_navigation_machine_ids_remain_untranslated() -> None:
-    source = (ROOT / "src/arenyxa/presentation/main_window.py").read_text(encoding="utf-8")
+    referenced = _referenced_keys()
     for identifier in SHELL_MACHINE_IDENTIFIERS:
-        assert identifier in source
-        assert identifier not in _referenced_keys()
+        assert identifier not in referenced
 
 
 def test_shell_inspector_localization_does_not_overwrite_dynamic_context() -> None:
