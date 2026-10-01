@@ -58,6 +58,21 @@ MIGRATED_UI_FILES = (
 )
 CATALOG_LOCALES = ("en_US", "zh_CN", "fr_FR", "de_DE", "ja_JP")
 CJK = re.compile(r"[\u3400-\u9fff]")
+PRESENTATION_ROOT = ROOT / "src/arenyxa/presentation"
+PRESENTATION_PAGE_FILES = tuple(sorted((PRESENTATION_ROOT / "pages").glob("*.py")))
+PRESENTATION_CJK_RESOURCE_FILES = {
+    PRESENTATION_ROOT / "language.py",
+    PRESENTATION_ROOT / "language_enterprise.py",
+    PRESENTATION_ROOT / "i18n_catalog.py",
+    PRESENTATION_ROOT / "repair_dialog.py",
+    PRESENTATION_ROOT / "product_copy.py",
+    PRESENTATION_ROOT / "themes.py",
+}
+PRESENTATION_RUNTIME_FILES = tuple(
+    path
+    for path in sorted(PRESENTATION_ROOT.glob("*.py"))
+    if path not in PRESENTATION_CJK_RESOURCE_FILES
+)
 ENTERPRISE_MACHINE_IDENTIFIERS = {
     "enterprise.account.manage",
     "enterprise.audit.read",
@@ -118,6 +133,24 @@ def _referenced_keys() -> set[str]:
         keys.add(f"shell.startup.state.{startup_key}")
         keys.add(f"shell.startup.hint.{startup_key}")
     return keys
+
+
+def test_all_presentation_pages_do_not_embed_cjk_ui_copy() -> None:
+    assert PRESENTATION_PAGE_FILES, "presentation/pages discovery unexpectedly returned no Python files"
+    for path in PRESENTATION_PAGE_FILES:
+        text = path.read_text(encoding="utf-8")
+        assert not CJK.search(text), f"hard-coded CJK UI copy remains in presentation page {path}"
+
+
+def test_presentation_runtime_modules_do_not_embed_cjk_ui_copy() -> None:
+    for path in PRESENTATION_RUNTIME_FILES:
+        text = path.read_text(encoding="utf-8")
+        assert not CJK.search(text), f"hard-coded CJK UI copy remains in presentation runtime {path}"
+
+
+def test_presentation_cjk_resource_allowlist_is_explicit_and_existing() -> None:
+    for path in PRESENTATION_CJK_RESOURCE_FILES:
+        assert path.is_file(), f"stale presentation CJK resource allowlist entry: {path}"
 
 
 def test_migrated_pages_do_not_embed_cjk_ui_copy() -> None:
