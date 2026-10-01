@@ -46,6 +46,12 @@ MIGRATED_UI_FILES = (
     ROOT / "src/arenyxa/presentation/pages/enterprise_distributed_actions.py",
     ROOT / "src/arenyxa/presentation/pages/tools_terminal_execution.py",
     ROOT / "src/arenyxa/presentation/pages/tools_terminal_workspace.py",
+    ROOT / "src/arenyxa/presentation/command_palette.py",
+    ROOT / "src/arenyxa/presentation/main_window.py",
+    ROOT / "src/arenyxa/presentation/main_window_lifecycle.py",
+    ROOT / "src/arenyxa/presentation/main_window_navigation.py",
+    ROOT / "src/arenyxa/presentation/main_window_operations.py",
+    ROOT / "src/arenyxa/presentation/shell_window.py",
 )
 CATALOG_LOCALES = ("en_US", "zh_CN", "fr_FR", "de_DE", "ja_JP")
 CJK = re.compile(r"[\u3400-\u9fff]")
@@ -60,7 +66,7 @@ ENTERPRISE_MACHINE_IDENTIFIERS = {
     "enterprise.workspace.manage",
 }
 KEY = re.compile(
-    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|studio_intelligence|dashboard|task_center|tasks|data|search|version|visualization|tools_console|tools_logs|tools_platform|tools_plugins|tools_automation|tools_workflow|enterprise|tools_terminal)\.[A-Za-z0-9_.]+)(?:"|\')'
+    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|studio_intelligence|dashboard|task_center|tasks|data|search|version|visualization|tools_console|tools_logs|tools_platform|tools_plugins|tools_automation|tools_workflow|enterprise|tools_terminal|shell)\.[A-Za-z0-9_.]+)(?:"|\')'
 )
 
 
@@ -230,6 +236,21 @@ def test_terminal_help_is_catalog_backed() -> None:
         encoding="utf-8"
     )
     assert 'return current_text("tools_terminal.help.text")' in source
+
+
+def test_shell_inspector_localization_does_not_overwrite_dynamic_context() -> None:
+    main_source = (ROOT / "src/arenyxa/presentation/main_window.py").read_text(encoding="utf-8")
+    nav_source = (ROOT / "src/arenyxa/presentation/main_window_navigation.py").read_text(
+        encoding="utf-8"
+    )
+    lifecycle_source = (ROOT / "src/arenyxa/presentation/main_window_lifecycle.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'setProperty("shellInspectorEmpty", True)' in main_source
+    assert 'setProperty("i18n_key_text", None)' in nav_source
+    assert 'setProperty("shellInspectorEmpty", False)' in nav_source
+    assert 'property("shellInspectorEmpty")' in lifecycle_source
+    assert 'current_text("shell.inspector.empty")' in lifecycle_source
 
 
 def test_task_center_workflow_catalogs_cover_router_workflows() -> None:
