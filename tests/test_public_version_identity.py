@@ -71,6 +71,17 @@ def test_compatibility_contracts_follow_public_identity_without_resetting_protoc
     assert ("plugin-api", "plugin", "6.8.0") in names
 
 
+def test_product_copy_uses_public_v01_and_keeps_v82_internal_only() -> None:
+    text = (ROOT / "src/arenyxa/presentation/product_copy.py").read_text(encoding="utf-8")
+    assert "Arenyxa v0.1" in text
+    assert "GitHub 正式公开版本" in text
+    assert "内部工程基线为 v8.2.0" in text
+    assert "发行与包装版本为 0.1.0" in text
+    assert "V8.2.0 稳定源码发行" not in text
+    assert "统一为 8.2 / 8.2.0 产品身份" not in text
+    assert "运行时短版本是 8.2" not in text
+
+
 def test_versioning_document_declares_public_reset() -> None:
     text = (ROOT / "VERSIONING.md").read_text(encoding="utf-8")
     assert "GitHub release line starts at **v0.1**" in text
