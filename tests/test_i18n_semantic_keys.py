@@ -18,6 +18,7 @@ from arenyxa.application.general_user import GeneralUserIntentRouter
 from arenyxa.domain.enums import RunStatus, TaskStatus
 from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.language import LanguageManager
+from arenyxa.presentation.shell_window import _STARTUP_ACTIVITY_KEYS
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,6 +47,12 @@ MIGRATED_UI_FILES = (
     ROOT / "src/arenyxa/presentation/pages/enterprise_distributed_actions.py",
     ROOT / "src/arenyxa/presentation/pages/tools_terminal_execution.py",
     ROOT / "src/arenyxa/presentation/pages/tools_terminal_workspace.py",
+    ROOT / "src/arenyxa/presentation/command_palette.py",
+    ROOT / "src/arenyxa/presentation/main_window.py",
+    ROOT / "src/arenyxa/presentation/main_window_lifecycle.py",
+    ROOT / "src/arenyxa/presentation/main_window_navigation.py",
+    ROOT / "src/arenyxa/presentation/main_window_operations.py",
+    ROOT / "src/arenyxa/presentation/shell_window.py",
 )
 CATALOG_LOCALES = ("en_US", "zh_CN", "fr_FR", "de_DE", "ja_JP")
 CJK = re.compile(r"[\u3400-\u9fff]")
@@ -59,8 +66,23 @@ ENTERPRISE_MACHINE_IDENTIFIERS = {
     "enterprise.vault.manage",
     "enterprise.workspace.manage",
 }
+SHELL_MACHINE_IDENTIFIERS = {
+    "studio.autopilot",
+    "studio.blueprint",
+    "studio.compatibility",
+    "studio.debugger",
+    "studio.http",
+    "studio.live",
+    "studio.portability",
+    "studio.profiles",
+    "studio.recorder",
+    "studio.secrets",
+    "studio.selector",
+    "studio.smartpath",
+    "studio.workers",
+}
 KEY = re.compile(
-    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|studio_intelligence|dashboard|task_center|tasks|data|search|version|visualization|tools_console|tools_logs|tools_platform|tools_plugins|tools_automation|tools_workflow|enterprise|tools_terminal)\.[A-Za-z0-9_.]+)(?:"|\')'
+    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|studio_intelligence|dashboard|task_center|tasks|data|search|version|visualization|tools_console|tools_logs|tools_platform|tools_plugins|tools_automation|tools_workflow|enterprise|tools_terminal|shell)\.[A-Za-z0-9_.]+)(?:"|\')'
 )
 
 
@@ -72,6 +94,7 @@ def _referenced_keys() -> set[str]:
     keys.discard("settings.json")
     keys.discard("visualization.png")
     keys.difference_update(ENTERPRISE_MACHINE_IDENTIFIERS)
+    keys.difference_update(SHELL_MACHINE_IDENTIFIERS)
     for profile in EXPERIENCE_PROFILES:
         keys.add(f"welcome.profile.{profile.id}.title")
         keys.add(f"welcome.profile.{profile.id}.summary")
@@ -89,6 +112,9 @@ def _referenced_keys() -> set[str]:
         keys.add(f"tasks.status.{status.value}")
     for status in RunStatus:
         keys.add(f"tasks.run_status.{status.value}")
+    for startup_key in set(_STARTUP_ACTIVITY_KEYS.values()):
+        keys.add(f"shell.startup.state.{startup_key}")
+        keys.add(f"shell.startup.hint.{startup_key}")
     return keys
 
 
@@ -230,6 +256,34 @@ def test_terminal_help_is_catalog_backed() -> None:
         encoding="utf-8"
     )
     assert 'return current_text("tools_terminal.help.text")' in source
+
+
+def test_shell_navigation_machine_ids_remain_untranslated() -> None:
+    referenced = _referenced_keys()
+    for identifier in SHELL_MACHINE_IDENTIFIERS:
+        assert identifier not in referenced
+
+
+def test_shell_inspector_localization_does_not_overwrite_dynamic_context() -> None:
+    main_source = (ROOT / "src/arenyxa/presentation/main_window.py").read_text(encoding="utf-8")
+    nav_source = (ROOT / "src/arenyxa/presentation/main_window_navigation.py").read_text(
+        encoding="utf-8"
+    )
+    lifecycle_source = (ROOT / "src/arenyxa/presentation/main_window_lifecycle.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'setProperty("shellInspectorEmpty", True)' in main_source
+    assert 'setProperty("i18n_key_text", None)' in nav_source
+    assert 'setProperty("shellInspectorEmpty", False)' in nav_source
+    assert 'property("shellInspectorEmpty")' in lifecycle_source
+    assert 'current_text("shell.inspector.empty")' in lifecycle_source
+
+
+def test_shell_startup_dynamic_keys_are_catalog_backed() -> None:
+    required = _referenced_keys()
+    for startup_key in set(_STARTUP_ACTIVITY_KEYS.values()):
+        assert f"shell.startup.state.{startup_key}" in required
+        assert f"shell.startup.hint.{startup_key}" in required
 
 
 def test_task_center_workflow_catalogs_cover_router_workflows() -> None:

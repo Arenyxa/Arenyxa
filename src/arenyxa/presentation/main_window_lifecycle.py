@@ -41,6 +41,7 @@ from arenyxa.domain.enums import MotionIntent
 from arenyxa.domain.models import MotionProfile
 from arenyxa.presentation.background import begin_background_shutdown, run_background
 from arenyxa.presentation.glass import GlassPanel
+from arenyxa.presentation.i18n_runtime import current_text
 from arenyxa.presentation.language import LanguageManager
 from arenyxa.presentation.launch_geometry import LaunchGeometryPlan
 from arenyxa.presentation.motion import MotionOrchestrator
@@ -151,6 +152,8 @@ class MainWindowLifecycleMixin:
         for surface in (self.nav, self.topbar, self.inspector, self.statusBar()):
             if isinstance(surface, QWidget):
                 self.language.translate_tree(surface)
+        if bool(self.inspector_content.property("shellInspectorEmpty")):
+            self.inspector_content.setPlainText(current_text("shell.inspector.empty"))
         current = self.pages.get(self.current_page_id)
         if isinstance(current, QWidget):
             self.language.translate_tree(current)
@@ -167,10 +170,10 @@ class MainWindowLifecycleMixin:
     def open_project(self, project_path: Path) -> None:
         try:
             manifest = self.context.projects.validate(project_path)
-            self.show_status(f"项目已验证：{manifest.name} {manifest.version}")
+            self.show_status(current_text("shell.project.verified").format(name=manifest.name, version=manifest.version))
             self.update_inspector(".arenyxa Project", manifest)
         except Exception as exc:                                                                     
-            QMessageBox.critical(self, "项目无法打开", str(exc))
+            QMessageBox.critical(self, current_text("shell.project.open_failed_title"), str(exc))
 
     def restore_window_state(self) -> None:
         settings = QSettings(str(self.context.paths.root / "window.ini"), QSettings.Format.IniFormat)
@@ -208,8 +211,8 @@ class MainWindowLifecycleMixin:
         if active and not self._repair_exit_requested:
             choice = QMessageBox.question(
                 self,
-                "安全关闭",
-                f"仍有 {len(active)} 个后台任务。停止任务并退出？",
+                current_text("shell.shutdown.title"),
+                current_text("shell.shutdown.active_tasks").format(count=len(active)),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             )
             if choice != QMessageBox.StandardButton.Yes:
