@@ -53,6 +53,8 @@ MIGRATED_UI_FILES = (
     ROOT / "src/arenyxa/presentation/main_window_navigation.py",
     ROOT / "src/arenyxa/presentation/main_window_operations.py",
     ROOT / "src/arenyxa/presentation/shell_window.py",
+    ROOT / "src/arenyxa/presentation/root_developer_gate.py",
+    ROOT / "src/arenyxa/presentation/root_owner_gate.py",
 )
 CATALOG_LOCALES = ("en_US", "zh_CN", "fr_FR", "de_DE", "ja_JP")
 CJK = re.compile(r"[\u3400-\u9fff]")
@@ -82,7 +84,7 @@ SHELL_MACHINE_IDENTIFIERS = {
     "studio.workers",
 }
 KEY = re.compile(
-    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|studio_intelligence|dashboard|task_center|tasks|data|search|version|visualization|tools_console|tools_logs|tools_platform|tools_plugins|tools_automation|tools_workflow|enterprise|tools_terminal|shell)\.[A-Za-z0-9_.]+)(?:"|\')'
+    r'(?:"|\')((?:welcome|personalization|settings|about|developer\.terms|theme|network|studio|studio_intelligence|dashboard|task_center|tasks|data|search|version|visualization|tools_console|tools_logs|tools_platform|tools_plugins|tools_automation|tools_workflow|enterprise|tools_terminal|shell|root_gate)\.[A-Za-z0-9_.]+)(?:"|\')'
 )
 
 
@@ -284,6 +286,20 @@ def test_shell_startup_dynamic_keys_are_catalog_backed() -> None:
     for startup_key in set(_STARTUP_ACTIVITY_KEYS.values()):
         assert f"shell.startup.state.{startup_key}" in required
         assert f"shell.startup.hint.{startup_key}" in required
+
+
+def test_root_gate_security_machine_values_remain_unlocalized() -> None:
+    developer_source = (ROOT / "src/arenyxa/presentation/root_developer_gate.py").read_text(
+        encoding="utf-8"
+    )
+    owner_source = (ROOT / "src/arenyxa/presentation/root_owner_gate.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'ROOT_CONFIRMATION_TEXT = "ROOT"' in developer_source
+    assert 'self.confirmation.text() == ROOT_CONFIRMATION_TEXT' in developer_source
+    assert '"platform.root"' in owner_source
+    assert '"ROOT_OWNER_AUTH_REQUIRED"' in owner_source
+    assert '"ROOT_OWNER_AUTH_ATTEMPTS_EXHAUSTED"' in owner_source
 
 
 def test_task_center_workflow_catalogs_cover_router_workflows() -> None:
