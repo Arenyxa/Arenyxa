@@ -39,8 +39,9 @@ The following high-visibility surfaces no longer embed Chinese user-facing copy 
 - Enterprise Identity / RBAC / Vault / Enrollment / Coordinator / Governance / Distributed Operations
 - Terminal execution / persistent Shell workspace / builtins / high-risk command confirmations
 - Main Window shell / navigation / command palette / startup recovery / Root Authority challenge
+- Root Developer / Root Owner break-glass and startup authentication gates
 
-Their user-facing copy is now sourced from semantic catalog keys under stable page/domain namespaces such as `welcome.*`, `personalization.*`, `settings.*`, `network.*`, `studio.*`, `studio_intelligence.*`, `dashboard.*`, `task_center.*`, `tasks.*`, `data.*`, `visualization.*`, `tools_*.*`, `tools_terminal.*`, `enterprise.*`, and `shell.*`.
+Their user-facing copy is now sourced from semantic catalog keys under stable page/domain namespaces such as `welcome.*`, `personalization.*`, `settings.*`, `network.*`, `studio.*`, `studio_intelligence.*`, `dashboard.*`, `task_center.*`, `tasks.*`, `data.*`, `visualization.*`, `tools_*.*`, `tools_terminal.*`, `enterprise.*`, `shell.*`, and `root_gate.*`.
 
 ## Regression protection
 
