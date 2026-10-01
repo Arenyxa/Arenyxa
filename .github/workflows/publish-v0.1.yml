@@ -1,0 +1,135 @@
+name: Publish Arenyxa v0.1
+
+on:
+  push:
+    branches:
+      - release/v0.1-publish
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - name: Checkout authoritative main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install deterministic packaging toolchain
+        shell: powershell
+        run: |
+          choco install innosetup --yes --no-progress
+          python -m pip install --upgrade pip
+
+      - name: Verify public release identity before build
+        shell: powershell
+        run: python scripts/verify_release_identity.py
+
+      - name: Reproducible Windows build
+        shell: powershell
+        run: .\scripts\reproducible_windows_build.ps1
+
+      - name: Prepare release assets
+        shell: powershell
+        run: |
+          $installer = Join-Path $PWD "dist\installer\Arenyxa_v0.1_Setup_x64.exe"
+          if (-not (Test-Path -LiteralPath $installer)) {
+            throw "Expected v0.1 installer not found: $installer"
+          }
+
+          $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          $sidecar = "$installer.sha256"
+          "$hash  Arenyxa_v0.1_Setup_x64.exe" | Set-Content -LiteralPath $sidecar -Encoding ascii
+
+          $commit = (git rev-parse HEAD).Trim()
+          $buildInfo = Join-Path $PWD "dist\installer\BUILD_INFO.txt"
+          @(
+            "Arenyxa public release: v0.1"
+            "Package/distribution: 0.1.0"
+            "Windows file version: 0.1.0.0"
+            "Internal engineering baseline: v8.2.0"
+            "Runtime/plugin compatibility: 6.8.0"
+            "Source commit: $commit"
+            "Installer SHA-256: $hash"
+          ) | Set-Content -LiteralPath $buildInfo -Encoding utf8
+
+          "ARENYXA_INSTALLER=$installer" >> $env:GITHUB_ENV
+          "ARENYXA_SHA256=$sidecar" >> $env:GITHUB_ENV
+          "ARENYXA_BUILD_INFO=$buildInfo" >> $env:GITHUB_ENV
+
+      - name: Mark historical v8 releases as internal engineering snapshots
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $repo = "${{ github.repository }}"
+          foreach ($tag in @("v8.1", "v8.1.1", "v8.2.0")) {
+            $json = gh release view $tag --repo $repo --json body 2>$null
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "Historical release $tag is not present; skipping."
+              continue
+            }
+            $existing = $json | ConvertFrom-Json
+            $warning = "> [!IMPORTANT]`r`n> **Internal engineering snapshot - not a public Arenyxa release version.**`r`n>`r`n> This v8.x tag predates the public version policy. The formal GitHub public release line starts at **v0.1**. This release and its original assets are retained only for engineering provenance and historical validation."
+            $notesPath = Join-Path $env:RUNNER_TEMP ($tag.Replace(".", "_") + "_notes.md")
+            ($warning + "`r`n`r`n---`r`n`r`n" + [string]$existing.body) | Set-Content -LiteralPath $notesPath -Encoding utf8
+            gh release edit $tag --repo $repo --prerelease --title "Arenyxa $tag (Internal Engineering Snapshot)" --notes-file $notesPath
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to update historical release $tag"
+            }
+          }
+
+      - name: Publish Arenyxa v0.1 release
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $repo = "${{ github.repository }}"
+          gh release view v0.1 --repo $repo *> $null
+          if ($LASTEXITCODE -eq 0) {
+            throw "Release v0.1 already exists; refusing to overwrite an existing formal release."
+          }
+
+          gh release create v0.1 `
+            "$env:ARENYXA_INSTALLER#Arenyxa v0.1 Windows x64 installer" `
+            "$env:ARENYXA_SHA256#SHA-256 verification sidecar" `
+            "$env:ARENYXA_BUILD_INFO#Build identity and provenance" `
+            --repo $repo `
+            --target main `
+            --title "Arenyxa v0.1" `
+            --notes-file "docs/release/V0.1_RELEASE_NOTES.md" `
+            --latest
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to publish Arenyxa v0.1"
+          }
+
+      - name: Verify published release
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view v0.1 --repo "${{ github.repository }}" --json tagName,name,isDraft,isPrerelease,isLatest,assets
+
+      - name: Upload reproducible build evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: arenyxa-v0.1-publication-evidence
+          path: |
+            dist/build/BUILD_REPORT.json
+            dist/installer/Arenyxa_v0.1_Setup_x64.exe
+            dist/installer/Arenyxa_v0.1_Setup_x64.exe.sha256
+            dist/installer/BUILD_INFO.txt
+            dist/security/SBOM.cdx.json
