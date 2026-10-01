@@ -47,9 +47,13 @@ Their user-facing copy is now sourced from semantic catalog keys under stable pa
 
 `tests/test_i18n_semantic_keys.py` enforces:
 
-- no CJK UI literals are reintroduced in the migrated page source files;
+- automatic discovery of every Python module under `src/arenyxa/presentation/pages/`; no page may introduce direct CJK UI literals;
+- automatic scanning of presentation runtime modules outside `pages/`, with an explicit allowlist only for translation/resource modules such as the language catalogs, Repair Center locale resources, centralized product copy, and bilingual theme source labels;
+- no CJK UI literals are reintroduced in the migrated semantic-key source files;
 - every referenced semantic key exists in each packaged locale catalog;
 - semantic widget keys re-render correctly when the active locale changes.
+
+This means newly added presentation pages are covered by the hard-code gate automatically and do not need to be manually added to a file list before CJK regressions can be detected.
 
 ## Remaining migration work
 
