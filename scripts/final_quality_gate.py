@@ -65,7 +65,7 @@ def _gates(python: str, *, full: bool, include_legacy: bool = False) -> list[Gat
         Gate("06_api_contract", (python, "scripts/api_contract_gate.py")),
         Gate("07_quality_20d", (python, "scripts/quality_20d_gate.py"), 180),
         Gate("08_autopilot_validation", (python, "scripts/autopilot_production_validation.py", "--samples", "200"), 120),
-        Gate("09_v81_release_identity", (python, "scripts/verify_v81_release_identity.py")),
+        Gate("09_public_release_identity", (python, "scripts/verify_release_identity.py")),
         Gate("09a_runtime_diagnostic", (python, "scripts/runtime_diagnostic.py")),
         Gate("09b_production_config", (python, "scripts/production_config_gate.py")),
         Gate("09c_recovery_validation", (python, "scripts/final_recovery_validation.py"), 360),

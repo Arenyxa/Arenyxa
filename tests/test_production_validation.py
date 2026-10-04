@@ -155,4 +155,3 @@ def test_multi_node_evidence_rejects_sqlite_and_weak_tls(tmp_path: Path) -> None
     base["deployment"]["tls_minimum"] = "TLSv1.2"
     path.write_text(json.dumps(base), encoding="utf-8")
     assert validate_multi_node_evidence(path)["status"] == "tls_policy_incomplete"
-

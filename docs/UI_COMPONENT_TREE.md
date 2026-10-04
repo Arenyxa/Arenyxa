@@ -58,4 +58,3 @@ QMainWindow Arenyxa
 ```
 
 布局不变量：主题、语言、侧栏折叠、DPI 和 Reduce Motion 变化不得移动功能入口或重建 `Task`、`Run`、表单、表格模型和捕获会话。
-

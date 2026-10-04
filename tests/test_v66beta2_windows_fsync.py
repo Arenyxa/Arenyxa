@@ -25,7 +25,7 @@ def test_fsync_existing_file_uses_write_capable_descriptor(tmp_path: Path, monke
 def test_windows_sensitive_runtime_flushes_use_portable_helper() -> None:
     root = Path(__file__).resolve().parents[1]
     expected = {
-        "src/arenyxa/infrastructure/database.py": "fsync_existing_file(temporary)",
+        "src/arenyxa/infrastructure/database_maintenance.py": "fsync_existing_file(temporary)",
         "src/arenyxa/application/export.py": "fsync_existing_file(temp_path)",
         "src/arenyxa/application/project_format.py": "fsync_existing_file(temporary)",
         "src/arenyxa/presentation/pages/settings.py": "fsync_existing_file(temporary)",

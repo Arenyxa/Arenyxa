@@ -185,11 +185,13 @@ try {
     if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "Arenyxa.exe is unavailable after the program-file phase: $exe" }
 
     Log 'Running configuration, database, cache, plugin and runtime repair stages...' Cyan
-    & $exe --repair-worker $PlanPath
-    $code = $LASTEXITCODE
-    if ($null -eq $code) { $code = 0 }
+    $repairArguments = @('--repair-worker', ('"{0}"' -f $PlanPath))
+    $worker = Start-Process -FilePath $exe -ArgumentList $repairArguments -WorkingDirectory $DataRoot -WindowStyle Hidden -PassThru
+    $worker.WaitForExit()
+    $code = $worker.ExitCode
+    if ($null -eq $code) { throw 'Repair worker did not provide an exit code.' }
     if ($code -eq 0) {
-        Log 'Automatic repair completed. Arenyxa has been restarted.' Green
+        Log 'Repair worker completed successfully. See the repair report for details.' Green
     } else {
         Log ("Repair completed with unresolved items (exit code {0}). See repair logs for details." -f $code) Yellow
     }

@@ -1,85 +1,47 @@
-# Arenyxa V7.0 Windows 安装包制作教程
+# Arenyxa v0.1 Windows 构建与安装验证
 
-## 1. 工具
+当前目标：`v0.1` / 包版本 `0.1.0` / PE `0.1.0.0`。状态为 **candidate、community unsigned、NOT READY FOR RELEASE**。本指南描述构建输入和验收步骤，不代表已经完成安装、签名、升级或发布。
 
-- Python 3.11、3.12 或 3.13 x64
-- PyInstaller 6.x（由 dev extra 安装）
-- Inno Setup 6 或 7
-- 可选：Windows SDK `signtool.exe` 与代码签名证书
+## 现代构建输入
 
-## 2. 准备与测试
+- Python 3.11–3.13 x64、项目声明的现代依赖与 PyInstaller 6.x。
+- Inno Setup 6 或 7；使用的具体编译器及产物哈希必须写入该次构建证据。
+- 与最终源码一致的修复种子和源清单；修改源码后应重新生成并核对最终安装载荷。
 
 ```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\scripts\bootstrap.ps1
-.\.venv\Scripts\python.exe .\scripts\verify_v73_release_identity.py
+.\scripts\bootstrap.ps1 -SkipBrowserRuntime
+.\.venv\Scripts\python.exe -B .\scripts\verify_release_identity.py
 .\scripts\test.ps1
+.\scripts\build.ps1 -RequireInno
 ```
 
-只有全部门禁通过后才制作安装包。v7.0 的构建脚本也会在打包前再次执行 release-identity gate，阻止版本号、Windows 文件属性、Inno Setup 文件名或 Release Attestation 版本发生漂移。
+预期输出：`dist/Arenyxa/Arenyxa.exe`、同目录服务组件，以及 `dist/installer/Arenyxa_v0.1_Setup_x64.exe`。身份门禁 PASS 仅说明源码元数据一致；构建完成后仍需读取实际 EXE/Installer 的版本属性、签名状态、哈希和载荷。`-SkipTests` 不能替代发布测试。
 
-## 3. Portable EXE 目录
+## 安装定义的实际行为
 
-```powershell
-.\.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean .\packaging\arenyxa.spec
-```
+现代与 legacy 安装定义均保留原 AppId `{62ED5A19-19D3-402F-8819-D06C9D4A768B}`；默认目录表达式为 `{autopf}\Arenyxa`。默认最低权限安装，并允许选择管理员模式。实际安装目录随安装模式解析，不能仅根据源码推断已经验证所有权限组合。
 
-输出：`dist\Arenyxa\Arenyxa.exe`。Spec 收集 PySide6 Qt 插件、lxml、openpyxl、DNS 与应用资源，排除浏览器运行时等超大可选组件。程序图标使用 `resources\icons\arenyxa.ico`；48 px 及以上保留完整核准图形，16/24/32 px 使用同一视觉语言的光学简化版本以保证 Windows 小图标可读性。`arenyxa.png` 使用 RGBA 透明外角，旧 `Arenyxa` 字样品牌图已从发行资源中移除；当前构建仅使用无文字的通用应用图标 `arenyxa.png` / `arenyxa.ico`。
+安装器提供中英文界面、自选桌面快捷方式、开始菜单入口、`.arenyxa` 文件关联与卸载入口。现代安装器仅在管理员模式下提供可选 Windows Service 安装任务。`[Code]` 未实现旧 EXE 清理；不能宣称安装成功后会执行额外旧程序删除。
 
-在干净 Windows Sandbox/虚拟机中检查：
+`[UninstallRun]` 会尝试移除现代服务。源码没有静默删除用户数据目录的卸载规则；实际卸载后数据、服务、快捷方式与关联的结果必须在干净环境中核验。默认应用数据根由 `AppPaths` 决定，可通过 `--data-dir` 显式指定独立验证目录。
 
-1. `Arenyxa.exe --version`
-2. 首次启动目录与 SQLite 初始化
-3. 100%/125%/150%/200% DPI
-4. 六主题、RTL、Reduce Motion
-5. 建任务 → 预览 → Run → 数据 → 导出
-6. HAR 导入与无 packet-analysis runtime 时的可执行降级提示
-7. 非管理员用户启动/退出
+## Candidate 验收记录
 
-## 4. Inno Setup Installer
+在干净 Windows 虚拟机或可恢复测试机上分别记录每步的系统版本、权限、结果、日志与截图：
 
-安装 Inno Setup 6 或 7 后运行：
+1. 读取实际安装器/EXE 的 `0.1.0`、`0.1.0.0` 元数据与签名状态；首次安装，确认程序文件及首次启动。
+2. `Arenyxa.exe --version` 显示 `Arenyxa 0.1`；该命令不能证明 GUI 正常。
+3. 非管理员启动、关闭、重启；在中英文、DPI、主题与 Reduce Motion 条件下检查关键工作流。
+4. 创建任务、运行/取消、查看数据、导出，并核对预期磁盘结果；记录缺失抓包/浏览器依赖时的提示。
+5. 从实际旧工程版本覆盖安装，核对迁移、保留数据与失败恢复。8.x → 0.1 的数字回退没有已验证的升级结论；先备份并在可丢弃环境验证。
+6. 卸载后检查服务、快捷方式、文件关联和安装目录，并证明用户数据按约定保留。
 
-```powershell
-.\scripts\build.ps1
-```
+本轮环境调查未找到可直接使用的干净 Windows VM。源码启动、单元测试、offscreen UI 或普通开发机安装不能替代干净机器验收。最终证据产生前保持 `NOT TESTED` / `BLOCKED`。
 
-输出：`dist\installer\Arenyxa_V7.0_Setup_x64.exe`。
+## 签名与信任
 
-Installer 会：
+本候选版按 **community unsigned** 处理。不得把 Developer Root、Owner、Enterprise Root 凭据用于产品发布签名；也不得把签名密钥、密码、私有证书或真实数据打包到发行物。Release Attestation 与 Windows Authenticode 是不同验证机制，任意一项存在都不能代替另一项的实测结果。当前指南不执行或宣称已完成签名。
 
-- 安装到当前用户可写的 `{autopf}\Arenyxa`
-- 创建开始菜单入口
-- 可选创建桌面快捷方式
-- 注册新的 `.arenyxa` 文件类型，并保留 `.arenyxa` 兼容打开命令
-- 在 Windows 应用列表注册卸载程序
-- 使用正式 Arenyxa 图标作为 Setup、快捷方式、应用和卸载显示图标
-- 同 AppId 升级时不会在安装开始前删除旧 `Arenyxa.exe`；新 payload 成功进入 `ssPostInstall` 后才尝试清理旧 EXE，降低失败升级造成不可运行的风险
+## Legacy lane
 
-不把 packet-capture driver、packet-analysis runtime、Playwright Browser 或数据库驱动强制捆绑进基础安装包；这些能力在 UI 中有明确依赖检查和安装说明，基础安装体积保持可控。
-
-## 5. 代码签名（发布建议）
-
-在签名前先对构建产物做病毒扫描、SBOM 和依赖审查。使用组织证书：
-
-```powershell
-signtool sign /fd SHA256 /td SHA256 /tr https://timestamp.digicert.com /a .\dist\Arenyxa\Arenyxa.exe
-signtool sign /fd SHA256 /td SHA256 /tr https://timestamp.digicert.com /a .\dist\installer\Arenyxa_V7.0_Setup_x64.exe
-```
-
-验证：
-
-```powershell
-signtool verify /pa /v .\dist\installer\Arenyxa_V7.0_Setup_x64.exe
-```
-
-不要把私钥或证书密码写入仓库、脚本、CI 日志或 `.arenyxa` / 兼容 `.arenyxa` 项目。
-
-## 6. 升级与卸载测试
-
-1. 安装旧版 fixture，创建 Task/Run/Result/Capture/Revision。
-2. 安装 V7.0 覆盖升级；确认 migration 成功，历史事实不变。
-3. 卸载应用；确认程序文件/快捷方式/关联清除。
-4. 用户数据默认保留在 `%LOCALAPPDATA%\Arenyxa`，卸载程序不得静默删除。
-5. 若产品未来增加“删除用户数据”选项，必须显示路径和影响范围并要求独立确认。
-
+`legacy/win7` 使用 Python 3.8 / PySide2 冻结实现，目标是 Windows 7 SP1 x64 兼容环境。定义的安装器名为 `Arenyxa_v0.1_Legacy_Win7_x64_Setup.exe`，构建入口为 `scripts/build-win7.ps1`。元数据已统一，但 **legacy 构建、真实运行和安装均 NOT TESTED**。现代源码或 Python 3.8 语法检查通过不等于 legacy 环境验证。

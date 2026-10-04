@@ -142,4 +142,3 @@ Arenyxa 是永久免费的开源、本地优先的桌面 Web 数据采集、浏�
 - 可访问性：键盘导航、焦点、Tooltip/AccessibleName、非纯颜色状态、Reduce Motion 和高对比回退。
 - Windows：x64；PyInstaller portable build；Inno Setup Installer、快捷方式、文件关联和卸载程序。
 - 测试：单元、契约、集成、迁移、网络 mock、插件安全、Qt offscreen、视觉截图、安装启动和数据库完整性。
-

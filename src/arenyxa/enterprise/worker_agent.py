@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import http.client
+import hashlib
 import logging
 import ssl
 import threading
@@ -18,6 +19,7 @@ from arenyxa.enterprise.server_api import EnterpriseWorkerHTTPClient
 
 MIN_RECONNECT_BACKOFF_SECONDS = 1.0
 MAX_RECONNECT_BACKOFF_SECONDS = 30.0
+MAX_DRAINING_GENERATIONS = 2
 LOGGER = logging.getLogger(__name__)
 
 
@@ -296,16 +298,25 @@ class EnterpriseWorkerAgent:
 
     def _generation_for_work(self) -> _AgentGeneration:
         stale: _AgentGeneration | None = None
-        with self._lock:
-            generation = self._current_generation
-            if generation is None or generation.stop.is_set() or generation.shutdown_started:
-                if generation is not None:
-                    generation.stop.set()
-                    self._detach_generation_locked(generation)
-                    stale = generation
-                generation = self._new_generation_locked()
-        if stale is not None:
-            self._shutdown_generation(stale)
+        try:
+            with self._lock:
+                self._prune_draining_locked()
+                generation = self._current_generation
+                if generation is None or generation.stop.is_set() or generation.shutdown_started:
+                    if generation is not None:
+                        generation.stop.set()
+                        self._detach_generation_locked(generation)
+                        stale = generation
+                    if len(self._draining_generations) >= MAX_DRAINING_GENERATIONS:
+                        raise ArenyxaError(
+                            "WORKER_GENERATION_CAPACITY_EXHAUSTED",
+                            "Previous worker generations must finish before another executor can start",
+                            domain="WORKER",
+                        )
+                    generation = self._new_generation_locked()
+        finally:
+            if stale is not None:
+                self._shutdown_generation(stale)
         return generation
 
     def _shutdown_generation(self, generation: _AgentGeneration) -> None:
@@ -396,6 +407,17 @@ class EnterpriseWorkerAgent:
                     generation.handover_thread = None
                 self._prune_draining_locked()
 
+    def _start_handover_locked(self, generation: _AgentGeneration, leases: list[DistributedLease]) -> None:
+        handover = threading.Thread(
+            target=self._handover_generation,
+            args=(generation, leases),
+            name=f"arenyxa-enterprise-worker-handover-{generation.number}",
+            daemon=True,
+        )
+        generation.handover_thread = handover
+        self._draining_generations[generation.number] = generation
+        handover.start()
+
     def stop(self, *, timeout: float = 15.0, cancel_running: bool = False) -> bool:
         deadline = time.monotonic() + max(0.0, float(timeout))
         with self._lock:
@@ -411,15 +433,8 @@ class EnterpriseWorkerAgent:
             leases = list(generation.active_leases.values())
 
         if cancel_running and leases:
-            handover = threading.Thread(
-                target=self._handover_generation,
-                args=(generation, leases),
-                name=f"arenyxa-enterprise-worker-handover-{generation.number}",
-                daemon=True,
-            )
             with self._lock:
-                generation.handover_thread = handover
-            handover.start()
+                self._start_handover_locked(generation, leases)
             for future in futures:
                 future.cancel()
 
@@ -428,6 +443,12 @@ class EnterpriseWorkerAgent:
         remaining = max(0.0, deadline - time.monotonic())
         if futures and remaining > 0.0:
             wait_futures(futures, timeout=remaining)
+        if not cancel_running:
+            with self._lock:
+                self._discard_stale_completed_locked(generation)
+                leases = list(generation.active_leases.values())
+                if leases:
+                    self._start_handover_locked(generation, leases)
         for future in futures:
             if not future.done():
                 future.cancel()
@@ -549,8 +570,16 @@ class EnterpriseWorkerAgent:
                     generation.thread = None
                 self._prune_draining_locked()
 
+    def _reconnect_delay(self, backoff: float, attempt: int) -> float:
+        """Stable per-worker jitter disperses retries within the existing 30s cap."""
+        base = max(MIN_RECONNECT_BACKOFF_SECONDS, min(MAX_RECONNECT_BACKOFF_SECONDS / 1.2, float(backoff)))
+        seed = f"{self.worker_id}:{int(attempt)}".encode("utf-8")
+        fraction = int.from_bytes(hashlib.blake2b(seed, digest_size=8).digest(), "big") / (2**64 - 1)
+        return min(MAX_RECONNECT_BACKOFF_SECONDS, base * (1.0 + 0.2 * fraction))
+
     def _run(self, generation: _AgentGeneration, *, propagate_fatal: bool = False) -> None:
         backoff = max(MIN_RECONNECT_BACKOFF_SECONDS, self.idle_seconds)
+        reconnect_attempt = 0
         while not generation.stop.is_set():
             try:
                 if not self._authenticated_at:
@@ -585,6 +614,7 @@ class EnterpriseWorkerAgent:
                         break
                     accepted += 1
                 backoff = self.idle_seconds
+                reconnect_attempt = 0
                 if accepted == 0:
                     generation.stop.wait(self.idle_seconds)
             except (ArenyxaError, OSError, RuntimeError, ValueError, TypeError, http.client.HTTPException) as exc:
@@ -609,7 +639,8 @@ class EnterpriseWorkerAgent:
                     with self._lock:
                         if self._current_generation is generation:
                             self._authenticated_at = ""
-                generation.stop.wait(backoff)
+                generation.stop.wait(self._reconnect_delay(backoff, reconnect_attempt))
+                reconnect_attempt += 1
                 backoff = min(
                     MAX_RECONNECT_BACKOFF_SECONDS,
                     max(MIN_RECONNECT_BACKOFF_SECONDS, self.idle_seconds, backoff * 2.0),

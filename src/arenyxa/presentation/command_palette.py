@@ -14,8 +14,6 @@ from arenyxa.qt_compat.QtWidgets import (
     QWidget,
 )
 
-from arenyxa.presentation.i18n_runtime import source_text
-
 
 class CommandPalette(QDialog):
     """Search and invoke shell commands without coupling mixins to MainWindow."""
@@ -32,7 +30,7 @@ class CommandPalette(QDialog):
         self.commands = commands
         layout = QVBoxLayout(self)
         self.query = QLineEdit()
-        self.query.setPlaceholderText(source_text("shell.palette.placeholder")); self.query.setProperty("i18n_key_placeholder", "shell.palette.placeholder")
+        self.query.setPlaceholderText("输入命令或页面名称")
         self.list = QListWidget()
         self.list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         layout.addWidget(self.query)

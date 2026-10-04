@@ -111,7 +111,7 @@ def _commands(env: dict[str, str]) -> list[Command]:
             unavailable_reason="ruff and/or mypy are not installed in this runtime",
         ),
         Command("python38_grammar", (py, "scripts/check_python38_grammar.py"), 240),
-        Command("v81_identity", (py, "scripts/verify_v81_release_identity.py"), 180),
+        Command("public_identity", (py, "scripts/verify_release_identity.py"), 180),
         Command("phase6_gate", (py, "scripts/v8_phase6_gate.py"), 900),
         Command("full_pytest", (py, "-m", "pytest", "-q", "--disable-warnings", "--maxfail=1"), 2400),
         Command("phase0_integrity", (py, "scripts/phase0_gate.py", "--skip-pytest", "--skip-static"), 600),
@@ -144,7 +144,7 @@ def _commands(env: dict[str, str]) -> list[Command]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Arenyxa v8.1 final release validation and evidence collector")
+    parser = argparse.ArgumentParser(description="Arenyxa v0.1 final release validation and evidence collector")
     parser.add_argument("--report", type=Path, default=ROOT / "V8_TEST_EVIDENCE.json")
     args = parser.parse_args(argv)
     env = dict(os.environ)
@@ -166,8 +166,8 @@ def main(argv: list[str] | None = None) -> int:
     external_complete = all(item.get("status") == "PASS" for item in external)
     payload = {
         "schema": "arenyxa.v8-test-evidence/v2",
-        "version": "8.1.1",
-        "package_version": "8.1.1",
+        "version": "0.1.0",
+        "package_version": "0.1.0",
         "started_at": started,
         "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "full": True,
@@ -187,7 +187,7 @@ def main(argv: list[str] | None = None) -> int:
     }
     _atomic(args.report.resolve(), payload)
     print(f"Evidence: {args.report.resolve()}")
-    print("V8.1 LOCAL ENGINEERING: PASS" if required_passed else "V8.1 LOCAL ENGINEERING: FAIL")
+    print("v0.1 LOCAL ENGINEERING: PASS" if required_passed else "v0.1 LOCAL ENGINEERING: FAIL")
     print("EXTERNAL CERTIFICATION: PASS" if external_complete else "EXTERNAL CERTIFICATION: PARTIAL / NOT EXECUTED")
     return 0 if required_passed else 1
 

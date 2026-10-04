@@ -78,4 +78,3 @@ def test_tls_client_hello_exposes_ja3_ja4_sni_alpn_and_cipher_intelligence() -> 
     assert decoded["ja3"] and len(decoded["ja3_md5"]) == 32
     assert decoded["ja4"].startswith("t13d")
     assert decoded["cipher_suites"] == ["0x1301", "0x1302"]
-

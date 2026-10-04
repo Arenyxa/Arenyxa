@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import re
+
+from arenyxa.presentation.critical_diagnostics import CRITICAL_UI_PHRASES, critical_for_locale
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -26,9 +28,9 @@ LOCALES = {
     "la_VA": "Latina",
 }
 
-                                                                                     
-                                                                                    
-                      
+
+
+
 EN = {
     "nav.task_center": "Task Center", "nav.dashboard": "Dashboard", "nav.tasks": "Capture Tasks", "nav.capture": "Capture", "nav.search": "Search Center",
     "nav.data": "Data Management", "nav.network": "Network Analysis", "nav.proxy": "Proxy Suite", "nav.api_security": "API Security Lab", "nav.forensics": "Forensics Lab", "nav.traffic_ai": "AI Traffic Intelligence", "nav.server_ops": "Fleet Control", "nav.mitm_proxy": "MITM Proxy", "nav.professional": "Professional Suite", "nav.extraction": "Extraction Lab", "nav.crawler": "Crawler Lab", "nav.workflow": "Flow Designer",
@@ -134,6 +136,7 @@ def _load_locale_catalogs() -> None:
 _load_locale_catalogs()
 
 
+
 PHRASES = {
     "仪表盘":"Dashboard", "概览您的本地网页索引与系统状态":"Overview of your local web index and system status",
     "抓取任务":"Capture Tasks", "搜索中心":"Search Center", "数据管理":"Data Management", "网络分析":"Network Analysis",
@@ -180,6 +183,7 @@ PHRASES = {
     "已请求协作式取消所有活动任务":"Cooperative cancellation requested for all active tasks", "活动任务暂停/恢复状态已更新":"Active-task pause/resume state updated",
     "请选择两个 Revision。":"Select two revisions.", "请选择包含 URL 的网络请求。":"Select a network request containing a URL.", "请选择包含 Host 的事件。":"Select an event containing a Host.",
     "请选择包含结果的 Run。":"Select a run containing results.", "请先创建任务":"Create a task first", "请先创建任务。":"Create a task first.",
+    "请先选择要运行的任务":"Select a task to run first.",
     "输入 JSON 数组":"Enter a JSON array", "Headers 必须是 JSON 对象。":"Headers must be a JSON object.", "输入命令或页面名称":"Enter a command or page name",
     "未知命令；输入 help。":"Unknown command; type help.", "系统命令已禁用。请在个性化/高级设置中启用 Developer Mode。":"System commands are disabled. Enable Developer Mode in Personalization/Advanced Settings.",
     "项目级工作目录；系统命令需 Developer Mode 并使用 ! 前缀":"Project working directory; system commands require Developer Mode and the ! prefix",
@@ -240,10 +244,10 @@ PHRASES.update({
     "恢复全部默认设置": "Restore all defaults",
 })
 
-                                                                                      
-                                                                                
 
-                                                                                             
+
+
+
 PHRASES.update({
     "界面缩放与字体": "Interface scale & text",
     "自动（随窗口大小）": "Auto (follow window size)",
@@ -351,8 +355,8 @@ PHRASES.update({
     "个后台任务。停止任务并退出？": " background tasks are still active. Stop them and exit?",
 })
 
-                                                                                       
-                                                                              
+
+
 PHRASES.update({
     "▷  开始抓取": "▷  Start Capture",
     "Ⅱ  暂停": "Ⅱ  Pause",
@@ -400,8 +404,8 @@ COMMON_NATIVE = {
 for _locale, _phrases in NATIVE_PHRASES.items():
     COMMON_NATIVE.setdefault(_locale, {}).update(_phrases)
 
-                                                                                        
-                                                                                                 
+
+
 for _locale, _table in TRANSLATIONS.items():
     if _locale in {"zh_CN", "en_US"}:
         continue
@@ -413,9 +417,9 @@ for _locale, _table in TRANSLATIONS.items():
 
 _CHINESE = re.compile(r"[\u3400-\u9fff]")
 
-                                                                                   
-                                                                                          
-                                                                        
+
+
+
 _ENGLISH_TO_ZH: dict[str, str] = {}
 for _zh_source, _english_source in PHRASES.items():
     if _CHINESE.search(_zh_source) and _english_source:
@@ -425,8 +429,8 @@ for _key, _english_source in EN.items():
     if _zh_source and _zh_source != _english_source:
         _ENGLISH_TO_ZH.setdefault(_english_source, _zh_source)
 
-                                                                                         
-                                                                                             
+
+
 _V653_ENGLISH_TO_ZH = {
     "Active request budget": "当前请求预算",
     "Analyze GraphQL / WebSocket / SSE": "分析 GraphQL / WebSocket / SSE",
@@ -594,7 +598,7 @@ for _native_table in COMMON_NATIVE.values():
 
 
 def _is_translatable_ui_literal(text: str) -> bool:
-    
+
 
 
 
@@ -608,7 +612,7 @@ def _is_translatable_ui_literal(text: str) -> bool:
         return True
     if re.fullmatch(r"\d+\s+(?:records|items|rows|events|issues?)", candidate, flags=re.IGNORECASE):
         return True
-                                                                                   
+
     for phrase in _TRANSLATABLE_ENGLISH:
         if len(phrase) >= 10 and phrase in candidate:
             return True
@@ -634,19 +638,15 @@ PHRASES.update({
     "之后可以在 设置 → 使用模式 中重新打开此页面。主题、字体、界面缩放与动效继续放在独立“个性化”页面。": "You can reopen this page later from Settings → Work Mode. Themes, typography, UI scale and motion remain in the separate Personalization page.",
 })
 
+PHRASES.update(CRITICAL_UI_PHRASES)
+
 def literal_for_locale(source: str, locale: str) -> str:
-    
-
-
-
-
-
     if not source:
         return source
     if locale in {"zh_CN", "zh_TW"}:
         chinese = source if _CHINESE.search(source) else _ENGLISH_TO_ZH.get(source, source)
         if chinese == source and not _CHINESE.search(source):
-                                                                                      
+
             chinese = source
             for english_phrase, zh_phrase in sorted(_ENGLISH_TO_ZH.items(), key=lambda item: len(item[0]), reverse=True):
                 if len(english_phrase) >= 10 and english_phrase in chinese:
@@ -658,6 +658,10 @@ def literal_for_locale(source: str, locale: str) -> str:
                         chinese,
                     )
         return chinese.translate(S2T) if locale == "zh_TW" else chinese
+
+    critical = critical_for_locale(source, locale)
+    if critical is not None:
+        return critical
 
     english = PHRASES.get(source)
     if english is None:
@@ -697,7 +701,7 @@ def literal_for_locale(source: str, locale: str) -> str:
 
 
 class LanguageManager(QObject):
-    
+
 
 
 
@@ -719,8 +723,8 @@ class LanguageManager(QObject):
         self.requested_locale = locale if locale in LOCALES else SYSTEM_LOCALE
         self.locale = resolve_system_locale() if self.requested_locale == SYSTEM_LOCALE else self.requested_locale
         self._pending_widgets: set[int] = set()
-                                                                                        
-                                                         
+
+
         self.application.installEventFilter(self)
 
     def text(self, key: str) -> str:
@@ -732,13 +736,13 @@ class LanguageManager(QObject):
         self.locale = resolve_system_locale() if self.requested_locale == SYSTEM_LOCALE else self.requested_locale
         qlocale = QLocale(self.locale)
         QLocale.setDefault(qlocale)
-                                                                                     
-                                                                                            
-                                                                                           
-                                                                                        
+
+
+
+
         self.application.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
-                                                                                                
-                                                                                      
+
+
         for top_level in self.application.topLevelWidgets():
             try:
                 top_level.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
@@ -769,7 +773,7 @@ class LanguageManager(QObject):
             try:
                 self.translate_tree(widget)
             except RuntimeError:
-                                                                                      
+
                 return
 
         QTimer.singleShot(0, run)
@@ -778,7 +782,7 @@ class LanguageManager(QObject):
     def _replace_english(text: str, english: str, native: str) -> str:
         if not english or english == native:
             return text
-                                                                                         
+
         if re.fullmatch(r"[A-Za-z0-9 _-]{1,12}", english) and " " not in english.strip():
             return re.sub(rf"(?<![A-Za-z0-9_]){re.escape(english)}(?![A-Za-z0-9_])", native, text)
         return text.replace(english, native)
@@ -791,13 +795,13 @@ class LanguageManager(QObject):
         if exact is not None:
             return exact
         result = source
-                                                                                         
-                                                                                            
+
+
         for zh, english in sorted(PHRASES.items(), key=lambda item: len(item[0]), reverse=True):
             if len(zh) <= 1:
                 continue
             result = result.replace(zh, english)
-                                                                                            
+
         result = result.replace(" 项", " items")
         if result.startswith("已") and len(result) > 1:
             result = "Done " + result[1:]
@@ -809,7 +813,7 @@ class LanguageManager(QObject):
         return literal_for_locale(source, self.locale)
 
     def translate_tree(self, root: QWidget) -> None:
-        
+
         widgets: Iterable[QWidget] = [root, *root.findChildren(QWidget)]
         for widget in widgets:
             title = widget.windowTitle()
@@ -830,9 +834,6 @@ class LanguageManager(QObject):
 
             if isinstance(widget, QTabWidget):
                 for index in range(widget.count()):
-                    semantic_key = widget.property(f"i18n_tab_key_{index}")
-                    if semantic_key:
-                        widget.setTabText(index, self.text(str(semantic_key))); continue
                     source_key = f"i18n_tab_{index}"
                     source = widget.property(source_key)
                     current = widget.tabText(index)
@@ -844,10 +845,6 @@ class LanguageManager(QObject):
 
             if isinstance(widget, QComboBox):
                 for index in range(widget.count()):
-                    semantic_key = widget.property(f"i18n_item_key_{index}")
-                    if semantic_key:
-                        widget.setItemText(index, self.text(str(semantic_key)))
-                        continue
                     source_key = f"i18n_item_{index}"
                     source = widget.property(source_key)
                     current = widget.itemText(index)
@@ -871,7 +868,7 @@ class LanguageManager(QObject):
                     if source:
                         item.setText(self.literal(str(source)))
 
-                                                                                          
+
             for attr in ("label", "center_top", "center_bottom"):
                 value = getattr(widget, attr, None)
                 if isinstance(value, str) and value:
@@ -884,7 +881,7 @@ class LanguageManager(QObject):
                         setattr(widget, attr, self.literal(str(source)))
                         widget.update()
 
-                                                                                                    
+
             if isinstance(widget, QPlainTextEdit) and widget.isReadOnly():
                 text = widget.toPlainText()
                 key = "i18n_plain_source"
@@ -908,7 +905,7 @@ class LanguageManager(QObject):
                     widget.setProperty(rendered_key, translated)
 
     def _apply_direction(self, widget: QWidget) -> None:
-        
+
 
 
 
@@ -965,18 +962,10 @@ class LanguageManager(QObject):
         current = getter()
         source_key = f"i18n_source_{name}"
         rendered_key = f"i18n_rendered_{name}"
-        semantic_key = widget.property(f"i18n_key_{name}")
-        if semantic_key:
-            prefix = str(widget.property(f"i18n_prefix_{name}") or "")
-            suffix = str(widget.property(f"i18n_suffix_{name}") or "")
-            translated = f"{prefix}{self.text(str(semantic_key))}{suffix}"
-            setter(translated)
-            widget.setProperty(rendered_key, translated)
-            return
         source = widget.property(source_key)
         rendered = widget.property(rendered_key)
         if rendered is not None and current != str(rendered):
-                                                                                             
+
             if _is_translatable_ui_literal(current):
                 source = current
                 widget.setProperty(source_key, source)
@@ -995,5 +984,16 @@ class LanguageManager(QObject):
 PHRASES.update({
     "Developer Experience（仅界面偏好；不会授予 Developer Authority）":
         "Developer Experience (interface preference only; does not grant Developer Authority)",
+    "为新设备生成一次性加入凭据，登记设备公钥并限制设备只能加入受信任的企业环境。":
+        "Generate a one-time enrollment credential, register the device public key, and restrict the device to a trusted enterprise environment.",
+    "协调器用于同一企业局域网内的设备注册和连接。局域网发现只负责找到服务地址，真正身份仍由企业签名与 TLS 证书验证。":
+        "The coordinator registers and connects devices within the enterprise LAN. Discovery only locates the service address; identity is still verified using enterprise signatures and TLS certificates.",
+    "用于 Arenyxa 官方开发调试能力。登录需要 .aryxdev Developer Login Bundle 与本机匹配的 Developer Personal Key Vault，并通过一次性私钥挑战；认证后只获得证书明确列出的 capability。它与公开 Developer Profile、企业管理员权限和 Root Developer 最高技术权限是彼此独立的授权流程。":
+        "Official Arenyxa development and debugging requires an .aryxdev Developer Login Bundle, a matching local Developer Personal Key Vault, and a one-time private-key challenge. Authentication grants only the capabilities listed in the certificate. Public Developer Profiles, enterprise administrator privileges, and Root Developer authority are separate authorization flows.",
+    "仅供根开发者进行最高技术权限调试。这里使用独立的 Root Owner 身份包与设备密钥完成强认证，并继续执行 Root Integrity Challenge；它不是普通官方开发者登录，也不会由企业管理员身份自动获得。":
+        "For Root Developer debugging with the highest technical authority. Authentication uses a separate Root Owner identity bundle and device key, followed by the Root Integrity Challenge. This is separate from official developer sign-in and is never granted automatically to enterprise administrators.",
+    "登录 Root Developer": "Sign in as Root Developer",
+    "企业工作模式提供本地企业身份、设备加入与信任、局域网协调器以及工作区治理。创建企业会建立独立的企业身份；加入现有企业需要管理员提供的一次性设备加入凭据。":
+        "Enterprise mode provides local enterprise identity, device enrollment and trust, a LAN coordinator, and workspace governance. Creating an enterprise establishes a separate identity; joining an existing enterprise requires a one-time device enrollment credential from its administrator.",
 })
 PHRASES.update(ENTERPRISE_PHRASES)

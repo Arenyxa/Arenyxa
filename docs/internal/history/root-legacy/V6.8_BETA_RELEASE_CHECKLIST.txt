@@ -1,0 +1,30 @@
+Arenyxa v6.8 Beta Release Checklist
+Date: 2026-08-11
+
+Identity
+- Public: 6.8beta
+- Python package: 6.8.0b1
+- Plugin/API comparator: 6.8.0
+- Modern installer: dist\installer\Arenyxa_V6.8beta_Setup_x64.exe
+- Legacy installer: dist\installer\Arenyxa_V6.8beta_Legacy_Win7_x64_Setup.exe
+
+Core v6.8 Beta gates
+- Adaptive global request admission starts from a four-slot floor when ceiling > 4.
+- Local parse/extract P95 drives global grow/backoff; network latency does not.
+- Existing per-host HTTP adaptive limiter remains independent.
+- Manual live request budget suspends auto mode; Auto Budget restores it.
+- Settings adaptive_request_concurrency is type-safe and defaults to true.
+- stress-test reports recommended_local_workers without treating it as an HTTP limit.
+- Repair single-console hotfix remains present.
+- Repair Seed and Source Manifest are regenerated only after source freeze.
+
+Required validation
+- Python compileall
+- Python 3.8 grammar gate
+- Full pytest regression
+- Repair Seed SHA-256 / internal manifest / ZIP CRC
+- Source Manifest current hashes
+- test-all
+- stress-test standard
+- stress-test extreme
+- Windows GUI/Repair/Capture/manual-vs-auto concurrency smoke

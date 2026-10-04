@@ -79,4 +79,3 @@ def test_virtual_capture_model_exposes_million_rows_without_allocating_them(qapp
     assert calls == []
     assert model.max_cached_pages == 24
     assert model.page_size == 1024
-

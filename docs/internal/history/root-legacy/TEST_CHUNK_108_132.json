@@ -1,0 +1,170 @@
+[
+  {
+    "file": "tests/test_v70_distributed_fault_matrix.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 4.404,
+    "output": ".....                                                                    [100%]\n5 passed in 0.63s\n"
+  },
+  {
+    "file": "tests/test_v70_ios_nonlinear_motion.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.33,
+    "output": "......                                                                   [100%]\n6 passed in 0.04s\n"
+  },
+  {
+    "file": "tests/test_v70_professional_expansion.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.725,
+    "output": "..........                                                               [100%]\n10 passed in 0.28s\n"
+  },
+  {
+    "file": "tests/test_v70_release_identity.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.209,
+    "output": ".....                                                                    [100%]\n5 passed in 0.07s\n"
+  },
+  {
+    "file": "tests/test_v70_security_stability_convergence.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 4.535,
+    "output": "...............                                                          [100%]\n15 passed in 2.04s\n"
+  },
+  {
+    "file": "tests/test_v70_server_ten_dimension_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 16.586,
+    "output": ".................                                                        [100%]\n=============================== warnings summary ===============================\ntests/test_v70_server_ten_dimension_hardening.py::test_server_http_tls13_concurrency_validator_is_stable\n  /opt/pyvenv/lib/python3.13/site-packages/websockets/legacy/__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions\n    warnings.warn(  # deprecated in 14.0 - 2024-11-09\n\ntests/test_v70_server_ten_dimension_hardening.py::test_server_http_tls13_concurrency_validator_is_stable\n  /opt/pyvenv/lib/python3.13/site-packages/uvicorn/protocols/websockets/websockets_impl.py:17: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated\n    from websockets.server import WebSocketServerProtocol\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n17 passed, 2 warnings in 12.96s\n"
+  },
+  {
+    "file": "tests/test_v70_traffic_forensics_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.555,
+    "output": ".....                                                                    [100%]\n5 passed in 0.12s\n"
+  },
+  {
+    "file": "tests/test_v71_active_defense_stage2.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 4.149,
+    "output": "......                                                                   [100%]\n6 passed in 1.56s\n"
+  },
+  {
+    "file": "tests/test_v71_active_resilience_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.972,
+    "output": "......                                                                   [100%]\n6 passed in 0.64s\n"
+  },
+  {
+    "file": "tests/test_v71_ci_storage_capacity_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.819,
+    "output": "......                                                                   [100%]\n6 passed in 0.29s\n"
+  },
+  {
+    "file": "tests/test_v71_distributed_trace_context.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.674,
+    "output": "......                                                                   [100%]\n6 passed in 0.24s\n"
+  },
+  {
+    "file": "tests/test_v71_enterprise_professional_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 6.839,
+    "output": "........                                                                 [100%]\n8 passed in 4.38s\n"
+  },
+  {
+    "file": "tests/test_v71_enterprise_protocol_forensics.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.544,
+    "output": ".....                                                                    [100%]\n5 passed in 0.11s\n"
+  },
+  {
+    "file": "tests/test_v71_external_multinode_chaos.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.731,
+    "output": ".......                                                                  [100%]\n7 passed in 0.18s\n"
+  },
+  {
+    "file": "tests/test_v71_hardware_root_lifecycle.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.785,
+    "output": ".........                                                                [100%]\n9 passed in 0.12s\n"
+  },
+  {
+    "file": "tests/test_v71_hardware_root_verification.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.96,
+    "output": "..                                                                       [100%]\n2 passed in 0.07s\n"
+  },
+  {
+    "file": "tests/test_v71_main_window_import_contract.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.785,
+    "output": ".s                                                                       [100%]\n=========================== short test summary info ============================\nSKIPPED [1] tests/test_v71_main_window_import_contract.py:35: Qt binding unavailable in this validation environment\n1 passed, 1 skipped in 0.09s\n"
+  },
+  {
+    "file": "tests/test_v71_network_extreme_protocols.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.047,
+    "output": "........................................................................ [ 40%]\n........................................................................ [ 80%]\n...................................                                      [100%]\n179 passed in 0.33s\n"
+  },
+  {
+    "file": "tests/test_v71_packet_evidence_fusion_ui.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.186,
+    "output": "..                                                                       [100%]\n2 passed in 0.09s\n"
+  },
+  {
+    "file": "tests/test_v71_page_runtime_contract.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.722,
+    "output": ".s                                                                       [100%]\n=========================== short test summary info ============================\nSKIPPED [1] tests/test_v71_page_runtime_contract.py:30: Qt binding unavailable in this validation environment\n1 passed, 1 skipped in 0.04s\n"
+  },
+  {
+    "file": "tests/test_v71_page_runtime_hotfix.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.741,
+    "output": "..                                                                       [100%]\n2 passed in 0.08s\n"
+  },
+  {
+    "file": "tests/test_v71_passive_evidence_fusion.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.377,
+    "output": "...                                                                      [100%]\n3 passed in 0.13s\n"
+  },
+  {
+    "file": "tests/test_v71_postgresql_pool_contract.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.284,
+    "output": "..                                                                       [100%]\n2 passed in 0.08s\n"
+  },
+  {
+    "file": "tests/test_v71_protocol_differential_tshark.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 1.968,
+    "output": "sss                                                                      [100%]\n=========================== short test summary info ============================\nSKIPPED [1] tests/test_v71_protocol_differential_tshark.py:96: TShark protocol parity backend is not installed\nSKIPPED [1] tests/test_v71_protocol_differential_tshark.py:109: TShark protocol parity backend is not installed\nSKIPPED [1] tests/test_v71_protocol_differential_tshark.py:149: TShark protocol parity backend is not installed\n3 skipped in 0.06s\n"
+  }
+]

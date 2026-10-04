@@ -41,7 +41,10 @@ def test_single_object_views_are_explicitly_single_selection() -> None:
     main = MAIN.read_text(encoding="utf-8-sig") + "\n" + (MAIN.parent / "command_palette.py").read_text(encoding="utf-8")
     data = DATA.read_text(encoding="utf-8-sig")
     network = NETWORK.read_text(encoding="utf-8-sig")
-    tools = TOOLS.read_text(encoding="utf-8-sig")
+    facade = TOOLS.read_text(encoding="utf-8-sig")
+    assert "from arenyxa.presentation.pages.tools_platform import AdvancedPlatformPage, PluginsPage" in facade
+    assert "from arenyxa.presentation.pages.tools_automation import AutomationPage, WorkflowPage" in facade
+    tools = "\n".join((TOOLS.parent / name).read_text(encoding="utf-8-sig") for name in ("tools_platform.py", "tools_automation.py"))
     tasks = TASKS.read_text(encoding="utf-8-sig")
 
     assert 'self.list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)' in main

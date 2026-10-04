@@ -1,4 +1,4 @@
-# Arenyxa v8.1 complete local capability runtime.
+# Arenyxa v8.2 complete local capability runtime.
 -r requirements.txt
 PySide6>=6.8,<7
 openpyxl>=3.1,<4

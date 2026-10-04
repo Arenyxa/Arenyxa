@@ -36,8 +36,9 @@ def isolated_postgres_dsn():
     try:
         yield base_dsn, make_conninfo(base_dsn, options=f"-c search_path={schema}")
     finally:
-        with psycopg.connect(base_dsn, autocommit=True) as admin:
-            admin.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(schema)))
+        if os.environ.get("ARENYXA_POSTGRES_RETAIN_TEST_SCHEMA") != "1":
+            with psycopg.connect(base_dsn, autocommit=True) as admin:
+                admin.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(schema)))
 
 
 def _worker_public_key() -> str:
@@ -201,3 +202,81 @@ def test_postgresql_pool_discards_server_terminated_idle_connections(
         while contexts:
             contexts.pop().__exit__(None, None, None)
         backend.close()
+
+
+def test_postgresql_fast_lease_sql_parameter_contract(isolated_postgres_dsn) -> None:
+    _base_dsn, dsn = isolated_postgres_dsn
+    queue = DurableDistributedQueue(dsn)
+    worker_id = f"worker-{uuid.uuid4().hex}"
+    try:
+        queue.register_worker(worker_id, _worker_public_key(), {"slots": 1}, max_slots=1)
+        job_id = queue.enqueue(
+            "task.run",
+            {"task": {"name": "lease-parameter-contract"}},
+            resource_id="postgresql-lease-parameter-contract",
+            permission="workflow.execute",
+            idempotency_key=f"lease-parameter-contract-{uuid.uuid4().hex}",
+        )
+        lease = queue.lease_next(worker_id, lease_seconds=60)
+        assert lease is not None
+        assert lease.job_id == job_id
+    finally:
+        queue.close()
+
+
+def test_postgresql_worker_revoke_race_does_not_escape_deadlock(
+    isolated_postgres_dsn, monkeypatch,
+) -> None:
+    from arenyxa.domain.errors import ArenyxaError
+
+    _base_dsn, dsn = isolated_postgres_dsn
+    complete_queue = DurableDistributedQueue(dsn)
+    revoke_queue = DurableDistributedQueue(dsn)
+    worker_id = f"worker-{uuid.uuid4().hex}"
+    worker_locked = threading.Event()
+    allow_recovery = threading.Event()
+    original_recover = revoke_queue._recover_worker_jobs_locked
+
+    def gated_recover(connection, target_worker: str, error_code: str) -> int:
+        worker_locked.set()
+        assert allow_recovery.wait(10.0)
+        return original_recover(connection, target_worker, error_code)
+
+    monkeypatch.setattr(revoke_queue, "_recover_worker_jobs_locked", gated_recover)
+    try:
+        complete_queue.register_worker(worker_id, _worker_public_key(), {"slots": 1}, max_slots=1)
+        job_id = complete_queue.enqueue(
+            "task.run", {"task": {"name": "revoke-complete-deadlock"}},
+            resource_id="postgresql-revoke-complete-deadlock",
+            permission="workflow.execute",
+            idempotency_key=f"revoke-complete-deadlock-{uuid.uuid4().hex}",
+        )
+        lease = complete_queue.lease_next(worker_id, lease_seconds=60)
+        assert lease is not None and lease.job_id == job_id
+        complete_queue.start_job(job_id, worker_id, lease.lease_token)
+        with ThreadPoolExecutor(max_workers=2, thread_name_prefix="postgres-revoke-complete") as executor:
+            revoke_future = executor.submit(revoke_queue.revoke_worker, worker_id)
+            assert worker_locked.wait(10.0)
+            complete_future = executor.submit(
+                complete_queue.complete,
+                job_id,
+                worker_id,
+                lease.lease_token,
+                {"status": "completed"},
+            )
+
+            # Revocation already owns the worker lock. Completion must wait for
+            # that same lock before acquiring the job, then reject its stale token.
+            allow_recovery.set()
+            with pytest.raises(ArenyxaError) as error:
+                complete_future.result(timeout=10.0)
+            assert error.value.code == "DISTRIBUTED_LEASE_STALE"
+            assert revoke_future.result(timeout=10.0) == 1
+
+        assert complete_queue.job(job_id)["state"] == "queued"
+        assert complete_queue.worker(worker_id)["state"] == "revoked"
+        assert complete_queue.worker(worker_id)["active_leases"] == 0
+    finally:
+        allow_recovery.set()
+        revoke_queue.close()
+        complete_queue.close()

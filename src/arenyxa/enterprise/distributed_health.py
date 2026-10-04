@@ -42,6 +42,7 @@ class DistributedQueueHealthMixin:
             "monotonic": snapshot.monotonic,
             "wall_drift_seconds": snapshot.wall_drift_seconds,
             "lease_grace_seconds": self._lease_grace_seconds,
+            "lease_epoch": self._now(),
         }
 
     def health(self) -> dict[str, Any]:
@@ -81,7 +82,7 @@ class DistributedQueueHealthMixin:
                    sum(CASE WHEN state IN ('leased','running') AND lease_expires_at>?
                        THEN 1 ELSE 0 END) AS implausible_future_count
                    FROM distributed_jobs GROUP BY state""",
-                (self._clock.stable_epoch() + MAX_LEASE_SECONDS + 60.0,),
+                (self._now(connection) + MAX_LEASE_SECONDS + 60.0,),
             ).fetchall()
             states = {str(row["state"]): int(row["state_count"]) for row in job_rows}
             inconsistent_leases = sum(int(row["inconsistent_count"] or 0) for row in job_rows)

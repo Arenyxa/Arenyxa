@@ -8,14 +8,17 @@ import shutil
 import subprocess
 import sys
 import time
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Callable
 
 from arenyxa.console_io import console_write
+from arenyxa.infrastructure.atomic_io import atomic_write_json
+from arenyxa.infrastructure.data_root_lock import DataRootLease
 from arenyxa.infrastructure.process_safety import validated_argv
-from arenyxa.repair_common import clear_repair_marker, repair_resource, _write_repair_marker
+from arenyxa.repair_common import clear_repair_marker, repair_resource, _write_repair_marker, _load_repair_marker
 from arenyxa.repair_engine import RepairEngine
-from arenyxa.repair_models import RepairPlan
+from arenyxa.repair_models import RepairPlan, RepairResult, _utc_now
 from arenyxa.repair_planner import validate_repair_plan_origin
 from arenyxa.repair_recovery import relaunch_arenyxa
 
@@ -37,6 +40,7 @@ def launch_repair_worker(
     environment = os.environ.copy()
     data_root = Path(plan.data_root).resolve()
     marker_token = secrets.token_hex(16)
+    environment["ARENYXA_REPAIR_MARKER_TOKEN"] = marker_token
 
     # Publish handoff before spawning the child: desktop/server startup sees a closed gate even
     # in the short parent->child ownership transition.
@@ -114,13 +118,57 @@ def run_repair_worker(plan_path: Path) -> int:
             ctypes.windll.kernel32.SetConsoleTitleW("Arenyxa Repair Center · 自动修复")
         except (AttributeError, OSError) as exc:
             LOGGER.debug("Unable to set Repair Center console title: %s", exc)
+    marker = _load_repair_marker(Path(plan.data_root))
+    plan_payload = asdict(plan)
+    marker_token = None
+    if marker:
+        observed_token = str(marker.get("token", ""))
+        handed_off_token = os.environ.get("ARENYXA_REPAIR_MARKER_TOKEN", "")
+        if marker.get("owner_pid") == os.getpid() or (
+            handed_off_token and secrets.compare_digest(observed_token, handed_off_token)
+        ):
+            marker_token = observed_token
     engine = RepairEngine(plan)
-    result = engine.run()
     try:
-        plan_path.unlink(missing_ok=True)
-    except OSError as exc:
+        result = engine.run()
+    except Exception as exc:
+        LOGGER.exception("Repair worker failed")
+        result = RepairResult(
+            started_at=engine.started_at,
+            finished_at=_utc_now(),
+            success=False,
+            categories=list(plan.categories),
+            backup_dir=str(engine.backup_root),
+            actions=list(engine.actions),
+            unresolved=[*engine.unresolved, f"Repair worker failed: {exc}"],
+        )
+        # A fatal engine failure must be auditable without overwriting another owner's report.
+        audit_lease = DataRootLease(Path(plan.data_root))
+        try:
+            if audit_lease.acquire():
+                atomic_write_json(engine.repair_root / "last_repair_report.json", result.to_dict())
+                engine.log(result.unresolved[-1])
+            else:
+                LOGGER.error("Cannot persist repair failure: data root is owned by another process")
+        except OSError:
+            LOGGER.exception("Unable to persist repair failure report")
+        finally:
+            audit_lease.release()
+    try:
+        current_marker = _load_repair_marker(Path(plan.data_root))
+        owns_marker = (
+            marker_token is not None
+            and current_marker is not None
+            and current_marker.get("token") == marker_token
+        ) or (marker is None and current_marker is None)
+        # Old callers may still use a shared filename. Never remove a replacement
+        # plan or one whose ownership has moved to another repair attempt.
+        if owns_marker and plan_path.exists() and asdict(RepairPlan.load(plan_path)) == plan_payload:
+            plan_path.unlink(missing_ok=True)
+    except (OSError, ValueError, TypeError) as exc:
         engine.log(f"清理修复计划失败（保留取证文件）: {exc}")
-    clear_repair_marker(Path(plan.data_root))
+    if marker_token is not None:
+        clear_repair_marker(Path(plan.data_root), marker_token)
     if plan.relaunch:
         try:
             relaunch_arenyxa(plan)

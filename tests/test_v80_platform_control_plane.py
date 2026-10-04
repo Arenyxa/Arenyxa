@@ -65,6 +65,7 @@ def test_diagnostics_export_runs_as_persistent_audited_job_and_redacts_secrets(c
         assert archive.testzip() is None
         manifest = json.loads(archive.read("manifest.json"))
         assert manifest["version"] == "0.1"
+        assert manifest["package_version"] == "0.1.0"
         combined_logs = "\n".join(
             archive.read(name).decode("utf-8")
             for name in archive.namelist()
@@ -84,8 +85,10 @@ def test_job_system_enforces_cancellation_timeout_and_backpressure(context) -> N
     session = context.local_control_session
     assert session is not None
     blocker = threading.Event()
+    operation_started = threading.Event()
 
     def blocking(execution):
+        operation_started.set()
         while not blocker.wait(0.01):
             execution.report_progress(0.2, "waiting")
         execution.check_cancelled()
@@ -102,6 +105,7 @@ def test_job_system_enforces_cancellation_timeout_and_backpressure(context) -> N
             surface="test",
             timeout_seconds=5,
         )
+        assert operation_started.wait(2.0)
         second = isolated.submit(
             "bounded-two",
             blocking,

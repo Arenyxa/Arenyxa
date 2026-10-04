@@ -97,6 +97,7 @@ ADVANCED_FEATURE_CONTRACTS: tuple[FeatureContract, ...] = (
     FeatureContract("studio.sources", "Data Source Discovery", "nextgen.sources", ("discover",)),
     FeatureContract("studio.smartpath", "SmartPath 2.0", "nextgen.smartpath", ("analyze",)),
     FeatureContract("studio.web_intelligence", "Web Intelligence Center", "nextgen.web_intelligence", ("analyze", "replay_candidates", "event_to_workflow")),
+    FeatureContract("studio.crawler_intelligence", "Crawler Web Intelligence", "nextgen.crawler_intelligence", ("analyze", "analyze_browser")),
     FeatureContract("studio.time_machine", "Web Time Machine Linkage", "nextgen.time_machine", ("record", "history")),
     FeatureContract("studio.quality", "Data Quality Studio", "nextgen.quality", ("analyze", "clean", "compare_schema")),
     FeatureContract("studio.secrets", "Secrets Vault", "nextgen.vault", ("set", "get", "delete", "names")),

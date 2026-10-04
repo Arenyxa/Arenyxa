@@ -9,7 +9,10 @@ def test_root_owner_is_not_exposed_as_an_ordinary_settings_login_action() -> Non
     assert 'QPushButton("登录 Root Owner / Authority")' not in source
     assert "root_owner_login_button" not in source
     assert "def _root_owner_login" not in source
-    assert "Root Owner 不在普通设置界面提供登录入口" in source
+    assert "if not self._root_developer_entry_allowed():" in source
+    assert "if not confirm_root_developer_login(self):" in source
+    assert "manager.begin_root_owner_login(raw_bundle)" in source
+    assert "manager.complete_root_owner_login(" in source
     language = (root / "src/arenyxa/presentation/language.py").read_text(encoding="utf-8")
     assert "登录 Root Owner / Authority" not in language
     assert "导出 Root Owner Challenge" not in language
@@ -51,7 +54,7 @@ def test_enterprise_ui_has_no_product_visible_phase_labels() -> None:
     for phase in ("Phase 7", "Phase 8", "Phase 9", "Phase 10", "Phase 11", "Phase 12"):
         assert phase not in enterprise
         assert phase not in language
-    assert 'SectionCard(theme, "Enrollment / Device Trust / Domain Lock")' in enterprise
-    assert 'SectionCard(theme, "Office Enterprise Coordinator")' in enterprise
+    assert 'SectionCard(theme, "设备加入与信任")' in enterprise
+    assert 'SectionCard(theme, "企业局域网协调器")' in enterprise
     assert 'SectionCard(theme, "Enterprise Workspace Governance")' in enterprise
     assert 'SectionCard(theme, "Enterprise Server / Distributed Worker")' in enterprise

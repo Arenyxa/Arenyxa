@@ -112,7 +112,11 @@ def test_logging_falls_back_when_primary_log_path_is_unwritable(tmp_path: Path) 
         configured = configure_logging(blocked / "logs")
         assert configured.handlers
         assert getattr(configured.handlers[0], "arenyxa_sink", "") == "stderr-fallback"
-        assert "NotADirectoryError" in getattr(configured.handlers[0], "arenyxa_file_error", "")
+        # Windows mkdir reports an existing file as FileExistsError; POSIX uses
+        # NotADirectoryError. Both must preserve the actual failed path.
+        error = getattr(configured.handlers[0], "arenyxa_file_error", "")
+        assert error.startswith(("NotADirectoryError:", "FileExistsError:"))
+        assert repr(str(blocked))[1:-1] in error
     finally:
         for handler in list(root.handlers):
             root.removeHandler(handler)

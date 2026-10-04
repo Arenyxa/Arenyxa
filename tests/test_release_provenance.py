@@ -9,7 +9,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 import arenyxa.provenance as provenance_module
-from arenyxa import __display_version__ as __version__
+from arenyxa import __package_version__ as __version__
 from arenyxa.provenance import ProvenanceState, verify_release_attestation
 
 
@@ -17,7 +17,7 @@ def _canonical(value: dict[str, object]) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
-def _fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path, str, str]:
+def _fixture(tmp_path: Path, *, product_version: str = __version__) -> tuple[Path, Path, Path, Path, str, str]:
     install = tmp_path / "install"
     repair = install / "repair"
     repair.mkdir(parents=True)
@@ -46,7 +46,7 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path, str, str]:
     signed: dict[str, object] = {
         "schema_version": 1,
         "product": "Arenyxa",
-        "version": __version__,
+        "version": product_version,
         "channel": "official",
         "build_id": "test-build",
         "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
@@ -89,6 +89,7 @@ def test_verified_official_release(tmp_path: Path, monkeypatch) -> None:
         trust_store_path=trust,
         deep_files=True,
     )
+    assert report.version == "0.1.0"
     assert report.state == ProvenanceState.VERIFIED_OFFICIAL
     assert report.signature_valid is True
     assert report.trusted_signer is True
@@ -192,3 +193,11 @@ def test_unexpected_loadable_file_is_detected(tmp_path: Path, monkeypatch) -> No
     )
     assert report.state == ProvenanceState.MODIFIED
     assert "injected.dll" in report.unexpected_files
+
+
+def test_signed_display_version_cannot_substitute_for_distribution_version(tmp_path: Path, monkeypatch) -> None:
+    install, attestation, manifest, trust, key_id, public_key = _fixture(tmp_path, product_version="0.1")
+    monkeypatch.setattr(provenance_module, "OFFICIAL_RELEASE_KEYS", {key_id: {"public_key": public_key, "role": "official", "status": "active"}})
+    report = verify_release_attestation(install, attestation_path=attestation, manifest_path=manifest, trust_store_path=trust)
+    assert report.state == ProvenanceState.INVALID
+    assert any("product/version does not match" in note for note in report.notes)

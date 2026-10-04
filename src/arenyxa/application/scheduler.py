@@ -10,6 +10,7 @@ from arenyxa.compat import dataclass, shutdown_executor
 from datetime import datetime, timedelta
 from arenyxa.compat import UTC
 from arenyxa.compat import ZoneInfo, ZoneInfoNotFoundError
+from arenyxa.infrastructure.shutdown import ShutdownDeadline
 
 LOGGER = logging.getLogger(__name__)
 
@@ -134,6 +135,8 @@ class SchedulerService:
             due_at = due_at.replace(tzinfo=UTC)
         with self._definition_io_lock:
             with self._condition:
+                if self._stopping:
+                    raise RuntimeError("SchedulerService 已停止，不能添加计划。")
                                                                                             
                                                                                                 
                                                                                         
@@ -159,6 +162,8 @@ class SchedulerService:
         cancel_future: Future[None] | None = None
         with self._definition_io_lock:
             with self._condition:
+                if self._stopping:
+                    raise RuntimeError("SchedulerService 已停止，不能启用计划。")
                 if schedule_id not in self._jobs:
                     raise KeyError(schedule_id)
                 rule, next_run, callback, was_enabled = self._jobs[schedule_id]
@@ -219,24 +224,45 @@ class SchedulerService:
         if cancel_future is not None:
             cancel_future.cancel()
 
-    def stop(self) -> None:
+    def begin_shutdown(self) -> None:
         with self._condition:
-            if self._stopping:
-                return
             self._stopping = True
             self._condition.notify_all()
-        if self._thread.is_alive() and self._thread is not threading.current_thread():
-            self._thread.join(timeout=5)
-                                                                                         
-                                                                                         
-                                                                                       
-        current_name = threading.current_thread().name
-        wait_callbacks = not current_name.startswith("arenyxa-schedule")
-        with self._condition:
             callback_futures = list(self._callback_futures.values())
         for future in callback_futures:
             future.cancel()
-        shutdown_executor(self._callback_executor, wait=wait_callbacks, cancel_futures=True)
+
+    def shutdown_snapshot(self) -> dict[str, object]:
+        with self._condition:
+            return {
+                "accepting": not self._stopping,
+                "running_callbacks": len(self._running),
+                "pending_callback_futures": len(self._callback_futures),
+                "scheduler_alive": self._thread.is_alive(),
+            }
+
+    def drain(self, timeout: float = 10.0) -> bool:
+        return self._drain(ShutdownDeadline.from_timeout(timeout))
+
+    def _drain(self, deadline: ShutdownDeadline) -> bool:
+        # A callback can initiate shutdown, but cannot wait for its own retirement.
+        if threading.current_thread().name.startswith("arenyxa-schedule"):
+            return False
+        if self._thread.is_alive():
+            self._thread.join(timeout=deadline.remaining())
+        with self._condition:
+            while self._thread.is_alive() or self._running or self._callback_futures:
+                remaining = deadline.remaining()
+                if remaining <= 0.0:
+                    return False
+                self._condition.wait(remaining)
+            return True
+
+    def stop(self, timeout: float = 10.0) -> bool:
+        deadline = ShutdownDeadline.from_timeout(timeout)
+        self.begin_shutdown()
+        shutdown_executor(self._callback_executor, wait=False, cancel_futures=True)
+        return self._drain(deadline)
 
     def _run(self) -> None:
         while True:
@@ -291,19 +317,24 @@ class SchedulerService:
                     self._persist_reschedule_if_current(schedule_id, generation, next_run)
             for schedule_id, callback, following, generation in callbacks:
                 try:
-                    future = self._callback_executor.submit(
-                        self._execute_callback, schedule_id, callback, following, generation
-                    )
                     with self._condition:
+                        if self._stopping:
+                            self._running.discard(schedule_id)
+                            self._condition.notify_all()
+                            continue
+                        future = self._callback_executor.submit(
+                            self._execute_callback, schedule_id, callback, following, generation
+                        )
                         self._callback_futures[schedule_id] = future
-                    future.add_done_callback(
-                        WeakMethodFutureCallback(self, "_callback_done", prefix=(schedule_id,))
-                    )
+                        future.add_done_callback(
+                            WeakMethodFutureCallback(self, "_callback_done", prefix=(schedule_id,))
+                        )
                 except RuntimeError:
                                                                                             
                                                                                         
                     with self._condition:
                         self._running.discard(schedule_id)
+                        self._condition.notify_all()
                     if not self._stopping:
                         LOGGER.exception("Unable to submit scheduled callback %s", schedule_id)
 

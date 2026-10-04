@@ -84,10 +84,10 @@ class DistributedQueueWorkerMixin:
         )
         slots = max(1, min(MAX_WORKER_SLOTS, int(max_slots)))
         now_iso = utc_now()
-        now = self._clock.stable_epoch()
         with self._lock, self._connection() as connection:
             self._begin(connection)
-            existing = connection.execute("SELECT * FROM distributed_workers WHERE worker_id=?", (worker,)).fetchone()
+            existing = self._lock_worker(connection, worker)
+            now = self._now(connection)
             if enforce_capacity and not self._storage.capabilities.multi_host_writers:
                 configured = int(connection.execute(
                     "SELECT coalesce(sum(max_slots),0) FROM distributed_workers WHERE state<>'revoked' AND worker_id<>?",
@@ -156,20 +156,20 @@ class DistributedQueueWorkerMixin:
         return [self._worker_row(row) for row in rows]
 
     def heartbeat(self, worker_id: str, *, resources: Mapping[str, Any] | None = None) -> None:
-        now = self._clock.stable_epoch()
         now_iso = utc_now()
         resources_json = None
         if resources is not None:
             resources_json, _ = _bounded_json(resources, MAX_RESOURCE_DECLARATION_BYTES, "worker resource declaration")
         with self._lock, self._connection() as connection:
             self._begin(connection)
-            row = connection.execute("SELECT state FROM distributed_workers WHERE worker_id=?", (str(worker_id),)).fetchone()
+            row = connection.execute(self._storage.worker_for_lease_sql(), (str(worker_id),)).fetchone()
             if row is None:
                 connection.rollback()
                 raise _fail("WORKER_UNKNOWN", "Worker is not registered")
             if str(row["state"]) == "revoked":
                 connection.rollback()
                 raise _fail("WORKER_REVOKED", "Worker is revoked")
+            now = self._now(connection)
             if resources_json is None:
                 connection.execute("UPDATE distributed_workers SET heartbeat_at=?,updated_at=? WHERE worker_id=?", (now, now_iso, str(worker_id)))
             else:
@@ -183,7 +183,7 @@ class DistributedQueueWorkerMixin:
         target = "draining" if drain else "active"
         with self._lock, self._connection() as connection:
             self._begin(connection)
-            row = connection.execute("SELECT state FROM distributed_workers WHERE worker_id=?", (str(worker_id),)).fetchone()
+            row = connection.execute(self._storage.worker_for_lease_sql(), (str(worker_id),)).fetchone()
             if row is None:
                 connection.rollback()
                 raise _fail("WORKER_UNKNOWN", "Worker is not registered")
@@ -197,7 +197,7 @@ class DistributedQueueWorkerMixin:
         worker = str(worker_id)
         with self._lock, self._connection() as connection:
             self._begin(connection)
-            row = connection.execute("SELECT state FROM distributed_workers WHERE worker_id=?", (worker,)).fetchone()
+            row = connection.execute(self._storage.worker_for_lease_sql(), (worker,)).fetchone()
             if row is None:
                 connection.rollback()
                 raise _fail("WORKER_UNKNOWN", "Worker is not registered")
@@ -215,7 +215,11 @@ class DistributedQueueWorkerMixin:
                FROM distributed_jobs WHERE lease_worker_id=? AND state IN ('leased','running')""",
             (worker_id,),
         ).fetchall()
-        for row in rows:
+        affected = 0
+        for candidate in rows:
+            row = connection.execute(self._storage.lease_for_update_sql(), (str(candidate["job_id"]),)).fetchone()
+            if row is None or str(row["lease_worker_id"]) != worker_id or str(row["state"]) not in {"leased", "running"}:
+                continue
             mode = str(row["side_effect_mode"])
             effect = str(row["side_effect_state"])
             attempt = int(row["attempt"])
@@ -236,7 +240,8 @@ class DistributedQueueWorkerMixin:
                 connection, str(row["job_id"]), "worker_lease_recovered", previous, state,
                 worker_id=str(worker_id), code=str(error_code),
             )
-        return len(rows)
+            affected += 1
+        return affected
 
     def recover_stale_worker_leases(self, now: float | None = None) -> int:
         """Recover active leases whose Worker heartbeat has disappeared before lease expiry.
@@ -244,7 +249,7 @@ class DistributedQueueWorkerMixin:
         Fencing tokens prevent a stale Worker from completing after reassignment. Non-idempotent
         work that may have started is never automatically re-executed and enters review_required.
         """
-        current = self._clock.stable_epoch() if now is None else float(now)
+        current = self._now() if now is None else float(now)
         cutoff = current - float(self._worker_heartbeat_timeout_seconds)
         with self._lock, self._connection() as connection:
             self._begin(connection)
@@ -256,14 +261,20 @@ class DistributedQueueWorkerMixin:
                      AND w.heartbeat_at>0 AND w.heartbeat_at<=? AND j.lease_expires_at>?""",
                 (cutoff, current),
             ).fetchall()
+            self._lock_all_workers(connection)
             affected = 0
             recovered_by_worker: dict[str, int] = {}
             for row in rows:
                 worker = str(row["lease_worker_id"])
-                if str(row["side_effect_mode"]) == "non_idempotent" and str(row["side_effect_state"]) == "started":
+                fresh = connection.execute(self._storage.lease_for_update_sql(), (str(row["job_id"]),)).fetchone()
+                if (fresh is None or str(fresh["state"]) != str(row["state"])
+                        or str(fresh["lease_worker_id"]) != worker
+                        or str(fresh["lease_token_sha256"]) != str(row["lease_token_sha256"])):
+                    continue
+                if str(fresh["side_effect_mode"]) == "non_idempotent" and str(fresh["side_effect_state"]) == "started":
                     target = "review_required"
                     code = "WORKER_HEARTBEAT_LOST_AFTER_SIDE_EFFECT_START"
-                elif int(row["attempt"]) < int(row["max_attempts"]):
+                elif int(fresh["attempt"]) < int(fresh["max_attempts"]):
                     target = "queued"
                     code = "WORKER_HEARTBEAT_LOST_REQUEUED"
                 else:
@@ -303,10 +314,11 @@ class DistributedQueueWorkerMixin:
         return affected
 
     def recover_expired_leases(self, now: float | None = None) -> int:
-        current = self._clock.stable_epoch() if now is None else float(now)
+        current = self._now() if now is None else float(now)
         recovery_cutoff = current - (self._lease_grace_seconds if now is None else 0.0)
         with self._lock, self._connection() as connection:
             self._begin(connection)
+            self._lock_all_workers(connection)
             rows = connection.execute(
                 self._storage.expired_lease_candidates_sql(),
                 (recovery_cutoff,),

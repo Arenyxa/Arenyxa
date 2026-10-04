@@ -24,7 +24,9 @@ class PacketRuntimeMixin:
         """List capture interfaces exposed by the packet runtime."""
         if not self.available:
             return []
-        output = self._run_tshark(["-D"], timeout=20)
+        self._require_tshark_contract()
+        # A missing capture driver does not invalidate the offline dissector.
+        output = self._run_process([self.executable, "-D"], timeout=20).stdout or ""
         return [line.strip() for line in output.splitlines() if line.strip()]
 
     def glossary(self, kind: str) -> list[str]:

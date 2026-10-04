@@ -150,8 +150,8 @@ FAILURE_RULES: tuple[FailureRule, ...] = (
 
 
 COMPATIBILITY_CONTRACTS: tuple[CompatibilityContract, ...] = (
-    CompatibilityContract("arenyxa", "python-package", "Public facade remains importable and re-exports public v0.1 version metadata.", "0.1"),
-    CompatibilityContract("arenyxa", "legacy-python-package", "Legacy runtime remains importable in public v0.1; internal engineering baseline is v8.2.", "0.1"),
+    CompatibilityContract("arenyxa", "python-package", "Public facade remains importable and re-exports public version metadata.", "0.1"),
+    CompatibilityContract("arenyxa", "legacy-python-package", "Historical implementation namespace remains importable in public v0.1.", "0.1"),
     CompatibilityContract("arenyxa", "cli", "arenyxa -> arenyxa.cli:main unified professional control plane", "0.1"),
     CompatibilityContract("arenyxa-gui", "desktop-cli", "arenyxa-gui -> arenyxa.app:main desktop launcher", "0.1"),
     CompatibilityContract("python -m arenyxa", "legacy-desktop-cli", "Historical desktop launch remains available", "0.1"),
@@ -160,11 +160,16 @@ COMPATIBILITY_CONTRACTS: tuple[CompatibilityContract, ...] = (
 )
 
 
+
+
+
 _FORBIDDEN_LAYER_EDGES: Mapping[str, tuple[str, ...]] = {
     "domain": ("arenyxa.application", "arenyxa.infrastructure", "arenyxa.presentation"),
     "application": ("arenyxa.presentation",),
     "infrastructure": ("arenyxa.presentation",),
 }
+
+
 
 _FORBIDDEN_PRESENTATION_IMPORTS = ("arenyxa.infrastructure.database",)
 
@@ -195,6 +200,8 @@ def _imports(path: Path) -> Iterable[str]:
 
 
 def validate_dependency_rules(source_root: Path) -> list[str]:
+
+
     source_root = Path(source_root)
     package_root = source_root / "arenyxa" if (source_root / "arenyxa").is_dir() else source_root
     violations: list[str] = []
@@ -219,12 +226,15 @@ def validate_dependency_rules(source_root: Path) -> list[str]:
 
 
 def lifecycle_is_ordered(states: Sequence[str]) -> bool:
+
+
     order = {name: index for index, name in enumerate(LIFECYCLE_SEQUENCE)}
     highest = -1
     for state in states:
         if state not in order:
             return False
         index = order[state]
+
         if state in {"pause", "resume"} and highest <= order["resume"]:
             highest = max(highest, index)
             continue

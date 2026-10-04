@@ -1,325 +1,412 @@
-# Arenyxa V8.0 软件架构
+# Arenyxa v0.1 Architecture
 
-## 分层与依赖方向
+> This document describes the **Arenyxa v0.1 candidate source tree**, derived from engineering baseline **v8.2.0**. Current status is **community unsigned, NOT READY FOR RELEASE**. Source ownership and tests are evidence for specific contracts; native platform behavior and release readiness require separate recorded validation.
+> Important statements are tied to real modules, classes, call paths, or runtime constraints. Historical V6.x/V7.x evolution is treated only as background.
 
-```mermaid
-flowchart TB
-  UI["Presentation: Qt Compatibility Facade / Theme / Motion / Pages"] --> APP["Application: Use Cases / Runner / Scheduler / Workflow"]
-  APP --> DOMAIN["Domain: Task / Run / Capture / Revision / Error / RBAC"]
-  APP --> PORTS["Ports: Fetcher / Repository / Exporter / Capture / Database / Plugin"]
-  INFRA["Infrastructure Adapters"] --> PORTS
-  INFRA --> DOMAIN
-  INFRA --> SQLITE["SQLite WAL / FTS5 / Migrations"]
-  INFRA --> NET["urllib / Playwright / tshark / dumpcap / DNS / TLS"]
-  INFRA --> RUNTIME["FastAPI / Plugin Worker / Windows Job / PyInstaller"]
-```
+## 1. Scope and Authoritative Sources
 
-UI 不直接访问网络库；页面通过 Application Service 发起用例。SQLite repository 是当前基础适配器，通用数据库、Browser、Packet、Server 和 Plugin 均为可替换适配器。
+This document covers the Desktop GUI, CLI, Headless Server, Enterprise Server/Worker runtime, network capture, workflow execution, persistence, security, Windows platform boundaries, Repair Center, and release/runtime lifecycle.
 
-## 采集与数据流
+Primary architecture authorities in the source tree are:
 
-```mermaid
-flowchart LR
-  TASK["Task + immutable snapshot"] --> QUEUE["Run Queue"]
-  QUEUE --> FETCH["HTTP / Browser / API"]
-  FETCH --> DECODE["Content Decoder"]
-  DECODE --> PARSE["HTML / JSON / XML"]
-  PARSE --> EXTRACT["Field Extractor"]
-  EXTRACT --> CLEAN["Cleaner Pipeline"]
-  CLEAN --> VALIDATE["Validation / Quality"]
-  VALIDATE --> DEDUP["Content Hash Dedup"]
-  DEDUP --> STORE["SQLite batch transaction"]
-  STORE --> SEARCH["FTS5"]
-  STORE --> EXPORT["CSV / JSONL / XLSX"]
-  STORE --> REV["Dataset Revision"]
-  STORE --> VIS["Visualization"]
-```
+- `src/arenyxa/architecture_contracts.py`: dependency rules, component ownership, failure rules, and compatibility contracts.
+- `src/arenyxa/bootstrap.py`: Desktop `ApplicationContext` construction, runtime ownership, startup, and shutdown ordering.
+- `src/arenyxa/application/*_control_plane.py`: shared application services used by GUI, CLI, and server surfaces.
+- `src/arenyxa/enterprise/distributed_*.py`: Enterprise Queue, Worker, Lease, and SQLite/PostgreSQL distributed runtime.
+- `src/arenyxa/presentation/`: Qt/PySide shell, pages, navigation, theme, motion, and window lifecycle.
+- `src/arenyxa/repair*.py`: startup diagnostics, repair planning, independent Repair Worker execution, and recovery.
 
-## HTTP 多 URL 并发与背压
+Core principle: **Presentation does not own durable truth. Application owns use cases and control planes. Domain/Security define rules. Infrastructure and Enterprise Runtime perform I/O, network operations, and persistence.**
+## 2. Executable Entry Points and Runtime Surfaces
+
+`pyproject.toml` defines the main runtime entry points:
+
+| Surface | Entry | Primary Owner | Purpose |
+|---|---|---|---|
+| Desktop GUI | `arenyxa-gui -> arenyxa.app:main` | `app.py`, `bootstrap.py`, `presentation.MainWindow` | Full local workstation; owns an `ApplicationContext` |
+| Unified CLI | `arenyxa` / `arenyxa-cli -> arenyxa.cli:main` | `cli.py` | Command-line control surface |
+| Headless Server | `arenyxa-server -> arenyxa.infrastructure.server:main` | `infrastructure/server.py` | FastAPI service, defaulting to `127.0.0.1:8787` |
+| Windows Service | `arenyxa-windows-service` | `infrastructure/windows_service.py` | Windows SCM service entry |
+| Crawler MCP | `arenyxa-crawler-mcp` | `application/crawler_mcp.py` | Crawler/MCP automation entry |
+| Enterprise Worker | Worker script / Agent runtime | `enterprise.worker_agent` | Authenticated HTTPS lease consumer |
 
 ```mermaid
 flowchart LR
-  RQ["Run Queue / arenyxa-run"] --> RUN["Run owner thread"]
-  RUN --> FRONTIER["Bounded pending deque"]
-  FRONTIER --> HOST["Per-host gate"]
-  HOST --> POOL["Global arenyxa-fetch pool"]
-  POOL --> FETCH2["HTTP Fetch"]
-  FETCH2 --> PARSE2["Parse + Extract"]
-  PARSE2 --> REDUCE["Run-thread reduce / dedup"]
-  REDUCE --> BATCH["SQLite batch write"]
-  REDUCE --> PROGRESS["Throttled Qt progress signal"]
+  GUI[Desktop GUI] --> CP[Application Control Planes]
+  CLI[CLI] --> CP
+  API[Headless Server] --> CP
+  CP --> CORE[Application / Domain / Security]
+  WORKER[Enterprise Worker Agent] --> EAPI[Enterprise Server API]
+  EAPI --> ERUNTIME[Enterprise Distributed Runtime]
+  CORE --> INFRA[Infrastructure Adapters]
+  ERUNTIME --> ESTORE[SQLite WAL / PostgreSQL]
+```
+## 3. Layering, Dependency Direction, and Forbidden Edges
+
+`architecture_contracts.py` turns the intended layer structure into auditable source rules:
+
+```text
+Presentation (arenyxa.presentation.*)
+        ↓ user intent / view models
+Application (arenyxa.application.*)
+        ↓ use cases / control-plane orchestration
+Domain / Security / Enterprise contracts
+        ↓ validated operations
+Infrastructure + Enterprise Runtime adapters
+        ↓
+SQLite / PostgreSQL / HTTP / Browser / Packet / Windows APIs / Filesystem
 ```
 
-`run_workers` 控制独立 Run 并发，`request_workers` 控制进程级 HTTP/Parse/Extract 并发，`per_host_workers` 同时在 Run 内和进程级限制同一 Host。Worker 不直接修改 Run 状态或写 SQLite；只有 Run owner 归并 Future 结果并批量提交数据库。URL 数量很大时只维持有限 in-flight Future，避免 ThreadPoolExecutor 无界任务队列造成内存峰值。Pause/Resume/Cancel 使用线程安全协作令牌。
+Enforced dependency restrictions:
 
-## Network Capture 并发与背压
+- `domain` must not depend on `application`, `infrastructure`, or `presentation`.
+- `application` must not depend on `presentation`.
+- `infrastructure` must not depend on `presentation`.
+- `presentation` must not directly import `arenyxa.infrastructure.database`.
+- Hiding a control, disabling a menu, or omitting a page is **not authorization**; protected operations must be re-authorized at the Security/Application boundary.
 
-```mermaid
-sequenceDiagram
-  participant A as Browser/System/HAR Adapter
-  participant C as CaptureController
-  participant Q as Bounded Event Queue
-  participant W as Traffic Writer
-  participant DB as TrafficStore
-  participant UI as Network Model
-  A->>C: NetworkEvent
-  C->>C: pre-filter + sensitivity flags
-  alt queue has capacity
-    C->>Q: enqueue
-  else queue full
-    C->>C: dropped_events += 1
-  end
-  W->>Q: batch dequeue (<=500 / 200ms)
-  W->>DB: transaction commit metadata
-  W-->>UI: throttled visible batch
-  Note over A,DB: dumpcap stores pcapng ring chunks; HTTPS payload stays encrypted
+`validate_dependency_rules()` scans Python imports through the AST and reports violations. Presentation may hold service references supplied through `ApplicationContext`, but it must not create a parallel persistence or authorization model.
+## 4. Desktop Startup Path: Process Entry to MainWindow
+
+The Desktop runtime is driven by `arenyxa.app:main`:
+
+```text
+app.main
+  → select_runtime / validate_python_for_runtime
+  → AppPaths.discover + paths.initialize
+  → active Repair Worker check
+  → Qt binding preflight
+  → QApplication
+  → SingleInstance.acquire
+  → DataRootLease.acquire
+  → load startup locale/settings + launch geometry
+  → show ArenyxaShellWindow
+  → bootstrap(...)
+  → mandatory Root Owner gate on registered Root workstations
+  → MainWindow(context)
+  → shell_window.attach_main_window
+  → deferred StartupHealthScanner
+  → QApplication event loop
+  → finalize_runtime
+  → ApplicationContext.shutdown + DataRootLease.release
 ```
 
-## V6.1 Unified Network Core
+`SingleInstance` prevents ordinary duplicate Desktop instances. `DataRootLease` prevents Desktop, Headless Server, and Repair Center from concurrently mutating the same data root. If the required Qt binding is unavailable, startup enters the Repair path rather than continuing into a partially constructed UI.
+
+`ArenyxaShellWindow` is the startup/recovery shell. It becomes visible before the full workspace is committed, then hosts the real `MainWindow`. If `MainWindow` construction fails, the application must shut down the already-created context and release the data-root lease before reporting failure.
+## 5. `ApplicationContext`: Desktop Runtime Ownership Graph
+
+`bootstrap.ApplicationContext` owns the initialized Desktop service graph.
+
+| Area | Context Field / Instance | Implementation |
+|---|---|---|
+| Local persistence | `store: SQLiteStore` | `infrastructure.database` |
+| Task/Run execution | `runner` | `application.runner` / `application.async_runner` |
+| Scheduling | `scheduler` | `application.scheduler` |
+| Workflow/Data | `workflows`, `workflow_runtime`, `lineage`, `versioning` | `application.workflows`, `workflow_runtime`, `data_lineage`, `versioning` |
+| Capture | `capture` | `infrastructure.capture.controller` |
+| Proxy/MITM | `proxy_engine`, `mitm_engine` | `infrastructure.capture.proxy`, `mitm_engine` |
+| Security | `security`, `local_control_session` | `security.SecurityKernel` |
+| Enterprise | `enterprise_identity`, `enrollment`, `enterprise_governance`, `enterprise_server` | `arenyxa.enterprise.*` |
+| Control planes | `control_plane`, `traffic_control`, `enterprise_control`, `windows_runtime` | `application.*_control_plane` |
+| Long-running work | `job_system` | `application.job_system` |
+| Reliability | `runtime_supervisor`, `survivability`, `performance_telemetry` | `application.runtime_supervisor`, `survivability`, `performance_telemetry` |
+| Developer tools | `terminal`, `terminal_workspace`, `command_runtime` | `application.terminal*`, `command_runtime` |
+
+`bootstrap()` creates storage/recovery first, then Security/Enterprise, then Runner/Workflow/Capture, and finally attaches Proxy/MITM, Runtime Supervisor, Survivability, telemetry, and control planes. Presentation receives the fully assembled context; it does not bootstrap these subsystems itself.
+## 6. Shared Control-Plane Boundaries
+
+### `PlatformControlPlane`
+
+`application/control_plane.py` owns platform health, diagnostic exports, Job System access, Survivability, Performance Telemetry, Enterprise status, and Windows runtime operations. Protected calls use `SecurityKernel.require()` and carry the entry `surface` into the authorization context.
+
+### `TrafficControlPlane`
+
+`application/traffic_control_plane.py` unifies Capture, packet analysis, protocol registry access, Proxy, MITM, and network exports. It owns path confinement, query-size limits, protocol decode budgets, export-root restrictions, and Job System handoff for long-running analysis.
+
+### `EnterpriseControlPlane`
+
+`application/enterprise_control_plane.py` exposes Enterprise identity/governance/enrollment, Worker management, distributed jobs, lease recovery, and audit projections. It does not manufacture Enterprise authority; sensitive operations remain subject to `LocalEnterpriseIdentityService.require()` and `require_recent_step_up()`.
+
+### `WindowsRuntimeControl`
+
+`application/windows_runtime.py` is the capability façade for Windows-native qualification and control, including ETW, WFP, Npcap, SCM/Event Log, and related runtime probes. An unavailable capability must be reported explicitly as unavailable rather than represented as a successful operation.
+
+## 7. Persistence Boundaries: Local SQLite vs. Enterprise Distributed Storage
+
+Arenyxa has two distinct persistence envelopes. The Desktop/Headless primary database is `SQLiteStore`, which stores Task, Run, Capture, Workflow, Dataset, Settings, and Platform Job state. Enterprise distributed execution uses `DurableDistributedQueue` with a separate `DistributedRuntimeStorageBackend` for Workers, distributed jobs, leases, checkpoints, and queue events.
+The default Enterprise queue target is `<data_root>/enterprise/distributed.sqlite`. Passing an Enterprise runtime database/DSN during bootstrap replaces that embedded target with PostgreSQL.
+
+`storage_backend_for()` currently selects backends as follows:
+
+- `postgresql://...` or `postgres://...` → PostgreSQL.
+- Valid libpq keyword conninfo such as `user=... dbname=... host=...` → PostgreSQL.
+- Ordinary filesystem paths, including valid filenames containing `=`, → SQLite.
+
+The distributed SQLite backend uses WAL and serialized local writers. PostgreSQL is the multi-host concurrent-writer backend and provides row locking, `SKIP LOCKED`, bounded connection pools, and dedicated hot-path SQL. The two backends share queue semantics but not transaction implementation.
+
+## 8. Enterprise Distributed Queue State Machine
+
+The queue owner is `enterprise.distributed_queue.DurableDistributedQueue`; state/protocol constants live in `enterprise.distributed_protocol`.
+
+| State | Meaning | Principal Entry Path |
+|---|---|---|
+| `queued` | Available for Worker admission | `enqueue`, retry, handover, recovery |
+| `leased` | Bound to Worker + lease token + expiry | `lease_next` / `lease_many` |
+| `running` | Worker confirmed execution start | `start_job` |
+| `completed` | Successful terminal state with receipt | `complete` |
+| `failed` | Non-retry terminal failure | `fail` / exhausted recovery |
+| `review_required` | Unsafe to auto-retry after non-idempotent effects | fail/handover/recovery |
+| `cancelled` | Explicit terminal cancellation | management/recovery paths |
+
+Lease plaintext is returned only to the Worker; durable storage keeps `lease_token_sha256`. An active lease requires a valid active state, Worker ID, token digest, and positive expiry. Terminal rows must clear active lease fields.
+`distributed_workers.active_leases` is a redundant counter and must match the number of that Worker's `leased`/`running` jobs. `reconcile_durable_state()` repairs counter drift and illegal lease rows after interrupted or inconsistent execution.
+
+## 9. PostgreSQL Queue Hot Paths and Connection Pool
+
+Each `PostgreSQLDistributedRuntimeStorage` instance owns one `psycopg_pool.ConnectionPool`. Current production sizing is eight warm connections with a maximum of eight. Checkout timeout is 15 seconds, connection establishment timeout is 10 seconds, maximum idle time is 300 seconds, and maximum connection lifetime is 1800 seconds.
+
+Physical connections receive `lock_timeout=10s`, `statement_timeout=60s`, and `idle_in_transaction_session_timeout=60s`. Returned connections record an Arenyxa idle timestamp. The checkout health callback prefers socket-readiness inspection and performs a lightweight SQL probe only for suspicious I/O, first use, or connections idle for at least five seconds.
+Successful PostgreSQL hot paths run as one CTE statement under pool `autocommit=True`:
+
+- `lease_next_fast_sql()` performs Worker admission, candidate selection, lease update, and event creation.
+- `start_job_fast_sql()` performs a conditional update fenced by job ID, state, Worker ownership, lease proof, and expiry, then records the start event.
+- `complete_fast_sql()` locks the candidate, writes terminal result state, decrements the Worker slot, and records the completion event.
+
+If a fast path returns no row, the queue falls back to the portable path so precise errors such as unknown/revoked Worker, stale lease, and expired lease remain observable.
+
+Queue database connections are checkout-per-method. A public queue operation releases its connection before application/business execution continues. `EnterpriseWorkerRuntime` therefore does not hold a PostgreSQL queue connection while the local `RunOrchestrator` executes task work; lease renewal uses separate short checkouts.
+
+### PostgreSQL Close Boundary
+
+`PostgreSQLDistributedRuntimeStorage.close(timeout=None)` moves lifecycle state from `open` to `closing`, stops new admissions, drains already-admitted connections, and only then closes the pool. An explicit timeout bounds the wait for stuck callers so application shutdown cannot block indefinitely on `_active_connections`.
+## 10. Enterprise Worker Execution Path
+
+Local distributed execution is owned by `EnterpriseWorkerRuntime`; the persistent remote control loop is owned by `EnterpriseWorkerAgent`.
+
+```text
+EnterpriseWorkerAgent
+  → authenticate and heartbeat
+  → request a bounded lease batch
+  → convert response to DistributedLease
+  → ThreadPoolExecutor(max_workers=max_slots)
+  → EnterpriseWorkerRuntime.execute_lease
+      → verify Worker ownership
+      → persist the immutable Task snapshot locally
+      → queue.start_job
+      → optional non-idempotent side-effect fence
+      → runner.submit(Task)
+      → keepalive thread renews the lease
+      → progress callback persists checkpoints
+      → successful Run: queue.complete
+      → failed Run: queue.fail
+```
+The remote Agent uses `_RemoteQueueAdapter` to map lifecycle operations onto Enterprise Server endpoints. Session refresh and temporary transport recovery are handled inside the Agent control loop with bounded retry/backoff behavior.
+
+Agent stop/restart is isolated by `_AgentGeneration`. A retired generation is detached and drained; a replacement generation receives a new executor. When explicit cancellation of running work is requested, active leases are handed over where possible before cancellable futures are cancelled.
+
+## 11. Lease Fencing, Idempotency, and Recovery
+
+Distributed execution uses Worker ownership, lease ownership, and terminal receipts as separate fences:
+
+- `start_job` succeeds only while the same Worker still owns a valid unexpired lease.
+- `renew_lease` revalidates ownership before extending expiry and refreshing Worker heartbeat.
+- `complete` stores terminal Worker identity, terminal lease proof, completion time, and result hash.
+- An exact terminal replay from the same ownership/result tuple is idempotent.
+- A conflicting terminal replay is rejected.
+- A stale or expired lease cannot overwrite a job whose ownership has changed.
+- A non-idempotent job that has already crossed its side-effect fence moves to `review_required` when automatic retry would be unsafe.
+
+Recovery is divided into `recover_expired_leases()`, `recover_stale_worker_leases()`, and `reconcile_durable_state()`. PostgreSQL recovery candidates use row locking with `SKIP LOCKED`, allowing multiple recovery actors to make progress without serializing the entire queue.
+## 12. PostgreSQL P99 Verification Contract
+
+P99 is a release-verification contract for the Enterprise Distributed Runtime. It must not be achieved by weakening the benchmark or durability configuration.
+
+The authoritative workload is fixed at 64 workers, 128 concurrency, 1024 jobs, and 16 independent clients.
+
+A valid run records completed/non-completed jobs, errors, remaining active leases, fencing results, pool acquisition/reconnect failures, throughput, P50/P95/P99/MAX, and PostgreSQL identity/configuration.
+
+Candidate comparisons must preserve the PostgreSQL server/configuration, Python runtime, dependencies, benchmark semantics, workload shape, and host environment. Each run uses a fresh database. Runtime source identity and imported bytecode identity must be verified. Slow or failed runs are never discarded.
+
+A PostgreSQL-labeled integration test must prove that the selected backend is actually PostgreSQL; an accidental SQLite fallback is not a PostgreSQL pass. Concrete benchmark values and closure decisions belong in dedicated evidence reports rather than permanent architecture claims.
+## 13. Task and Run Execution
+
+`RunOrchestrator` and `AsyncRunOrchestrator` own Task execution. Desktop bootstrap selects the implementation for the active runtime tier.
+
+The normal pipeline is: Task snapshot → bounded execution → fetch/parse/extract → validation/deduplication → bounded result batches → `SQLiteStore` transaction → durable Run state.
+
+`PerformancePolicy` resolves concurrency and batching limits. `ResourceGovernor` may reduce admission under resource pressure without changing durability, security, or integrity rules.
+## 14. Workflow, Dataset Revision, and Data Lineage
+
+Workflow execution reuses the existing `WorkflowEngine`; `WorkflowDatasetService` applies a workflow to a Dataset Revision and owns checkpoint/output consistency.
 
 ```mermaid
 flowchart LR
-  ADAPTER["Browser / System / HAR / HTTP adapters"] --> EVENT["NetworkEvent ingestion envelope"]
-  EVENT --> TX["Atomic SQLite transaction"]
-  TX --> LEGACY["network_events compatibility table"]
-  TX --> NORM["NetworkNormalizer"]
-  NORM --> FLOW["NetworkFlow"]
-  NORM --> HTTP["HTTP Request / Response"]
-  NORM --> DNS["DNS Transaction"]
-  NORM --> TLS["TLS Handshake"]
-  NORM --> WS["WebSocket Channel / Message"]
-  PROJECT["Project + ProjectSource"] --> BIND["Capture Binding"]
-  BIND --> EVENT
-```
-
-`NetworkEvent` remains the adapter/UI compatibility envelope, but it is no longer the long-term analytical model. V6.1 deterministically projects each accepted event into normalized entities in the **same transaction** as the legacy row. Stable request/flow IDs therefore become a safe foundation for V6.2 capture enrichment, V6.3 Replay/API Map, and later Dataset lineage without forcing an all-at-once adapter rewrite.
-
-## 持久化对象
-
-- `Task`, `Run`, `ResultRecord`, `Schedule`, `ExportJob`
-- `Project`, `ProjectSource`, `CaptureSession`, `CaptureBinding`, `NetworkEvent`, `CaptureChunk`
-- `NetworkFlow`, `HttpRequestRecord`, `HttpResponseRecord`, `DnsTransaction`, `TlsHandshake`, `WebSocketChannel`, `WebSocketMessage`
-- `DatasetRevision`, `RevisionRecord`
-- `Workflow`, `Visualization`, `BrowserProfile`, `Plugin`
-- `Workspace`, `WorkspaceMember`, `AuditLog`
-- `Settings`, `SchemaMigration`, `LocalSearch`
-
-所有稳定事实使用 UUID 前缀 ID；JSON 对象用于可扩展配置，关系/查询字段保持结构化列。数据库迁移是单向可审计链，备份/恢复在写入前校验版本和内容。
-
-## 视觉合成
-
-```mermaid
-flowchart TB
-  L4["L4 Feedback: Toast / Edge Flow"]
-  L3["L3 Modal: Overlay Glass"]
-  L2["L2 Context: Elevated Glass"]
-  L1["L1 Navigation: Glass Base"]
-  L0["L0 Content: Surface / Canvas"]
-  L4 --> L3 --> L2 --> L1 --> L0
-  TOKENS["Theme + Material + Motion Tokens"] --> L4
-  TOKENS --> L3
-  TOKENS --> L2
-  TOKENS --> L1
-  TOKENS --> L0
-  PROFILER["Frame Profiler"] --> QUALITY["High / Balanced / Efficiency"]
-  QUALITY --> TOKENS
-```
-
-Windows 11 尝试 DWM backdrop；不可用时使用半透明 Qt 材质，Reduce Motion/高对比/远程桌面可回退到 Solid。业务线程和 UI 动画互不等待。
-
-V6.5.3 将 L1 Navigation 收敛为 236 px 展开 / 68 px 紧凑的单选 rail。中部仅承载可滚动 Core/Advanced/Developer 导航，Settings/About 固定在非滚动 footer；页面按钮由一个 exclusive `QButtonGroup` 管理，路由提交后再同步视觉选中态。普通可点击项使用中性文字，Accent 只表达当前页面和语义状态，避免“多个绿色项看起来同时被选中”。
-
-
-## Developer Terminal execution boundary
-
-```mermaid
-flowchart LR
-  UI["ConsolePage"] --> SESSION["Application TerminalSession"]
-  UI -->|Developer Mode + per-command confirmation| PLAN["Execution Mode"]
-  PLAN --> DIRECT["Direct Process / shell=False"]
-  PLAN --> PS["PowerShell"]
-  PLAN --> CMD["CMD"]
-  PLAN --> PY["Python -u -c"]
-  SESSION --> CWD["Projects-root cwd guard"]
-  SESSION --> ENV["Session env + redaction"]
-  SESSION --> SQL["SQLite mode=ro"]
-  SESSION --> PROC["Bounded child-process lifecycle"]
-  PROC --> STREAM["Streaming stdout/stderr"]
-  PROC --> LIMIT["Timeout / output budget / Stop / process-tree teardown"]
-```
-
-`TerminalSession` 属于 Application 层且不依赖 Qt；Presentation 只负责 Developer Mode 权限门、逐次确认、模式选择与流式输出渲染。Direct 模式不调用 Shell；PowerShell/CMD 是显式高权限语义入口而不是隐式 `shell=True`。工作目录通过 `Path.resolve()` 后限制在 Projects 根目录，SQL Console 通过 SQLite `mode=ro` 打开数据库。关闭 Developer Mode 使用非阻塞取消请求，应用退出再执行同步终止，避免 GUI 为子进程清理长时间卡住。
-
-## Explainable Web Intelligence and portable context
-
-The competitive-edge layer is implemented in `src/arenyxa/application/competitive.py` and remains Qt-independent. It consumes existing `FetchResponse`, `NetworkEvent`, SmartPath and Workflow domain objects instead of creating a parallel data model.
-
-```mermaid
-flowchart LR
-  RESP[FetchResponse] --> SP[SmartPath 2.0]
-  NET[NetworkEvent stream] --> SP
-  SP --> INTEL[Explainable Web Intelligence]
-  RESP --> INTEL
-  NET --> INTEL
-  INTEL --> TRACE[Decision Trace]
-  INTEL --> EST[Engine Estimates]
-  INTEL --> FALLBACK[Fallback Chain]
-  INTEL --> WF[Starter Workflow]
-  NET --> BRIDGE[Context Bridge]
-  BRIDGE --> HTTP[HTTP Builder]
-  BRIDGE --> CODE[Code Generator]
-  BRIDGE --> WF
-  WF --> PORT[arenyxa.workflow/v1]
-  PORT --> GIT[Git / Review / CI]
-  INTEL --> LAB[Compatibility Lab]
-```
-
-Heuristic resource/latency figures are always labelled estimates; measured compatibility/performance claims must come from a separately recorded benchmark run. Context conversion omits authentication/cookie material unless code explicitly opts in, and the portable workflow layer rejects likely inline secrets in favor of Secrets Vault references.
-## V6.2 Network Capture Enrichment
-
-V6.2 keeps the V6.1 normalized projection boundary and improves the quality of data entering it. Browser and HAR capture can now persist bounded body artifacts through a content-addressed local body store. The database records logical body IDs, original/stored SHA-256 values, original/stored sizes, MIME/encoding, truncation state, sensitivity state, and a capture-relative storage reference. Absolute machine paths are intentionally excluded from normalized HTTP rows.
-
-Browser Capture emits completed HTTP exchanges after `requestfinished`, enriches flows with server endpoint/security details when Playwright exposes them, and emits WebSocket open/frame/close events into the same `NetworkEvent` ingestion envelope. Response payload reads are budgeted and skipped for known oversized resources rather than materializing arbitrarily large bodies.
-
-System Capture negotiates optional tshark fields instead of blindly requiring version-specific dissector fields. It now normalizes TCP/UDP stream IDs, process-informed direction, local/remote endpoints, DNS query type/answers/latency, TLS SNI/cipher/ALPN, and packet timestamps. HAR one-shot imports commit the capture row, legacy events, body metadata, and normalized projections in one transaction.
-
-This capture layer remains the durability boundary consumed by V6.3 Replay/API Map. Replay and API discovery read normalized HTTP identities and verified Body Refs rather than reaching back into adapter-specific transient state.
-
-
-## V6.2.1 Autopilot Learning integration
-
-Autopilot remains an **advisory, deterministic-feedback layer** above `SmartPathV2`; it does not bypass the existing execution, permission, capture, or validation boundaries. `ExperienceStore` uses a dedicated SQLite/WAL database under the local data root and stores only bounded coarse features, strategy outcomes, selector categories, and failure labels. Raw response bodies, DOM, headers, cookies, tokens, prompts, URL paths/query strings, and raw selector text are intentionally excluded.
-
-The merge keeps V6.1/V6.2 Network Core authoritative. Autopilot currently consumes the compatibility `NetworkEvent` view so the learning branch can be integrated without weakening normalized capture transactions. A later iteration may consume normalized HTTP/Flow entities directly once V6.3 Replay/API Map stabilizes those query contracts.
-
-
-## V6.3 Replay + API Map
-
-V6.3 moves API discovery and Request Replay onto the normalized V6.1/V6.2 HTTP Exchange contract. `ApiMapService` groups deterministic route signatures, profiles query/pagination parameters, records status/content-type/auth signals, and can infer a bounded JSON response schema from integrity-checked Body Refs. Snapshot persistence is atomic: the snapshot header and all endpoint definitions are committed in one SQLite transaction.
-
-Replay no longer depends on raw adapter state. `CapturedBodyResolver` looks up logical Body IDs in SQLite, constrains reads to the canonical capture directory, and verifies stored size/SHA-256 before a payload can be used. Captured Authorization/Cookie/API-key values are never silently injected into a replay request; sensitive fields become explicit Secret references. A user may bind new values deliberately or drop unresolved sensitive fields for an anonymous replay. Write-like methods retain an explicit side-effect confirmation gate, and truncated request bodies are rejected by default.
-
-Replay results store only a redacted request snapshot, response metadata/hash, and bounded structural comparison. Full replay response bodies are not duplicated into SQLite. JSON comparison records bounded path-level changes while volatile headers are excluded from header-diff noise. Corrupt normalized JSON rows produce stable `NETWORK_CORE_CORRUPT` errors rather than leaking raw decoder exceptions into the UI.
-
-```mermaid
-flowchart LR
-  CAP[Capture Adapters] --> EVT[NetworkEvent compatibility envelope]
-  EVT --> CORE[Normalized HTTP Exchange + Body Ref]
-  CORE --> MAP[API Map v2]
-  CORE --> DRAFT[Replay Draft]
-  BODY[Verified Body Store] --> MAP
-  BODY --> DRAFT
-  DRAFT --> SECRET[Explicit Secret binding / anonymous mode]
-  SECRET --> HTTP[HttpFetcher + CancellationToken]
-  HTTP --> DIFF[Status/Header/JSON Diff]
-  DIFF --> HISTORY[Replay History]
-  MAP --> SNAP[Atomic API Map Snapshot]
-```
-
-
-## V6.4 Dataset + Data Lineage
-
-V6.4 promotes collected records from a Run-local implementation detail into a durable, queryable Dataset model. A Dataset owns a sequence of immutable revisions. Revision construction uses an explicit `building -> ready` lifecycle; `interrupted`, `failed`, and `cancelled` revisions remain available for diagnostics/recovery but are hidden from normal history by default. This prevents partially materialized data from being mistaken for a published revision.
-
-`DataLineageService` streams canonical ResultRecords from SQLite and writes revision records in bounded batches. Logical identity can be derived from caller-selected identity fields; when no logical key is supplied, a canonical content hash is used. Later source runs deterministically replace earlier values for the same logical identity during one materialization. Online schema inference is bounded and widens compatible numeric types while marking incompatible observations as mixed rather than attempting unbounded deep inference.
-
-```mermaid
-flowchart LR
-  TASK[Task] -->|executed_as| RUN[Run]
-  RUN -->|materialized_into| REV[Dataset Revision]
-  PREV[Parent Revision] -->|parent_of| REV
-  REV -->|version_of| DATASET[Dataset]
-  REV --> RECORDS[Revision Records]
-```
-
-Lineage is persisted as deterministic nodes/edges. Graph traversal is bounded by depth and node count and is cycle-safe. Metadata is structural and bounded: raw bodies, cookies, authorization headers, tokens, and other captured secret-bearing payloads are not copied into lineage metadata. Database migration and recovery are separated from legacy Run/Capture recovery so older callers retain their exact compatibility contract.
-
-## V6.5 Workflow Engine Integration
-
-V6.5 connects Dataset revisions to the existing deterministic Workflow Engine without creating a second execution model. The runtime consumes one immutable source record at a time, invokes the existing Workflow Engine, buffers only a bounded number of outputs, and persists progress using keyset checkpoints. The output is built as a new hidden Dataset revision and becomes visible only after finalization.
-
-```mermaid
-flowchart LR
-  SRC[Ready Dataset Revision] --> EXEC[Workflow Execution]
+  SRC[Ready Dataset Revision] --> EXEC[WorkflowDatasetService]
   WF[Workflow Definition] --> EXEC
   EXEC --> NODE[Node Metrics]
-  EXEC --> CHECK[Durable Checkpoint]
-  EXEC --> OUT[Building Output Revision]
-  OUT -->|finalize| READY[Ready Output Revision]
-  READY --> DATASET[Output Dataset]
+  EXEC --> CKPT[Durable Checkpoint]
+  EXEC --> BUILD[Building Output Revision]
+  BUILD -->|finalize| READY[Ready Output Revision]
+  READY --> LINEAGE[DataLineageService]
 ```
 
-For resumability, output identities are deterministic over source identity, workflow identity, and output ordinal. Re-executing an uncheckpointed source item therefore replaces the same staged rows instead of duplicating them. An execution stores a semantic definition hash covering workflow identity/version/schema/nodes while excluding provenance timestamps; resume is rejected if the executable definition changed. Cancellation checkpoints only completed source inputs, marks the execution/revision as cancelled, and leaves the staged revision eligible for an explicit resume operation.
+Revision lifecycle is `building → ready`, with `interrupted`, `failed`, and `cancelled` representing non-published outcomes. Normal consumers should treat only `ready` revisions as published data.
 
-Node-level counters are accumulated in `workflow_node_executions`. End-to-end lineage records source Revision -> Workflow Execution, Workflow -> Execution, Execution -> output Revision, parent Revision -> output Revision, and output Revision -> Dataset. Active executions found after an unclean shutdown are changed to `interrupted`; building revisions are similarly marked interrupted rather than silently published.
+`RuntimeRecoveryService` audits active Runs/Captures/Workflows, building Revisions, invalid schedules, and damaged resume metadata during bootstrap. Recoverable work remains explicitly resumable; inconsistent definition hashes or missing source/output revision relationships are failed rather than presented as completed.
 
-## V6.5.3 Startup Diagnostics, Motion and i18n Hardening
+Lineage stores bounded structural nodes and edges. It does not copy raw captured bodies, cookies, authorization material, or other secret-bearing payloads into lineage metadata.
+## 15. Network Capture, Proxy, MITM, and Protocol Intelligence
 
-V6.5.3 moves the normal startup health scan behind the first visible MainWindow frame and executes it as a background UI job. Any detected issue is therefore presented in the context of the running application and is parented to the main window. Bootstrap failures that prevent normal workspace creation enter a minimal Recovery Mode shell before the repair prompt is shown. A missing Qt dependency remains the sole native pre-UI recovery path because a Qt surface cannot be constructed without Qt.
+`CaptureController` owns capture lifecycle. `TrafficControlPlane` is the shared application façade used by presentation and external surfaces.
 
-Navigation transitions no longer animate geometry of layout-managed pages. `MotionOrchestrator.transition_stack()` captures the committed outgoing page, switches the stack to the new page, and cross-fades a snapshot overlay with an `OutCubic` easing curve. Reduced-motion and efficiency modes use immediate page switches. This isolates motion from layout calculation and keeps rapid route changes interruptible.
+```text
+Browser / HAR / Native / System adapters
+  → CaptureController
+  → bounded event queue and batches
+  → NetworkEvent compatibility envelope
+  → normalized Flow / HTTP / DNS / TLS / WebSocket records
+  → SQLite transaction
+  → LiveIntelligencePipeline / UI / Replay / API Map
+```
 
-Advanced-feature integrity is described by explicit side-effect-free contracts in `application.feature_audit`; the contract set covers every `NextGenFeatureHub` service plus workflow, dataset lineage/runtime, capture, scheduler and plugin surfaces. The startup scan can therefore detect a partially merged UI/runtime feature without executing network, subprocess, browser, capture or plugin operations.
+A saturated capture queue must expose dropped-event accounting rather than silently claiming a complete capture. Large payloads use bounded body handling and content-addressed body references instead of unrestricted SQLite storage.
 
-Localization now stores stable semantic sources for both Chinese-first and catalogued English-first controls. Dynamic language changes are reversible across all supported locales while editable technical/user data remains outside the translation walker. Specialist advanced-page copy is catalogued separately from technical identifiers so localization does not mutate URLs, JSON, code, commands, IDs or secrets.
+`InterceptingProxy` and `MitmEngine` are owned by `ApplicationContext`; management and export operations pass through `TrafficControlPlane`. Proxy history is paged and bounded. Network-analysis inputs are confined to configured Projects/Captures roots, and traffic exports are confined to the configured Exports root.
 
-## V6.6.0 Stability and Compatibility Baseline
+Protocol decoding has an explicit payload budget. External packet tooling is an optional capability boundary; its absence degrades the relevant external analysis path without redefining the rest of the Network Core as unavailable.
+## 16. Runtime Policy Model
 
-V6.6.0 is intentionally stability-first. The V6.5.6 security/crash-consistency fixes become the new baseline rather than being reimplemented. Small control files use atomic replace with a bounded retry window for transient sharing violations commonly introduced by Windows antivirus, indexing and sync clients; permanent permission or filesystem failures still surface and the prior destination remains intact.
+Runtime policy decisions are centralized outside the presentation layer. The UI does not become the source of truth for permission-sensitive operations.
+Policy state, capability definitions, audit records, and key-protection adapters have separate owners under `arenyxa.security`. Enterprise administration remains a distinct boundary from ordinary local workstation authority. Application services re-check protected operations before execution instead of trusting navigation state or widget visibility.
 
-HTTP cancellation remains cooperative. Because urllib cannot interrupt the OS while DNS/TCP/TLS connect is in progress, V6.6.0 limits the effective single connect phase to 60 seconds even when a legacy/project timeout is configured higher. This bounds the longest uninterruptible network phase without changing the persisted project schema. Response reads continue to use short socket polling and CancellationToken checkpoints.
+## 17. Desktop UI Shell and Presentation Boundary
 
-Bootstrap now validates Python 3.11–3.13 and SQLite capabilities before persistent migrations. SQLite must support UPSERT-era semantics and FTS5. Unsupported source runtimes raise stable ArenyxaError codes before user data is modified, and Recovery Mode maps those codes to dependency/database categories instead of collapsing every bootstrap failure into a generic crash.
+The Desktop surface is not a single raw `QMainWindow` startup path. The visible hierarchy is:
 
-The V6.6 stability suite repeatedly exercises Runner/Fetcher executor teardown, Scheduler start/stop, ApplicationContext bootstrap/shutdown, Headless Server lifespan, DataRootLease ownership, concurrent SQLite writers, atomic-write failures, and POSIX file-descriptor accounting. These tests are release gates in addition to the historical functional, security, workflow, capture, repair and provenance suites.
+```text
+ArenyxaShellWindow
+  ├─ startup / bootstrap / recovered-session presentation
+  └─ attached MainWindow
+       ├─ Navigation GlassPanel
+       ├─ Top Command Bar
+       ├─ QStackedWidget workspace
+       ├─ Context Inspector
+       ├─ StatusBar
+       └─ tray / shortcuts / overlays
+```
 
+`MainWindow` delegates navigation, operations, and lifecycle behavior to `main_window_navigation.py`, `main_window_operations.py`, and `main_window_lifecycle.py`. Page metadata and navigation groups are centralized in `main_window_registry.py`; page instances are created through `NavigationResolver` and `PageFactory` and cached rather than rebuilt for theme changes.
 
+The Sidebar is 236 px in expanded mode. Core pages occupy the scrollable navigation body, while system destinations are kept in the footer. A single `QButtonGroup` maintains visual page selection.
+The visual system is coordinated by `ThemeManager`, `GlassPanel`, `MotionOrchestrator`, `ThemeTransitionController`, and `InterfaceScaleManager`. `animation_mode`, Reduce Motion, system motion preference, high-contrast mode, and performance mode can reduce or disable non-essential effects.
 
-## V6.6.1 Windows 7 Legacy Enterprise Compatibility Layer
+Glass, blur, motion, and theme transitions are presentation concerns only. They must not change route authority, Task/Run state, database transaction semantics, or Enterprise runtime decisions.
 
-V6.6.1 keeps a single Domain/Application/Infrastructure implementation and moves operating-system differences to explicit compatibility boundaries. `platform_compat.py` selects either the modern runtime (Windows 10 1809+/Python 3.11-3.13/PySide6) or the Legacy Enterprise runtime (Windows 7 SP1 x64 through pre-1809 Windows/Python 3.8.x/PySide2). `compat.py` owns Python 3.8 shims, while `qt_compat/` presents the Qt6-style API surface used by Presentation and maps it to Qt5 when required.
+## 18. Repair Center vs. Runtime Recovery
 
-The Legacy lane uses conservative rendering (`QT_OPENGL=software`, reduced motion, no modern DWM backdrop). Browser Recorder/Playwright execution and QtWebEngine are excluded from the Win7 package; ordinary HTTP capture, Dataset, Workflow, SQLite/FTS5, plugins, terminal, scheduling, recovery and Headless services remain on the shared core. This prevents a second divergent application tree.
+These are separate recovery mechanisms.
 
-Runner pause/resume persistence is deliberately split into an in-memory state transition under the run lock and a guarded status-only SQLite update after the lock is released. Terminal database states cannot be overwritten by delayed PAUSED/RUNNING writes, and a pause requested between submit and worker startup is preserved. Executor shutdown uses a Python-version-safe helper and explicitly cancels tracked request/callback futures on Python 3.8, where `cancel_futures=` is unavailable.
+### Runtime Recovery
 
-The Legacy packaging lane is isolated under `requirements-win7.txt`, `requirements-dev-win7.txt`, `packaging/arenyxa_win7.spec`, `packaging/installer_win7.iss` and `scripts/*-win7.ps1`. Native Windows 7 execution remains a release-certification gate; Linux static/regression validation cannot substitute for a real Win7 SP1 x64 VM/hardware smoke test.
+`application.runtime_recovery.RuntimeRecoveryService` runs inside normal bootstrap. It reconciles durable lifecycle state left by an interrupted process: active Runs/Captures, active Workflows, building Revisions, invalid schedules, and invalid resume metadata. It repairs **runtime data state**; it does not replace program files.
 
+### Repair Center
 
-## V6.6beta2 Independent Compatibility Re-audit Delta
+`repair_scanner.StartupHealthScanner` detects installation/runtime problems and `repair_engine.RepairEngine` performs selected repair actions in an independent repair process.
 
-V6.6beta2 keeps the V6.6.1 dual-runtime architecture but tightens the compatibility boundary after a fresh audit found Python 3.8 expressions that parse under a modern interpreter yet evaluate unsupported post-3.8 generic/runtime APIs. `compat.strict_zip()` now owns the Python 3.10 `zip(strict=...)` semantic, evaluated generic arguments use `typing` aliases that exist on Python 3.8, and source gates explicitly reject parenthesized multi-context `with` syntax in the shared runtime tree.
+```text
+Desktop detects issue
+  → create RepairPlan
+  → launch independent Repair Worker
+  → main process exits
+  → Repair Worker waits for parent exit
+  → acquire DataRootLease exclusively
+  → backup affected state
+  → execute selected repair actions
+  → final health verification
+  → write last_repair_report.json
+  → optional relaunch
+```
+Program-file recovery uses only the current release's verified offline repair payload or repair seed. Paths remain confined to the installation root and restored files are verified by SHA-256. Database repair creates backups first; a rebuilt SQLite database must pass `quick_check` before it can replace the active database, and the original damaged file is preserved under a unique name.
 
-Scheduler definitions now carry a monotonic generation. A callback from a retired definition cannot persist execution state or a stale `next_run` into a replacement/re-enabled definition, and overlap advancement persists the current in-memory deadline rather than the originally dispatched deadline. Runner request submission treats executor shutdown races caused by intentional teardown as cancellation rather than an unexpected run failure.
+Repair preserves Projects, Captures, Exports, and other durable user data unless an explicit operation defines otherwise.
 
+## 19. Windows Platform and Compatibility Boundary
 
-## V6.6 Stable Promotion Delta
+Modern Windows behavior is isolated behind `platform_compat.py`, `qt_compat/`, and platform-specific services.
+| Capability | Primary Owner |
+|---|---|
+| SCM / Windows Service | `infrastructure.windows_service` |
+| ETW / WFP / Npcap qualification | `application.windows_runtime` |
+| DPAPI / CNG / TPM protection | `security.key_protection`, `security.hardware_*` |
+| ConPTY | `application.windows_conpty` |
+| Windows taskbar integration | `presentation.taskbar` |
+| Native visual capability and theme integration | presentation theme/platform helpers |
 
-The stable promotion preserves the beta2 runtime architecture and compatibility contracts. The release-specific change is build-shell isolation: Qt offscreen mode is now scoped to the pytest process window and restored immediately afterward, preventing a packaged Windows GUI started from the same PowerShell session from inheriting `QT_QPA_PLATFORM=offscreen`. Diagnostic packaged-startup tracing used to identify the defect is not part of the stable runtime. Public runtime identity is `6.6`, Python distribution identity is `6.6.0`, and the plugin/API compatibility comparator remains `6.6.2`.
+The modern package contract targets Python 3.11–3.13 with PySide6. The Windows 7 Legacy lane is NOT TESTED for this candidate and is isolated through `requirements-win7.txt`, compatibility shims, a dedicated PyInstaller spec, and a dedicated installer definition while reusing the same core Domain/Application/Infrastructure implementation.
 
-## V6.7 Startup Presentation and Readiness Boundary
+Legacy runtime disables or simplifies unsupported modern visual/runtime capabilities. Native Windows 7 qualification must be performed on a real Windows 7 SP1 x64 VM or machine; static analysis on a modern OS is not a substitute for that release gate.
 
-V6.7 keeps the v6.6 runtime, recovery, concurrency and compatibility architecture and adds a presentation-only startup boundary. The splash is created only after the Qt binding, single-instance lock and DataRootLease checks have succeeded. It paints one Arenyxa brand frame and immediately returns control to synchronous bootstrap; there is no nested event loop, sleep, artificial minimum display time or progress animation that can gate readiness.
+## 20. Developer Terminal, Plugins, and Headless Server
 
-The real `MainWindow` is constructed and shown before the splash exit begins. The exit is a short non-linear expansion/fade over the already-ready workspace. Reduce Motion retains only a static brand frame with an immediate handoff, while safe mode, smoke tests and reduced-visual legacy runtimes bypass the splash. Any splash import, construction, compositor, paint or teardown failure is logged and falls back to the ordinary startup path.
+`TerminalSession` belongs to the Application layer rather than QWidget code. Its working directory is confined to the Projects root, execution modes are explicit, and read-only SQL inspection uses a read-only database connection.
+Plugins are discovered by `PluginManager`; compatibility and isolation are handled by the plugin runtime/sandbox boundary. Plugin failure must remain isolated from host lifecycle and durable application state.
 
-Bootstrap and UI-construction failures remain authoritative over presentation. A bootstrap exception aborts the splash before Recovery Mode is shown. If `MainWindow` construction fails after services have already opened, V6.7 explicitly shuts down the application context and releases DataRootLease before presenting the failure, preventing a failed UI startup from leaving a half-open backend that can collide with a repair/retry launch.
+The Headless Server does not construct the full Qt Desktop `ApplicationContext`. `infrastructure.server._build_server_services()` independently creates `AppPaths`, `DataRootLease`, `SQLiteStore`, `RuntimeRecoveryService`, `AsyncRunOrchestrator`, `SecurityKernel`, `JobSystem`, `WindowsRuntimeControl`, and `PlatformControlPlane`.
 
+The server binds to loopback by default. Non-loopback binding requires explicit operator intent. API authentication is converted into short-lived application sessions, and endpoints continue to use capability checks rather than treating transport authentication as unlimited authority.
 
-## V6.8 Beta Adaptive Concurrency Boundary
+## 21. Shutdown Dependency Order
 
-V6.8 Beta adds a process-wide adaptive admission controller above the bounded HTTP worker
-executor. The executor's configured size remains the hard ceiling; admission begins from a
-four-request floor when the ceiling is higher. The controller observes only local parse/extract
-processing time and can grow or reduce the live gate without rebuilding executors or cancelling
-requests already in flight.
+`ApplicationContext.shutdown(reason="unspecified", timeout=10.0) -> bool` uses one `ShutdownDeadline` per attempt. It first stops scheduler, runner and Job System intake and requests workflow cancellation, then drains those producers. Ownership includes submissions still in authorization/persistence and retirement callbacks; a completed Future alone is insufficient.
 
-This controller is intentionally independent from the existing per-host `AdaptiveRateLimiter`.
-Remote latency, 429 and 503 responses belong to host politeness/backoff; local parse/extract P95
-belongs to process capacity. Keeping those feedback loops separate prevents one slow remote host
-from reducing unrelated-host concurrency across the whole application.
+After producer drain, `DependencyShutdownCoordinator` follows its registered dependency graph: monitor/scheduler owners precede the Job System and Enterprise/Office/Workflow work; Capture and Proxy/MITM precede runner resource release; terminal and identity/session consumers precede settings, database maintenance and logging. The authoritative order is the coordinator registration in `bootstrap.py`, including independent resilience-monitor cleanup.
 
-A manual request-budget change is authoritative for the current session and suspends the global
-automatic loop until Auto Budget is re-enabled. This preserves Arenyxa's developer-level control
-while making the default path safer on machines where large local worker counts create latency
-without useful throughput.
+A timeout, exception or false result preserves incomplete ownership and blocks dependent cleanup; independent steps may still run within the remaining budget. Successfully completed steps are retained for a later retry. The application finalizer releases the data-root lease and clears the recovery marker only after background work and context shutdown succeed; an incomplete window close does not accept the close event.
+
+Known executor, callback, registration and monitor waits use bounded contracts. Some synchronous external/native close APIs (for example a fetcher or capture adapter with no timeout interface) can still block arbitrarily; the source does not establish a universal wall-clock bound over such third-party behavior. Hiding a window or returning from an offscreen test is not evidence of complete runtime shutdown.
+
+Any new long-lived component must define its owner, start point, stop operation, dependency order, retry behavior, and exact position in `ApplicationContext.shutdown()`.
+
+## 22. Failure Classification and System Response
+
+`architecture_contracts.FAILURE_RULES` defines the common failure model:
+
+| Category | Default Disposition | Required Invariant |
+|---|---|---|
+| transient | bounded retry | Retry is cancellable and idempotency-aware |
+| recoverable | rollback + recover | Restore the last durable invariant before success is exposed |
+| configuration | reject | Reject before side effects and explain the invalid input |
+| permission | reject | Authorization remains a backend decision |
+| corruption | stop mutation and preserve diagnostics | Use only a verified recovery path |
+| fatal | fail closed | Finalize owned resources and preserve evidence |
+
+A degraded survivability state is not permission to ignore failures. Resource pressure may reduce admission or non-critical work, but it must not weaken durable state rules, queue ownership, audit semantics, or integrity verification.
+
+## 23. Architecture-Level Invariants
+
+The following invariants should remain continuously testable and release-gated:
+
+- Durable success is exposed only after the relevant commit or atomic replacement succeeds.
+- Presentation never becomes the source of truth for persistence or authorization.
+- Enterprise Worker business execution does not hold a queue database connection for the duration of the application task.
+- Old or expired lease ownership cannot overwrite newer ownership.
+- Exact terminal replay may be idempotent, while conflicting terminal ownership/result state is rejected.
+- Repair Center and normal Desktop/Server runtimes are mutually exclusive on the same data root.
+- Root workstation authority and Enterprise administrative authority remain separate trust boundaries.
+- Queue backend identity must be explicit; PostgreSQL verification cannot silently run on SQLite.
+- Capture backpressure, resource pressure, and reduced-function modes must remain observable rather than silently dropping correctness guarantees.
+- Shutdown must drain owned runtime resources before final storage maintenance.
+
+## 24. Compatibility and Release Identity
+
+Current public display identity is `0.1`; package/distribution identity is `0.1.0`, and PE metadata is `0.1.0.0`. Engineering baseline `v8.2.0` is retained separately. `pyproject.toml` declares Python `>=3.11,<3.14` for the modern package. Plugin/runtime compatibility remains `6.8.0`; this product identity change does not alter database, workflow or Enterprise wire schemas. See [VERSIONING.md](../VERSIONING.md).
+
+Plugin API compatibility remains a separately versioned contract and must not be inferred from the application display version. Packaging artifacts, installer resources, Repair payloads, Windows qualification, and benchmark evidence are release-gate concerns layered on top of this runtime architecture.
+
+## 25. Historical Evolution
+
+Earlier V6.x/V7.x releases introduced many of the capabilities that remain present today: normalized network capture, Replay/API Map, Dataset lineage, Workflow execution, adaptive concurrency, startup recovery, legacy Windows compatibility, and motion/theme infrastructure.
+
+Those version-by-version implementation notes are useful historical context, but they are not the authoritative description of the v0.1 candidate runtime. For current engineering work, use the current owners, call paths, storage boundaries, lifecycle rules, and invariants defined above and verify them against the source tree.

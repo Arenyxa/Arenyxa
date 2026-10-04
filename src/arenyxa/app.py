@@ -385,32 +385,35 @@ def _show_bootstrap_recovery(
     return 1
 
 
-def _make_runtime_finalizer(context: Any, crash_marker: Path, data_root_lease: Any) -> Callable[[], None]:
+def _make_runtime_finalizer(context: Any, crash_marker: Path, data_root_lease: Any) -> Callable[[], bool]:
     """Create an idempotent shutdown callback for Qt and explicit-finally paths."""
     finalization_lock = threading.Lock()
     runtime_finalized = False
 
-    def finalize_runtime() -> None:
+    def finalize_runtime() -> bool:
         nonlocal runtime_finalized
-        with finalization_lock:
-            if runtime_finalized:
-                return
-            runtime_finalized = True
+        if not finalization_lock.acquire(blocking=False):
+            return False
         try:
+            if runtime_finalized:
+                return True
             from arenyxa.presentation.background import begin_background_shutdown
 
             if not begin_background_shutdown(timeout_ms=2500):
                 LOGGER.warning("UI background jobs did not fully quiesce during application finalization")
-        except Exception:
-            LOGGER.exception("UI background shutdown boundary failed")
-        try:
-            context.shutdown()
-        finally:
-            try:
-                crash_marker.unlink(missing_ok=True)
-            except OSError:
-                LOGGER.exception("Failed to remove crash marker during application finalization")
+                return False
+            if context.shutdown() is False:
+                LOGGER.warning("Runtime finalization incomplete; retaining crash marker and data-root lease")
+                return False
+            crash_marker.unlink(missing_ok=True)
             data_root_lease.release()
+            runtime_finalized = True
+            return True
+        except Exception:
+            LOGGER.exception("Runtime finalization incomplete; cleanup can be retried")
+            return False
+        finally:
+            finalization_lock.release()
 
     return finalize_runtime
 
@@ -466,15 +469,13 @@ def _enforce_registered_root_startup(
     )
     if not allowed:
         try:
-            context.shutdown()
+            if context.shutdown() is not False:
+                data_root_lease.release()
+                crash_marker.unlink(missing_ok=True)
+            else:
+                LOGGER.warning("Root gate cleanup incomplete; retaining runtime ownership and recovery marker")
         except (OSError, RuntimeError, ValueError, TypeError):
             LOGGER.exception("Context shutdown failed after Root Owner startup gate denial")
-        finally:
-            data_root_lease.release()
-            try:
-                crash_marker.unlink(missing_ok=True)
-            except OSError:
-                LOGGER.warning("Unable to remove crash marker after intentional Root security lock")
         return False, None
     if shell_window is not None:
         shell_window.show_splash("Authentication complete · preparing Main UI")
@@ -757,7 +758,6 @@ def main(argv: list[str] | None = None) -> int:
 
     from arenyxa.presentation.main_window import MainWindow
     checkpoint("BOOT-022-MAIN-WINDOW-IMPORTED")
-
     try:
         checkpoint("BOOT-023-MAIN-WINDOW-CONSTRUCT-BEGIN")
         # Legacy construction-boundary marker: window = MainWindow(context
@@ -779,11 +779,12 @@ def main(argv: list[str] | None = None) -> int:
                                                                                               
                                                                                       
         try:
-            context.shutdown()
+            if context.shutdown() is not False:
+                data_root_lease.release()
+            else:
+                LOGGER.warning("Failed-window cleanup incomplete; retaining data-root lease")
         except Exception:
             LOGGER.exception("Context shutdown failed after main-window construction failure")
-        finally:
-            data_root_lease.release()
         QMessageBox.critical(None, "Arenyxa", f"Arenyxa interface initialization failed:\n{exc}")
         return 1
     _write_crash_marker(crash_marker, "running")

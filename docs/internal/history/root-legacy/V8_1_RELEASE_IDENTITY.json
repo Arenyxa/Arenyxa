@@ -1,0 +1,14 @@
+{
+  "schema": "arenyxa.release-identity/v1",
+  "product": "Arenyxa",
+  "display_version": "8.1",
+  "package_version": "8.1.0",
+  "windows_file_version": "8.1.0.0",
+  "release_channel": "stable",
+  "completed_phase": 8,
+  "artifact_name": "Arenyxa_v8.1",
+  "baseline": "Arenyxa_v8.0",
+  "compatibility_identity": "6.8.0",
+  "promotion_source": "v8.1_brand_refresh_2026_08_26",
+  "release_status": "official_source_release"
+}

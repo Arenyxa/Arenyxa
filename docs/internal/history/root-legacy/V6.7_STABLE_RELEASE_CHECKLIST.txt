@@ -1,0 +1,28 @@
+Arenyxa v6.7 Stable Release Checklist
+====================================
+
+Version identity
+- Public: 6.7
+- Python package: 6.7.0
+- Plugin minimum-app comparator: 6.7.0
+- Modern installer: dist\installer\Arenyxa_V6.7_Setup_x64.exe
+- Legacy installer: dist\installer\Arenyxa_V6.7_Legacy_Win7_x64_Setup.exe
+
+Startup transition contract
+- Splash first paint must happen before bootstrap work begins.
+- Splash must never use sleep()/blocking waits or delay initialization.
+- MainWindow is shown before the splash exit animation starts.
+- Bootstrap/recovery failures abort the splash before any recovery dialog appears.
+- Reduce Motion, smoke tests, safe mode and reduced-visual legacy runtimes bypass animated exit.
+- Animation is best-effort: any splash failure falls back to ordinary startup.
+
+Release gates
+1. Run scripts\bootstrap.ps1 on Windows.
+2. Run scripts\test.ps1.
+3. Run test-all in Developer Terminal.
+4. Run stress-test extreme in Developer Terminal.
+5. Build modern package with scripts\build.ps1.
+6. If supporting Windows 7, run the separate Legacy build/test lane.
+7. Verify Repair Seed and SOURCE_MANIFEST.sha256 after all code/resource changes.
+8. Verify window/taskbar/tray/installer icon and startup splash use the same approved Arenyxa icon.
+9. Verify clean launch, second-instance activation, recovery-mode launch, --safe-mode and --smoke-test.

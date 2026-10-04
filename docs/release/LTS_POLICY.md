@@ -1,5 +1,7 @@
 # Arenyxa LTS Policy — Phase 12
 
+Candidate policy scope: Arenyxa v0.1 is community unsigned and NOT READY FOR RELEASE. The values below mirror ReleasePolicy defaults (24-month maintenance, 30-month security fixes, 12-month deprecation); this candidate has not been designated an LTS release and has no asserted LTS start date.
+
 - Release channels are **Stable**, **Beta**, **Developer**, and **Enterprise**. A channel changes promotion/testing policy; it does not change Enterprise or Developer authorization.
 - LTS feature/maintenance window: 24 months from LTS designation. Security fixes: 30 months.
 - Public API/schema deprecation window: at least 12 months unless an actively exploitable security defect requires faster retirement.

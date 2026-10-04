@@ -81,8 +81,16 @@ def test_postgresql_hot_paths_use_atomic_admission_and_one_event_statement() -> 
     assert "WITH eligible_worker AS" in backend.lease_next_fast_sql()
     assert "FOR UPDATE OF j SKIP LOCKED" in backend.lease_next_fast_sql()
     assert "w.active_leases<w.max_slots" in backend.lease_next_fast_sql()
-    assert "WITH candidate AS" in backend.start_job_fast_sql()
-    assert "WITH candidate AS" in backend.complete_fast_sql()
+    start_sql = backend.start_job_fast_sql()
+    assert "WITH worker_locked AS MATERIALIZED" in start_sql
+    assert "FOR UPDATE OF j" in start_sql
+    assert "UPDATE distributed_jobs AS j" in start_sql
+    assert "j.job_id=?" in start_sql and "c.state='leased'" in start_sql
+    assert "c.lease_worker_id=?" in start_sql
+    assert "c.lease_token_sha256=?" in start_sql
+    assert "c.lease_expires_at>EXTRACT(EPOCH FROM clock_timestamp())" in start_sql
+    assert start_sql.count("?") == 9
+    assert "WITH worker_locked AS MATERIALIZED" in backend.complete_fast_sql()
     assert "worker_updated AS" in backend.complete_fast_sql()
 
     connection = _RecordingConnection([])

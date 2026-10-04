@@ -7,7 +7,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_beta12_preserves_beta11_runtime_hardening():
-    assert __release_channel__ == "stable"
+    # The v0.1 candidate preserves historical hardening without claiming promotion.
+    assert __release_channel__ == "candidate"
 
 
 def test_stable_epoch_ignores_wall_clock_rollback():

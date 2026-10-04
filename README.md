@@ -1,173 +1,74 @@
 # Arenyxa v0.1
 
-Arenyxa is an open-source, Windows-first network analysis, traffic forensics, proxy debugging, data workflow, automation, and local security engineering platform.
+**Public source release v0.1.** Package identity is `0.1.0`, Windows file version is `0.1.0.0`, the retained engineering baseline is `v8.2.0`, and plugin/runtime compatibility remains `6.8.0`. The Windows distribution is **community unsigned**; source publication does not imply Authenticode signing or independent clean-machine installer qualification.
 
-**Arenyxa v0.1 is the first formal public release in the GitHub release version line.**
+Arenyxa is a Windows-first network inspection, proxy debugging, data collection and automation application. Its source contains a Qt desktop shell, shared command/control services, local storage, headless server and Enterprise Worker surfaces. The capability descriptions below identify source scope; they do not certify every platform integration or deployment.
 
-The project existed through a long internal engineering cycle before the public version line was reset. Historical labels such as v6.x, v7.x, v8.0, v8.1, and v8.2 are retained as engineering milestones and validation baselines. They are not the public semantic-version sequence going forward.
+## Status and evidence
 
-Public version: **v0.1**  
-Package / distribution version: **0.1.0**  
-Windows file version: **0.1.0.0**  
-Internal engineering baseline: **v8.2.0**  
-Runtime / plugin compatibility identity: **6.8.0**
+The current identity is recorded in [RELEASE_IDENTITY.json](RELEASE_IDENTITY.json), while [VERSIONING.md](VERSIONING.md) separates product, engineering, compatibility and schema versions. The current publication decision and validation scope are summarized in [docs/RELEASE_STATUS.md](docs/RELEASE_STATUS.md).
 
-See [VERSIONING.md](VERSIONING.md) for the complete version model.
+The v0.1 source tree passed the release regression/integrity work recorded for this cycle after the release owner approved the current application icon. Representative automated GUI flows and release-owner manual GUI acceptance are recorded separately. The optional 24-hour soak was explicitly deferred as non-blocking and is not reported as passed. Independent clean-machine install/upgrade/rollback/uninstall qualification is not claimed by this source publication. Historical engineering audits remain indexed in [docs/RELEASE_HISTORY.md](docs/RELEASE_HISTORY.md).
 
-## Download
+The modern lane targets Python 3.11–3.13 and PySide6. The frozen legacy lane targets Python 3.8/PySide2 on Windows 7 SP1 x64. **Legacy runtime, packaging and installation are NOT TESTED for this candidate.** Its matching version metadata is not a compatibility certification.
 
-The public release line is **v0.1**. A v0.1 installer must be built from the v0.1 source identity so its embedded package and Windows metadata also report 0.1; an older v8.x binary must never be relabeled as v0.1.
+## Source capabilities
 
-GitHub Releases:
+| Area | Implemented source boundary |
+| --- | --- |
+| Tasks and data | HTTP request configuration, extraction/parsing, cleaning, validation, Run history, export, immutable dataset revisions, lineage and workflows |
+| Traffic | Capture adapters, protocol analysis, proxy/MITM, replay, HAR import/export, API analysis and traffic forensics; adapters depend on the selected runtime and permissions |
+| Desktop | Qt shell, navigation, six theme presets, motion/Reduce Motion, diagnostics, Repair Center and command terminal |
+| Runtime | Runner/scheduler/Job System ownership, cancellation, bounded queues, resource pressure, recovery, storage and diagnostic services |
+| Server/Worker | Headless service plus authenticated Enterprise lease execution, fencing, SQLite/PostgreSQL backends and observability |
+| Trust | Separate local/Developer/Enterprise/release trust domains, plugin capability controls and optional native Windows key protection |
 
-https://github.com/Arenyxa/Arenyxa/releases
+Use capture, interception and replay only on systems you are authorized to inspect. Review [SECURITY.md](SECURITY.md) for trust boundaries and sensitive-data handling. Optional native capture, browser, database and telemetry dependencies are separate from basic product availability.
 
-Historical v8.x entries on the Releases page are legacy development snapshots created before the public numbering policy was corrected. They are not part of the public release sequence defined by this repository.
+## Source setup and entry points
 
-Release assets are Windows installers or explicitly named release artifacts. GitHub-generated source archives are source code and are not Windows installers.
-
-Project source:
-
-https://github.com/Arenyxa/Arenyxa
-
-Project websites:
-
-https://arenyxa.pages.dev/
-
-https://arenyxa.github.io/
-
-## What Arenyxa provides
-
-Arenyxa combines desktop workflows, a command-line control plane, server/worker execution, local data management, recovery tooling, and enterprise-oriented security boundaries in one codebase.
-
-Core product areas include network capture and analysis, HTTP/browser/packet workflows, proxy and MITM debugging for authorized environments, API analysis, traffic forensics, protocol intelligence, data extraction, datasets and lineage, workflow automation, visualization, scheduling, plugins, terminal tooling, diagnostics, Repair Center, Enterprise identity/governance, Server/Worker execution, and SQLite/PostgreSQL storage boundaries.
-
-The desktop application and CLI use shared application services rather than separate business-logic implementations. Security-sensitive capabilities are enforced by backend policy; hiding or showing a UI control is not treated as authorization.
-
-Arenyxa is local-first. Core projects, settings, search indexes, datasets, captures, and diagnostics are designed to remain under the operator's control. Network-facing functions naturally contact the targets or infrastructure selected by the operator.
-
-## Platform
-
-The primary runtime targets modern Windows with Python 3.11–3.13 and PySide6.
-
-A separate frozen compatibility lane exists for Windows 7 SP1 x64 with Python 3.8 and PySide2. That lane is maintained for compatibility and does not define the public release version independently.
-
-Optional capabilities are installed by feature group so headless and development environments do not need the entire desktop stack.
-
-## Quick start
-
-On Windows PowerShell:
+From a source checkout on a supported modern Windows x64 development machine:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\scripts\bootstrap.ps1
-.\scripts\run.ps1
+.\scripts\bootstrap.ps1 -SkipBrowserRuntime
+.\.venv\Scripts\python.exe -B .\scripts\verify_release_identity.py
+.\.venv\Scripts\python.exe -B -m arenyxa --version
+.\.venv\Scripts\python.exe -B -m arenyxa --data-dir .\local-data
 ```
 
-For an editable Python installation:
+Bootstrap creates the local virtual environment and installs declared dependencies. Omit `-SkipBrowserRuntime` only when the optional browser runtime is needed. The last command starts the desktop and creates its explicitly selected data directory.
+
+The installed console entry points are `arenyxa` / `arenyxa-cli` for commands, `arenyxa-gui` for the desktop, `arenyxa-server` for the headless server and `arenyxa-windows-service` for the Windows Service. Source command examples:
 
 ```powershell
-python -m pip install -e ".[desktop,analysis,capture]"
-arenyxa-gui
+.\.venv\Scripts\python.exe -B -m arenyxa.cli --data-dir .\local-data version
+.\.venv\Scripts\python.exe -B -m arenyxa.cli --data-dir .\local-data help
 ```
 
-Additional optional groups include `browser`, `database`, `server`, `telemetry`, `crawler`, and `mcp`.
+Inspect command help and local authorization before enabling network capture, replay, a listening server or a service. A command's presence does not mean the necessary adapter, permission or trust provisioning is available.
 
-## Build and test
-
-Run the release-blocking validation suite:
+## Tests and packaging
 
 ```powershell
+.\.venv\Scripts\python.exe -B .\scripts\verify_release_identity.py
 .\scripts\test.ps1
+.\scripts\build.ps1 -RequireInno
 ```
 
-Build the modern Windows package:
+The normal build invokes test and integrity gates, builds desktop/service payloads, and prepares the installer using Inno Setup. `-SkipTests` is a developer shortcut and must not be presented as release acceptance. Source/repair manifests must be regenerated after the final source changes, then verified against the packaged bytes.
 
-```powershell
-.\scripts\build.ps1
-```
+Expected modern outputs are `dist/Arenyxa/Arenyxa.exe` and `dist/installer/Arenyxa_v0.1_Setup_x64.exe`. Their existence, hashes, signatures and successful clean-machine execution must be established from each build. See [Windows installer guide](docs/WINDOWS_INSTALLER_zh-CN.md) for installation, unsigned status, data retention and upgrade limitations.
 
-The build pipeline validates the canonical public release identity before packaging. Modern installer output is expected to use the public name:
+The source repository is [Arenyxa/Arenyxa](https://github.com/Arenyxa/Arenyxa). Its [release inventory](https://github.com/Arenyxa/Arenyxa/releases) is separate from this local candidate's status; an automatically generated source archive is not a tested Windows installer.
 
-```text
-Arenyxa_v0.1_Setup_x64.exe
-```
+## Repository map
 
-The legacy Windows 7 package uses:
+- `src/arenyxa/`: modern Domain, Application, Infrastructure, Enterprise, Security and Presentation code.
+- `legacy/win7/`: feature-frozen legacy source and compatibility lane.
+- `tests/`: unit, integration, contract, security and offscreen UI checks; fixture identities remain historical.
+- `packaging/` and `scripts/`: package metadata, build, test and validation tools.
+- `docs/`: [architecture](docs/ARCHITECTURE.md), requirements, UI tree, historical evidence and build guidance.
 
-```text
-Arenyxa_v0.1_Legacy_Win7_x64_Setup.exe
-```
+## License and attribution
 
-## Version model
-
-Arenyxa deliberately separates three identities.
-
-| Identity | Current value | Purpose |
-| --- | --- | --- |
-| Public release | `v0.1` | Version shown to GitHub users and in the application |
-| Package / distribution | `0.1.0` | PEP 440, installer, attestation, and package metadata |
-| Engineering baseline | `v8.2.0` | Internal development history and engineering provenance |
-| Runtime / plugin compatibility | `6.8.0` | Compatibility contract; changes only through an explicit migration |
-
-The internal engineering baseline must not be used as the public product version. Likewise, the public v0.1 reset does not reset database schema numbers, workflow schemas, Enterprise protocol versions, plugin APIs, or other machine compatibility identifiers.
-
-Historical v6/v7/v8 reports remain in the repository because they contain useful engineering evidence. They should be read as internal milestone records. Any older GitHub Release artifacts carrying v8.x names are legacy development snapshots from before the public numbering policy was corrected; the public release line starts at v0.1.
-
-## Architecture and safety boundaries
-
-Arenyxa follows a layered architecture with domain, application, infrastructure, presentation, security, enterprise, and compatibility boundaries.
-
-Long-running network, parsing, capture, export, database, plugin, and workflow work is kept off the GUI event loop. Durable operations are designed around bounded queues, explicit lifecycle states, cancellation, failure recovery, and auditability.
-
-Secrets such as Authorization values, cookies, tokens, private paths, and credential-bearing payloads are redacted or constrained at log, diagnostic, export, and plugin boundaries where applicable.
-
-Security-sensitive operations must be used only on systems, traffic, and infrastructure the operator owns or is authorized to test.
-
-## Internationalization
-
-Arenyxa supports runtime localization through `LanguageManager` and packaged locale catalogs. New high-visibility UI surfaces use semantic catalog keys instead of embedding user-facing language directly in page source.
-
-Legacy pages are being migrated incrementally so compatibility behavior remains stable while hard-coded UI copy is removed.
-
-## Repository layout
-
-```text
-src/arenyxa/
-  domain/             entities, state machines, errors, permissions
-  application/        use cases, orchestration, workflows, versioning
-  infrastructure/     storage, HTTP, capture, server and adapters
-  presentation/       desktop shell, pages, themes and localization
-  enterprise/         enterprise identity, governance and distributed runtime
-  security/           trust, hardware identity and security boundaries
-
-legacy/win7/          frozen Windows 7 compatibility lane
-scripts/              bootstrap, validation, build and release automation
-packaging/            PyInstaller and Inno Setup definitions
-tests/                regression, contract, security and platform tests
-docs/                 architecture, engineering history and release evidence
-```
-
-## Release and engineering history
-
-Public release history begins with **v0.1**.
-
-Internal engineering milestone documents retain their original v6.x, v7.x, and v8.x identifiers for traceability. Their original technical claims and validation evidence are not rewritten into fake public releases.
-
-See:
-
-[VERSIONING.md](VERSIONING.md)
-
-[Engineering Release History](docs/RELEASE_HISTORY.md)
-
-[Architecture](docs/ARCHITECTURE.md)
-
-[API Reference](docs/API_REFERENCE.md)
-
-[Security Policy](SECURITY.md)
-
-## License
-
-Arenyxa is licensed under **GPL-3.0-or-later**. See [LICENSE](LICENSE).
-
-Release signatures and integrity metadata verify provenance and installed content. They do not replace the open-source license, require online activation, or convert the application into a hardware-bound product.
+GPL-3.0-or-later. Arenyxa uses its own capability names. Optional third-party runtimes retain their package names where needed for installation or operation, and their applicable license/notice obligations remain in force.

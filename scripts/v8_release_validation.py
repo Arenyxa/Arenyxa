@@ -68,7 +68,7 @@ def _commands(python: str, *, full: bool) -> list[ValidationCommand]:
             180,
         ),
         ValidationCommand("architecture", (python, "scripts/architecture_debt_gate.py"), 180),
-        ValidationCommand("version", (python, "scripts/verify_v81_release_identity.py"), 120),
+        ValidationCommand("version", (python, "scripts/verify_release_identity.py"), 120),
         ValidationCommand("cli_runtime", (python, "scripts/verify_cli_contract.py"), 180),
         ValidationCommand("ui_wiring", (python, "scripts/verify_ui_button_connections.py"), 180),
         ValidationCommand(
@@ -122,7 +122,7 @@ def _run(command: ValidationCommand, environment: dict[str, str]) -> dict[str, o
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Execute and retain reproducible Arenyxa v8.1 validation evidence."
+        description="Execute and retain reproducible Arenyxa v0.1 validation evidence."
     )
     parser.add_argument("--full", action="store_true", help="include the complete pytest regression suite")
     parser.add_argument("--report", type=Path, default=ROOT / "V8_TEST_EVIDENCE.json")

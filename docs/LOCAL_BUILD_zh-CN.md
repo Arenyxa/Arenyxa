@@ -1,4 +1,6 @@
-# Arenyxa V6.6 本地编译与调试教程
+# Arenyxa v0.1 本地编译与调试教程
+
+当前为 candidate / community unsigned / NOT READY FOR RELEASE。包版本 `0.1.0`，工程基线 `v8.2.0`，兼容身份 `6.8.0`。以下是源码运行和调试步骤；不代表干净 Windows 安装、GUI、原生能力或 legacy runtime 已验收。发布身份由 `scripts/verify_release_identity.py` 核验，实际交付边界见 [Windows 安装指南](WINDOWS_INSTALLER_zh-CN.md)。
 
 ## 1. 环境要求
 
@@ -27,7 +29,7 @@ Set-ExecutionPolicy -Scope Process Bypass
 4. 以 editable 模式安装 Arenyxa、PySide6、lxml/cssselect、dnspython、openpyxl、Playwright、数据库驱动，以及测试、Server 和 Process Monitor 依赖。
 5. 下载经过 Playwright 固定版本管理的 Chromium 运行时。
 
-若只做无浏览器引擎的离线代码审阅，可使用 `./scripts/bootstrap.ps1 -SkipBrowserRuntime` 跳过约 300 MB 的 Chromium 下载；Browser Capture 在安装运行时前会明确报告缺失，不会静默替代。
+若只做无浏览器引擎的离线代码审阅，可使用 `./scripts/bootstrap.ps1 -SkipBrowserRuntime` 跳过 Chromium 运行时下载；Browser Capture 在安装运行时前会明确报告缺失，不会静默替代。
 
 ## 3. 运行桌面程序
 

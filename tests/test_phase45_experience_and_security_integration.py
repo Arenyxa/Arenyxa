@@ -23,7 +23,13 @@ def test_experience_profile_is_presentation_not_authority() -> None:
     assert settings.experience_profile == "developer"
                                                                                                  
     assert settings.developer_mode is False
-    assert settings.developer_nav_expanded is False
+    assert settings.developer_nav_expanded is True
+    from arenyxa.navigation import AccountRole, ExperienceMode, NavigationContext, NavigationResolver, RuntimeMode
+    from arenyxa.navigation.manifest import DEFAULT_PAGE_MANIFESTS
+    navigation = NavigationContext(ExperienceMode.DEVELOPER, RuntimeMode.DESKTOP, AccountRole.PERSONAL)
+    resolver = NavigationResolver(DEFAULT_PAGE_MANIFESTS)
+    assert resolver.allowed("developer_center", navigation) is True
+    assert resolver.allowed("console", navigation) is False
     assert (settings.request_concurrency, settings.resource_max_browser_instances) == before_limits
 
 

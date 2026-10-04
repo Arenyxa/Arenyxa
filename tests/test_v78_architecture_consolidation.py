@@ -4,7 +4,7 @@ import asyncio
 import tomllib
 from pathlib import Path
 
-from arenyxa import __engineering_build__, __package_version__, __version__
+from arenyxa import __package_version__, __version__
 from arenyxa.application.async_runner import AsyncRunOrchestrator
 from arenyxa.application.traffic_automation import (
     TrafficAction,
@@ -20,7 +20,6 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_v78_release_identity_and_architecture_documents() -> None:
     assert __version__ == "0.1"
     assert __package_version__ == "0.1.0"
-    assert __engineering_build__ == "v8.2.0"
     assert (ROOT / "docs/architecture/V7_8_ARCHITECTURE_CONSOLIDATION.md").is_file()
     assert (ROOT / "docs/adr/ADR_V78_ASYNC_IO_AND_CAPABILITY_LAYERS.md").is_file()
 
@@ -111,7 +110,11 @@ def test_traffic_automation_priority_preview_stop_and_throttle(tmp_path: Path) -
 def test_modern_ci_is_lightweight_and_heavy_integration_is_isolated() -> None:
     quality = (ROOT / ".github/workflows/quality.yml").read_text(encoding="utf-8").casefold()
     integration = (ROOT / ".github/workflows/capability-integration.yml").read_text(encoding="utf-8").casefold()
-    assert "postgres:" not in quality
+    core = quality.split("\n  core-quality:", 1)[1].split("\n  windows-desktop:", 1)[0]
+    desktop = quality.split("\n  windows-desktop:", 1)[1]
+    postgres = quality.split("\n  postgres-correctness:", 1)[1].split("\n  core-quality:", 1)[0]
+    assert "services:" not in core and "services:" not in desktop
+    assert "postgres:" in postgres and "verify_postgresql_test_results.py" in postgres
     assert "tshark" not in quality
     assert "playwright install" not in quality
     assert "postgres:" in integration

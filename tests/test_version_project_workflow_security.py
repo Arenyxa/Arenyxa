@@ -135,7 +135,7 @@ def test_application_png_matches_current_approved_arenyxa_app_icon() -> None:
     )
     assert (
         hashlib.sha256(icon.read_bytes()).hexdigest().upper()
-        == "EE03DFC7C4160A31B7B0730376E65E22932A501E25A4593D0DDE06E209D51FB8"
+        == "EAF8A3F0D8B0AFEA1411F73C495764ECCF5167C69A72F01323ADAB60CBCC51F5"
     )
 
 

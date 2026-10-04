@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
 from typing import Iterable
+
+try:
+    from scripts.build_source_manifest import is_preserved_local_artifact
+except ModuleNotFoundError:
+    from build_source_manifest import is_preserved_local_artifact
 
 REQUIRED_FILES = {
     '.gitattributes',
@@ -74,17 +80,28 @@ SECRET_PATTERNS = (
 )
 
 PERSONAL_OR_PRIVATE_PATTERNS = (
-    ('local Jerry profile path', re.compile(r'(?i)C:\\\\Users\\\\Jerry(?:\\\\|\b)')),
-    ('local Arenyxa development path', re.compile(r'(?i)D:\\\\Project\\\\Arenyxa')),
-    ('private owner email', re.compile(r'(?i)wangyixuan\.2013\.4@gmail\.com')),
+    ('local user profile path', re.compile(
+        r'(?i)\b[A-Z]:[\\/]+Users[\\/]+(?![<{$%])[^\\/\r\n:"<>|?*]+')),
+    ('local Arenyxa development path', re.compile(r'(?i)[A-Z]:[\\/]+Project[\\/]+Arenyxa')),
+    # Match consumer domains, including escaped regex dots, without storing an owner's identity.
+    ('consumer mailbox address for review', re.compile(
+        r"(?i)(?<![\w.+-])[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@(?:"
+        r'(?:gmail|googlemail|outlook|hotmail|live|yahoo|icloud|me|protonmail|qq|163|126)(?:\\+)?\.com'
+        r'|proton(?:\\+)?\.me|yahoo(?:\\+)?\.co(?:\\+)?\.uk)(?![\w.\\-])')),
     ('forbidden assistant/provider branding', re.compile(r'(?i)\b(?:' + 'Open' + 'AI' + '|' + 'Chat' + 'GPT' + r')\b')),
 )
 
 
-def iter_files(root: Path) -> Iterable[Path]:
-    for path in sorted(root.rglob('*')):
-        if path.is_file():
-            yield path
+def iter_files(root: Path, *, allow_local_artifacts: bool = False) -> Iterable[Path]:
+    for directory, names, files in os.walk(root):
+        parent = Path(directory)
+        if allow_local_artifacts:
+            names[:] = sorted(name for name in names if name not in LOCAL_ARTIFACT_DIR_NAMES
+                              and not is_preserved_local_artifact((parent / name).relative_to(root)))
+        for name in sorted(files):
+            path = parent / name
+            if path.is_file():
+                yield path
 
 
 def relative(path: Path, root: Path) -> str:
@@ -132,12 +149,17 @@ def main() -> int:
         if '* text=auto eol=lf' not in attributes_text:
             findings.append('.gitattributes must pin text checkout bytes to LF for source-manifest stability')
 
-    files = list(iter_files(root))
+    files = list(iter_files(root, allow_local_artifacts=args.allow_local_artifacts))
     total_bytes = 0
     scanned_files: list[Path] = []
     for path in files:
         rel = relative(path, root)
         parts = set(path.relative_to(root).parts[:-1])
+        preserved_local = is_preserved_local_artifact(path.relative_to(root))
+        if preserved_local:
+            if not args.allow_local_artifacts:
+                findings.append(f'preserved local tool/evidence/backup artifact: {rel}')
+            continue
         if args.allow_local_artifacts and parts & LOCAL_ARTIFACT_DIR_NAMES:
             continue
         if parts & FORBIDDEN_DIR_NAMES:
@@ -166,6 +188,8 @@ def main() -> int:
                                                                                              
                                                                                             
     for path in files:
+        if args.allow_local_artifacts and is_preserved_local_artifact(path.relative_to(root)):
+            continue
         parts = set(path.relative_to(root).parts[:-1])
         if args.allow_local_artifacts and parts & LOCAL_ARTIFACT_DIR_NAMES:
             continue
@@ -187,7 +211,7 @@ def main() -> int:
     print(f'- largest file: {largest} bytes')
     print('- no private key/vault/Authority artifacts detected')
     print('- no common credential-token signatures detected')
-    print('- no user-specific Jerry/email paths detected')
+    print('- no local user profile paths or consumer mailbox addresses detected')
     print('- no forbidden assistant/provider branding detected')
     print('- required GPL/public repository documents are present')
     return 0

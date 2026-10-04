@@ -7,10 +7,14 @@ protocol implementation so ``proxy.py`` remains below the architecture module-si
 """
 
 import logging
+import inspect
+import socket
+import time
 import threading
 from typing import Any
 
 from arenyxa.domain.errors import ArenyxaError
+from arenyxa.recoverable import record_current_exception
 from arenyxa.infrastructure.capture.proxy_models import ProxyFlow, ProxySettings
 from arenyxa.infrastructure.capture.proxy_persistence import ProxyPersistencePipeline
 
@@ -120,3 +124,120 @@ class ProxyResilienceMixin:
         if telemetry is not None:
             telemetry.increment("proxy.persistence_backpressure")
         self._emit("backpressure", {"flow_id": flow.id, "mode": mode})
+
+    def stop(self, timeout: float = 6.0) -> bool:
+        """Bound the caller's wait while retaining the listener cleanup owner."""
+        with self._lock:
+            if self._stop_worker is None or (self._stop_finished.is_set() and not self._stop_succeeded):
+                self._stop_finished.clear()
+                self._stop_succeeded = False
+
+                def stop_owned() -> None:
+                    try:
+                        self._stop_runtime()
+                        with self._client_condition:
+                            self._stop_succeeded = not self._active_clients
+                    except Exception:
+                        LOGGER.exception("Proxy stop incomplete; resources retained for retry")
+                    finally:
+                        self._stop_finished.set()
+
+                self._stop_worker = threading.Thread(target=stop_owned, name="arenyxa-proxy-stop", daemon=True)
+                self._stop_worker.start()
+            completed = self._stop_finished
+        return bool(completed.wait(max(0.0, float(timeout))) and self._stop_succeeded)
+
+    def _stop_runtime(self) -> None:
+        """Stop listeners and release proxy runtime resources."""
+        with self._lock:
+            server = self._server
+            thread = self._thread
+            self._server = None
+            self._thread = None
+            session_id = self._session_id
+            self._session_id = ""
+            pending = list(self._pending.values())
+            self._pending.clear()
+        for item in pending:
+            item.action = "forward"
+            item.modified_raw = item.raw
+            item.event.set()
+        if server is not None:
+            try:
+                server.shutdown()
+                server.server_close()
+            except Exception:
+                with self._lock:
+                    self._server = server
+                    self._thread = thread
+                    self._session_id = session_id
+                raise
+        with self._client_condition:
+            clients = list(self._active_clients)
+        for client in clients:
+            try:
+                client.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                record_current_exception(__name__, 'InterceptingProxy.stop:487')
+            try:
+                client.close()
+            except OSError:
+                record_current_exception(__name__, 'InterceptingProxy.stop:491')
+        if thread is not None and thread.is_alive() and thread is not threading.current_thread():
+            thread.join(timeout=3.0)
+        deadline = time.monotonic() + 3.0
+        with self._client_condition:
+            while self._active_clients:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                self._client_condition.wait(timeout=remaining)
+        if session_id:
+            if not self.flush_persistence():
+                self._emit(
+                    "error",
+                    {
+                        "code": "PROXY_PERSISTENCE_DRAIN_TIMEOUT",
+                        "session_id": session_id,
+                        "message": "Proxy persistence queue did not drain before session finalization",
+                    },
+                )
+            try:
+                self.history_store.finish_session(session_id)
+            except ArenyxaError:
+                LOGGER.exception("Proxy Suite session finalization failed")
+                self._emit("error", {"code": "PROXY_SESSION_FINALIZE_FAILED", "session_id": session_id})
+        self._emit("stopped", self.status())
+
+    def close(self, timeout: float | None = None) -> bool:
+        """Permanently stop the proxy and close its durable history database."""
+        with self._lock:
+            if self._closed:
+                return True
+            self._close_requested = True
+        deadline = time.monotonic() + (6.0 if timeout is None else max(0.0, float(timeout)))
+        stopped = (
+            self.stop(timeout=max(0.0, deadline - time.monotonic()))
+            if "timeout" in inspect.signature(self.stop).parameters else self.stop()
+        )
+        if stopped is False:
+            return False
+        with self._client_condition:
+            if self._active_clients:
+                LOGGER.warning(
+                    "Proxy history database remains open because %d client handler(s) did not quiesce",
+                    len(self._active_clients),
+                )
+                return False
+        with self._persistence_lifecycle_lock:
+            with self._lock:
+                if self._closed:
+                    return True
+            remaining = min(float(self.settings.persistence_flush_timeout_seconds), max(0.0, deadline - time.monotonic()))
+            if not self.persistence.close(remaining):
+                LOGGER.warning("Proxy persistence writer did not quiesce before close")
+                return False
+            self.history_store.close()
+            with self._lock:
+                self._closed = True
+            return True

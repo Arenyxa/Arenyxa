@@ -4,7 +4,7 @@ from arenyxa.recoverable import record_current_exception
 from collections.abc import Callable
 from typing import Any
 
-from arenyxa.qt_compat.QtCore import QAbstractTableModel, QItemSelectionModel, QModelIndex, QRectF, Qt, Signal
+from arenyxa.qt_compat.QtCore import QAbstractTableModel, QItemSelectionModel, QModelIndex, QRectF, Qt, Signal, Slot
 from arenyxa.qt_compat.QtGui import QColor, QPainter, QPen
 from arenyxa.qt_compat.QtWidgets import (
     QApplication,
@@ -244,27 +244,15 @@ class ResponsiveActionBar(QWidget):
 
 
 class PageHeader(QWidget):
-    def __init__(
-        self,
-        title: str,
-        subtitle: str = "",
-        parent: QWidget | None = None,
-        *,
-        title_key: str = "",
-        subtitle_key: str = "",
-    ) -> None:
+    def __init__(self, title: str, subtitle: str = "", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 8)
         layout.setSpacing(3)
         self.title_label = QLabel(title)
         self.title_label.setProperty("title", True)
-        if title_key:
-            self.title_label.setProperty("i18n_key_text", title_key)
         self.subtitle_label = QLabel(subtitle)
         self.subtitle_label.setProperty("muted", True)
-        if subtitle_key:
-            self.subtitle_label.setProperty("i18n_key_text", subtitle_key)
         self.subtitle_label.setWordWrap(True)
         layout.addWidget(self.title_label)
         if subtitle:
@@ -321,14 +309,7 @@ class MetricCard(GlassPanel):
 
 class SectionCard(GlassPanel):
     def __init__(
-        self,
-        theme: ThemeManager,
-        title: str,
-        action: str = "",
-        parent: QWidget | None = None,
-        *,
-        title_key: str = "",
-        action_key: str = "",
+        self, theme: ThemeManager, title: str, action: str = "", parent: QWidget | None = None
     ) -> None:
         super().__init__(theme, parent=parent)
         self.outer = QVBoxLayout(self)
@@ -337,14 +318,10 @@ class SectionCard(GlassPanel):
         header = QHBoxLayout()
         label = QLabel(title)
         label.setProperty("section", True)
-        if title_key:
-            label.setProperty("i18n_key_text", title_key)
         header.addWidget(label)
         header.addStretch()
         self.action = QPushButton(action) if action else None
         if self.action:
-            if action_key:
-                self.action.setProperty("i18n_key_text", action_key)
             self.action.setFlat(True)
             header.addWidget(self.action)
         self.outer.addLayout(header)
@@ -362,7 +339,11 @@ class RingGauge(QWidget):
         self.value = value
         self.label = label
         self.setMinimumSize(130, 130)
-        self.theme.changed.connect(lambda _theme: self.update())
+        self.theme.changed.connect(self._theme_changed)
+
+    @Slot(str)
+    def _theme_changed(self, _theme: str) -> None:
+        self.update()
 
     def set_value(self, value: float) -> None:
         self.value = max(0.0, min(100.0, value))
@@ -408,7 +389,11 @@ class MiniBars(QWidget):
         self.theme = theme
         self.values = values or []
         self.setMinimumHeight(120)
-        self.theme.changed.connect(lambda _theme: self.update())
+        self.theme.changed.connect(self._theme_changed)
+
+    @Slot(str)
+    def _theme_changed(self, _theme: str) -> None:
+        self.update()
 
     def set_values(self, values: list[tuple[str, float]]) -> None:
         self.values = values

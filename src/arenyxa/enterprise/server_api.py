@@ -83,8 +83,6 @@ def _zero_trust_denial(runtime: EnterpriseServerRuntime, request: Any, peer: str
                 "via_server_relay": True,
                 "peer_to_peer": False,
                 "network_trust": "private" if peer not in {"unknown", ""} else "unknown",
-                "risk_score": 0,
-                "auth_age_seconds": 0,
             },
         )
     except ArenyxaError as exc:
@@ -368,8 +366,6 @@ def create_enterprise_server_app(runtime: EnterpriseServerRuntime, server_identi
                 "via_server_relay": True,
                 "peer_to_peer": False,
                 "network_trust": "private" if peer not in {"unknown", ""} else "unknown",
-                "risk_score": 0,
-                "auth_age_seconds": 0,
             },
         )
 

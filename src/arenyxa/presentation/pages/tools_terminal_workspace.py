@@ -55,8 +55,8 @@ from arenyxa.application.workflow_graph import WorkflowGraphModel
 from arenyxa.domain.models import RequestSpec, Workflow, WorkflowNode, new_id
 from arenyxa.infrastructure.http_client import HttpFetcher
 from arenyxa.presentation.background import run_background
-from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.flow_graph import FlowGraphCanvas
+from arenyxa.presentation.language import resolve_system_locale
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.widgets import MiniBars, PageHeader, set_table_header_stretch_last, ScrollSafeComboBox
 
@@ -68,40 +68,24 @@ class TerminalWorkspaceMixin:
         layout = QVBoxLayout(holder)
         layout.setContentsMargins(0, 0, 0, 0)
         toolbar = QHBoxLayout()
-        session_label = QLabel(source_text("tools_terminal.workspace.session_label")); session_label.setProperty("i18n_key_text", "tools_terminal.workspace.session_label"); toolbar.addWidget(session_label)
+        toolbar.addWidget(QLabel("Session"))
         self.workspace_mode = ScrollSafeComboBox()
-        mode_items = [
-            ("tools_terminal.workspace.mode.powershell", TerminalMode.POWERSHELL_SESSION.value),
-        ]
+        self.workspace_mode.addItem("PowerShell", TerminalMode.POWERSHELL_SESSION.value)
         if os.name == "nt":
-            mode_items.append(("tools_terminal.workspace.mode.cmd", TerminalMode.CMD_SESSION.value))
-        mode_items.append(("tools_terminal.workspace.mode.python", TerminalMode.PYTHON_SESSION.value))
-        for index, (key, value) in enumerate(mode_items):
-            self.workspace_mode.addItem(source_text(key), value)
-            self.workspace_mode.setProperty(f"i18n_item_key_{index}", key)
+            self.workspace_mode.addItem("CMD", TerminalMode.CMD_SESSION.value)
+        self.workspace_mode.addItem("Python REPL", TerminalMode.PYTHON_SESSION.value)
         self.workspace_pane = ScrollSafeComboBox()
-        for index, (key, value) in enumerate((
-            ("tools_terminal.workspace.pane.primary", "primary"),
-            ("tools_terminal.workspace.pane.secondary", "secondary"),
-            ("tools_terminal.workspace.pane.bottom", "bottom"),
-        )):
-            self.workspace_pane.addItem(source_text(key), value)
-            self.workspace_pane.setProperty(f"i18n_item_key_{index}", key)
-        self.workspace_new = QPushButton(source_text("tools_terminal.workspace.action.new"))
-        self.workspace_new.setProperty("i18n_key_text", "tools_terminal.workspace.action.new")
+        self.workspace_pane.addItem("Primary", "primary")
+        self.workspace_pane.addItem("Secondary", "secondary")
+        self.workspace_pane.addItem("Bottom", "bottom")
+        self.workspace_new = QPushButton("New Session")
         self.workspace_new.setProperty("primary", True)
-        self.workspace_interrupt = QPushButton(source_text("tools_terminal.workspace.action.interrupt"))
-        self.workspace_interrupt.setProperty("i18n_key_text", "tools_terminal.workspace.action.interrupt")
-        self.workspace_rename = QPushButton(source_text("tools_terminal.workspace.action.rename"))
-        self.workspace_rename.setProperty("i18n_key_text", "tools_terminal.workspace.action.rename")
-        self.workspace_move = QPushButton(source_text("tools_terminal.workspace.action.move"))
-        self.workspace_move.setProperty("i18n_key_text", "tools_terminal.workspace.action.move")
-        self.workspace_resize = QPushButton(source_text("tools_terminal.workspace.action.resize"))
-        self.workspace_resize.setProperty("i18n_key_text", "tools_terminal.workspace.action.resize")
-        self.workspace_stop = QPushButton(source_text("tools_terminal.workspace.action.stop"))
-        self.workspace_stop.setProperty("i18n_key_text", "tools_terminal.workspace.action.stop")
-        self.workspace_close = QPushButton(source_text("tools_terminal.workspace.action.close"))
-        self.workspace_close.setProperty("i18n_key_text", "tools_terminal.workspace.action.close")
+        self.workspace_interrupt = QPushButton("Interrupt")
+        self.workspace_rename = QPushButton("Rename")
+        self.workspace_move = QPushButton("Move Pane")
+        self.workspace_resize = QPushButton("Resize")
+        self.workspace_stop = QPushButton("Stop")
+        self.workspace_close = QPushButton("Close")
         toolbar.addWidget(self.workspace_mode)
         toolbar.addWidget(self.workspace_pane)
         toolbar.addWidget(self.workspace_new)
@@ -134,8 +118,10 @@ class TerminalWorkspaceMixin:
         workspace_split.addWidget(self.workspace_bottom_tabs)
         workspace_split.setSizes([620, 260])
         layout.addWidget(workspace_split, 1)
-        note = QLabel(source_text("tools_terminal.workspace.note"))
-        note.setProperty("i18n_key_text", "tools_terminal.workspace.note")
+        note = QLabel(
+            "Arenyxa Shell Sessions are isolated persistent processes. They share the Projects boundary, "
+            "Developer authorization, output budgets and process-tree shutdown policy."
+        )
         note.setWordWrap(True)
         note.setProperty("muted", True)
         layout.addWidget(note)
@@ -156,13 +142,13 @@ class TerminalWorkspaceMixin:
 
     def _new_terminal_workspace_session(self) -> None:
         if not self._terminal_workspace_authorized():
-            QMessageBox.warning(self, current_text("tools_terminal.workspace.developer_mode_title"), current_text("tools_terminal.workspace.developer_mode_required"))
+            QMessageBox.warning(self, "Developer Mode", "Enable Developer Mode and accept the Developer risk agreement first.")
             return
         mode = str(self.workspace_mode.currentData())
         if mode in {TerminalMode.POWERSHELL_SESSION.value, TerminalMode.CMD_SESSION.value} and not bool(
             getattr(self.context.settings, "developer_direct_shell_enabled", False)
         ):
-            QMessageBox.warning(self, current_text("tools_terminal.workspace.direct_shell_title"), current_text("tools_terminal.workspace.direct_shell_required"))
+            QMessageBox.warning(self, "Direct Shell", "PowerShell/CMD sessions require the Developer Mode Direct Shell setting.")
             return
         pane = str(self.workspace_pane.currentData() or "primary")
         try:
@@ -172,7 +158,7 @@ class TerminalWorkspaceMixin:
             session_id = str(state["id"])
             self.context.terminal_workspace.start(session_id)
         except (OSError, RuntimeError, ValueError) as exc:
-            QMessageBox.warning(self, current_text("tools_terminal.workspace.shell_session_title"), str(exc))
+            QMessageBox.warning(self, "Shell Session", str(exc))
             return
         tab = QWidget()
         tab_layout = QVBoxLayout(tab)
@@ -183,8 +169,8 @@ class TerminalWorkspaceMixin:
         output.setMaximumBlockCount(self._log_tail_lines)
         send_row = QHBoxLayout()
         command = QLineEdit()
-        command.setPlaceholderText(source_text("tools_terminal.workspace.command_placeholder")); command.setProperty("i18n_key_placeholder", "tools_terminal.workspace.command_placeholder")
-        send = QPushButton(source_text("tools_terminal.workspace.action.send")); send.setProperty("i18n_key_text", "tools_terminal.workspace.action.send")
+        command.setPlaceholderText("Persistent session command")
+        send = QPushButton("Send")
         send.setProperty("primary", True)
         send_row.addWidget(command, 1)
         send_row.addWidget(send)
@@ -197,7 +183,7 @@ class TerminalWorkspaceMixin:
         command.returnPressed.connect(lambda sid=session_id: self._send_terminal_workspace_command(sid))
         host.setCurrentIndex(index)
         self._active_workspace_pane = pane
-        self.statusMessage.emit(current_text("tools_terminal.workspace.created").format(session_id=session_id))
+        self.statusMessage.emit(f"Shell session created: {session_id}")
 
     def _current_terminal_workspace_id(self) -> str | None:
         host = self._workspace_hosts.get(self._active_workspace_pane, self.workspace_primary_tabs)
@@ -228,7 +214,7 @@ class TerminalWorkspaceMixin:
             self.context.terminal_workspace.send(session_id, text)
             self.statusMessage.emit(f"{session_id}> {safe}")
         except (KeyError, OSError, RuntimeError, ValueError) as exc:
-            QMessageBox.warning(self, current_text("tools_terminal.workspace.shell_session_title"), str(exc))
+            QMessageBox.warning(self, "Shell Session", str(exc))
 
     def _refresh_terminal_workspace(self) -> None:
         live_ids = {str(item["id"]) for item in self.context.terminal_workspace.list()}
@@ -251,15 +237,15 @@ class TerminalWorkspaceMixin:
             return
         try:
             self.context.terminal_workspace.interrupt(session_id)
-            self.statusMessage.emit(current_text("tools_terminal.workspace.interrupt_sent").format(session_id=session_id))
+            self.statusMessage.emit(f"Interrupt sent to {session_id}")
         except (KeyError, OSError, RuntimeError, ValueError) as exc:
-            QMessageBox.warning(self, current_text("tools_terminal.workspace.shell_session_title"), str(exc))
+            QMessageBox.warning(self, "Shell Session", str(exc))
 
     def _rename_terminal_workspace_session(self) -> None:
         session_id = self._current_terminal_workspace_id()
         if not session_id:
             return
-        title, ok = QInputDialog.getText(self, current_text("tools_terminal.workspace.rename_title"), current_text("tools_terminal.workspace.session_title_label"))
+        title, ok = QInputDialog.getText(self, "Rename Shell Session", "Session title")
         if not ok or not title.strip():
             return
         try:
@@ -271,28 +257,15 @@ class TerminalWorkspaceMixin:
                     host.setTabText(index, f"{state['title']} · {session_id}")
                     break
         except (KeyError, ValueError) as exc:
-            QMessageBox.warning(self, current_text("tools_terminal.workspace.shell_session_title"), str(exc))
+            QMessageBox.warning(self, "Shell Session", str(exc))
 
     def _move_terminal_workspace_session(self) -> None:
         session_id = self._current_terminal_workspace_id()
         if not session_id:
             return
-        pane_options = (
-            ("tools_terminal.workspace.pane.primary", "primary"),
-            ("tools_terminal.workspace.pane.secondary", "secondary"),
-            ("tools_terminal.workspace.pane.bottom", "bottom"),
-        )
-        pane_labels = [current_text(key) for key, _value in pane_options]
-        pane_label, ok = QInputDialog.getItem(
-            self,
-            current_text("tools_terminal.workspace.move_title"),
-            current_text("tools_terminal.workspace.pane_label"),
-            pane_labels,
-            0,
-            False,
-        )
-        if ok and pane_label:
-            pane = pane_options[pane_labels.index(pane_label)][1]
+        panes = ["primary", "secondary", "bottom"]
+        pane, ok = QInputDialog.getItem(self, "Move Shell Session", "Pane", panes, 0, False)
+        if ok and pane:
             try:
                 self.context.terminal_workspace.move(session_id, pane)
                 widget = self._workspace_views[session_id][2]
@@ -307,24 +280,24 @@ class TerminalWorkspaceMixin:
                 index = destination.addTab(widget, title)
                 destination.setCurrentIndex(index)
                 self._active_workspace_pane = str(pane)
-                self.statusMessage.emit(current_text("tools_terminal.workspace.moved").format(session_id=session_id, pane=current_text(f"tools_terminal.workspace.pane.{pane}")))
+                self.statusMessage.emit(f"{session_id} moved to {pane} pane")
             except (KeyError, ValueError) as exc:
-                QMessageBox.warning(self, current_text("tools_terminal.workspace.shell_session_title"), str(exc))
+                QMessageBox.warning(self, "Shell Session", str(exc))
 
     def _resize_terminal_workspace_session(self) -> None:
         session_id = self._current_terminal_workspace_id()
         if not session_id:
             return
-        columns, ok = QInputDialog.getInt(self, current_text("tools_terminal.workspace.resize_title"), current_text("tools_terminal.workspace.columns"), 120, 20, 1000)
+        columns, ok = QInputDialog.getInt(self, "Resize Shell Session", "Columns", 120, 20, 1000)
         if not ok:
             return
-        rows, ok = QInputDialog.getInt(self, current_text("tools_terminal.workspace.resize_title"), current_text("tools_terminal.workspace.rows"), 32, 5, 400)
+        rows, ok = QInputDialog.getInt(self, "Resize Shell Session", "Rows", 32, 5, 400)
         if not ok:
             return
         try:
             self.context.terminal_workspace.resize(session_id, columns, rows)
         except (KeyError, OSError, RuntimeError, ValueError) as exc:
-            QMessageBox.warning(self, current_text("tools_terminal.workspace.shell_session_title"), str(exc))
+            QMessageBox.warning(self, "Shell Session", str(exc))
 
     def _stop_terminal_workspace_session(self) -> None:
         session_id = self._current_terminal_workspace_id()
@@ -394,7 +367,7 @@ class ConsoleCommandMixin:
             TerminalMode.PYTHON_SESSION.value: "import sys; print(sys.version)",
         }
         self.prompt.setText(prompts.get(value, "Arenyxa>"))
-        self.command.setPlaceholderText(placeholders.get(value, current_text("tools_terminal.command.placeholder_default")))
+        self.command.setPlaceholderText(placeholders.get(value, "输入命令"))
 
     def _complete_command(self) -> None:
         if bool(getattr(self, "_secret_stdin_pending", False)):
@@ -428,7 +401,7 @@ class ConsoleCommandMixin:
             else:
                 self.command.setText(common)
             self.command.setCursorPosition(len(self.command.text()))
-        self.output.appendPlainText(current_text("tools_terminal.completion.prefix") + "  ".join(candidates[:32]))
+        self.output.appendPlainText("Completions: " + "  ".join(candidates[:32]))
 
     def _refresh_cwd(self) -> None:
         cwd = self.context.terminal.cwd
@@ -437,7 +410,7 @@ class ConsoleCommandMixin:
             shown = "." if str(relative) == "." else f".\\{relative}"
         except ValueError:
             shown = str(cwd)
-        self.cwd_label.setText(current_text("tools_terminal.cwd.summary").format(cwd=shown, timeout=f"{self.context.terminal.timeout_seconds:g}"))
+        self.cwd_label.setText(f"工作目录：{shown}  ·  Timeout {self.context.terminal.timeout_seconds:g}s")
         self.cwd_label.setToolTip(str(cwd))
 
     def _history_step(self, delta: int) -> None:
@@ -469,9 +442,9 @@ class ConsoleCommandMixin:
         try:
             sent = self.context.terminal.send_input(payload)
         except ValueError as exc:
-            self.output.appendPlainText(current_text("tools_terminal.stdin.secret_failed").format(error=exc))
+            self.output.appendPlainText(f"stdin-secret failed: {exc}")
         else:
-            self.output.appendPlainText("[secret stdin sent]" if sent else current_text("tools_terminal.stdin.not_accepted"))
+            self.output.appendPlainText("[secret stdin sent]" if sent else "The active process cannot receive standard input.")
         finally:
             self._secret_stdin_pending = False
             self.prompt.setText("Arenyxa>")
@@ -488,9 +461,9 @@ class ConsoleCommandMixin:
             return
         if command.casefold() == "stdin-secret":
             self._secret_stdin_pending = True
-            self.prompt.setText(current_text("tools_terminal.stdin.secret_prompt"))
+            self.prompt.setText("Secret stdin>")
             self._update_secret_input_mode("")
-            self.output.appendPlainText(current_text("tools_terminal.stdin.secure_mode_notice"))
+            self.output.appendPlainText("[secure stdin mode: next input is masked and is not stored in history]")
             return
         if command.casefold().startswith("stdin-secret "):
             safe_command = "stdin-secret <redacted>"
@@ -543,9 +516,77 @@ class ConsoleCommandMixin:
             if handler(name, command, parts):
                 return
 
+    def _terminal_locale(self) -> str:
+        configured = str(getattr(getattr(self.context, "settings", None), "locale", "system") or "system")
+        if configured == "system":
+            environment = os.environ.get("ARENYXA_LANGUAGE", "").strip()
+            return environment or resolve_system_locale()
+        return configured
+
     def _builtin_help_text(self) -> str:
-        """Return terminal help from the active semantic locale catalog."""
-        return current_text("tools_terminal.help.text")
+        """Return terminal help in the same locale selected by the application."""
+        english = self._terminal_locale().casefold().startswith("en")
+        if english:
+            return (
+                "Arenyxa Terminal-First Control Plane:\n"
+                "  task list/show/run                         Task query and execution (--json supported)\n"
+                "  run list/show/cancel/pause/resume/export  Run control and export\n"
+                "  capture start/browser/har-import/pcap-import  Live, browser, HAR and PCAP capture\n"
+                "  capture status/events/intelligence/alerts/stream-stats  Live intelligence and alerts\n"
+                "  packet summary/conversations/analytics    Packet Intelligence session analysis\n"
+                "  packet detect/hunt/protocols/fields       Detection, hunting and dynamic field discovery\n"
+                "  packet build                               Offline packet fixture/PCAP construction\n"
+                "  extraction analyze/dry-run/pick            Extraction Lab and web picking\n"
+                "  dataset list/show/revisions                Dataset queries\n"
+                "  flow list/show/executions/inspect-execution Flow Designer analysis\n"
+                "  proxy status/history/inspect/summary       Proxy control and Session analysis\n"
+                "  mitm flows/pending/resolve/export/replay-current  MITM Proxy control\n"
+                "  fleet status/workers/jobs/health           Fleet Control\n"
+                "  plugin list/health                          Plugin Runtime\n"
+                "  terminal capabilities/session-*             Shell capability and multi-session control\n"
+                "  Tab                                         Arenyxa command completion\n"
+                "  Append --json to professional commands for machine-readable output\n\n"
+                "Compatibility / Session Commands:\n"
+                "  help                              Show help\n"
+                "  clear                             Clear output\n"
+                "  history [n]                       Show session command history\n"
+                "  pwd / cd <path> / ls [path]       Project navigation\n"
+                "  status / paths / version          Runtime information\n"
+                "  stdin <text> / stdin-secret       Send process input; secure mode masks and omits secrets from history\n"
+                "  tasks [n] / runs [n] / captures [n]  Stored records\n"
+                "  test-all                          Isolated full feature validation\n"
+                "  stress-test [profile]             Performance stress validation\n"
+            )
+        return (
+            "Arenyxa Terminal-First Control Plane：\n"
+            "  task list/show/run                         任务查询与启动（支持 --json）\n"
+            "  run list/show/cancel/pause/resume/export  Run 控制与导出\n"
+            "  capture start/browser/har-import/pcap-import  实时、浏览器、HAR 与 PCAP 捕获\n"
+            "  capture status/events/intelligence/alerts/stream-stats  实时情报与告警\n"
+            "  packet summary/conversations/analytics    Packet Intelligence 会话分析\n"
+            "  packet detect/hunt/protocols/fields       检测、威胁狩猎与动态字段发现\n"
+            "  packet build                               离线数据包/PCAP 测试构造\n"
+            "  extraction analyze/dry-run/pick            Extraction Lab 与网页点选\n"
+            "  dataset list/show/revisions                Dataset 查询\n"
+            "  flow list/show/executions/inspect-execution Flow Designer 查询与执行分析\n"
+            "  proxy status/history/inspect/summary       Proxy 控制与 Session 分析\n"
+            "  mitm flows/pending/resolve/export/replay-current  MITM Proxy 控制\n"
+            "  fleet status/workers/jobs/health           Fleet Control\n"
+            "  plugin list/health                          Plugin Runtime\n"
+            "  terminal capabilities/session-*             Shell 能力探测与多会话控制\n"
+            "  Tab                                         Arenyxa 命令组/动作补全\n"
+            "  任意专业命令追加 --json 可输出机器可读 JSON\n\n"
+            "兼容 / 会话命令：\n"
+            "  help                              显示帮助\n"
+            "  clear                             清空输出\n"
+            "  history [n]                       显示命令历史\n"
+            "  pwd / cd <path> / ls [path]       项目目录导航\n"
+            "  status / paths / version          运行时信息\n"
+            "  stdin <text> / stdin-secret       发送进程输入；安全模式会隐藏且不记录密钥\n"
+            "  tasks [n] / runs [n] / captures [n]  已保存记录\n"
+            "  test-all                          隔离完整功能验证\n"
+            "  stress-test [profile]             性能压力验证\n"
+        )
 
     def _execute_builtin_core(self, name: str, command: str, parts: list[str]) -> bool:
         """Handle help, navigation, history, and process-input builtins."""
@@ -561,21 +602,19 @@ class ConsoleCommandMixin:
         if name in {"stdin", "stdin-secret"}:
             payload = command[len(parts[0]):].lstrip()
             if not payload:
-                self.output.appendPlainText(current_text("tools_terminal.usage.stdin").format(name=name))
+                self.output.appendPlainText(f"用法：{name} <text>")
                 return True
             try:
                 sent = self.context.terminal.send_input(payload)
             except ValueError as exc:
-                self.output.appendPlainText(current_text("tools_terminal.command.named_failed").format(name=name, error=exc))
+                self.output.appendPlainText(f"{name} 失败：{exc}")
             else:
                 label = "[secret stdin sent]" if name == "stdin-secret" else "[stdin sent]"
-                self.output.appendPlainText(label if sent else current_text("tools_terminal.stdin.not_accepted"))
+                self.output.appendPlainText(label if sent else "当前进程无法接收标准输入。")
             return True
         if name == "eof":
             self.output.appendPlainText(
-                "[stdin closed]"
-                if self.context.terminal.close_input()
-                else current_text("tools_terminal.stdin.no_open_input")
+                "[stdin closed]" if self.context.terminal.close_input() else "当前进程没有可关闭的标准输入。"
             )
             return True
         if name == "history":
@@ -592,7 +631,7 @@ class ConsoleCommandMixin:
             try:
                 changed = self.context.terminal.set_cwd(raw)
             except (OSError, ValueError) as exc:
-                self.output.appendPlainText(current_text("tools_terminal.command.cd_failed").format(error=exc))
+                self.output.appendPlainText(f"cd 失败：{exc}")
             else:
                 self.output.appendPlainText(str(changed))
                 self._refresh_cwd()
@@ -602,7 +641,7 @@ class ConsoleCommandMixin:
             try:
                 rows = self.context.terminal.list_directory(raw)
             except (OSError, ValueError) as exc:
-                self.output.appendPlainText(current_text("tools_terminal.command.ls_failed").format(error=exc))
+                self.output.appendPlainText(f"ls 失败：{exc}")
                 return True
             if not rows:
                 self.output.appendPlainText("<empty>")
@@ -621,18 +660,18 @@ class ConsoleCommandMixin:
         if name == "env":
             needle = parts[1] if len(parts) > 1 else ""
             rows = self.context.terminal.environment_items(needle)
-            self.output.appendPlainText(current_text("tools_terminal.environment.no_matches") if not rows else "\n".join(f"{key}={value}" for key, value in rows))
+            self.output.appendPlainText("没有匹配的环境变量。" if not rows else "\n".join(f"{key}={value}" for key, value in rows))
             return True
         if name == "setenv":
             payload = command[len(parts[0]):].strip()
             key, separator, value = payload.partition("=")
             if not separator:
-                self.output.appendPlainText(current_text("tools_terminal.usage.setenv"))
+                self.output.appendPlainText("用法：setenv NAME=VALUE")
                 return True
             try:
                 self.context.terminal.set_environment(key.strip(), value)
             except ValueError as exc:
-                self.output.appendPlainText(current_text("tools_terminal.environment.set_failed").format(error=exc))
+                self.output.appendPlainText(f"setenv 失败：{exc}")
             else:
                 shown = "<redacted>" if (
                     self.context.terminal.is_sensitive_environment_name(key.strip())
@@ -642,34 +681,34 @@ class ConsoleCommandMixin:
             return True
         if name == "unsetenv":
             if len(parts) != 2:
-                self.output.appendPlainText(current_text("tools_terminal.usage.unsetenv"))
+                self.output.appendPlainText("用法：unsetenv NAME")
                 return True
             try:
                 removed = self.context.terminal.unset_environment(parts[1])
             except ValueError as exc:
-                self.output.appendPlainText(current_text("tools_terminal.environment.unset_failed").format(error=exc))
+                self.output.appendPlainText(f"unsetenv 失败：{exc}")
             else:
-                self.output.appendPlainText(current_text("tools_terminal.environment.removed") if removed else current_text("tools_terminal.environment.not_found"))
+                self.output.appendPlainText("已删除。" if removed else "变量不存在。")
             return True
         if name == "which":
             if len(parts) != 2:
-                self.output.appendPlainText(current_text("tools_terminal.usage.which"))
+                self.output.appendPlainText("用法：which <program>")
             else:
-                self.output.appendPlainText(self.context.terminal.which(parts[1]) or current_text("tools_terminal.common.not_found"))
+                self.output.appendPlainText(self.context.terminal.which(parts[1]) or "未找到。")
             return True
         if name == "timeout":
             if len(parts) == 1:
                 self.output.appendPlainText(f"{self.context.terminal.timeout_seconds:g} seconds")
                 return True
             if len(parts) != 2:
-                self.output.appendPlainText(current_text("tools_terminal.usage.timeout"))
+                self.output.appendPlainText("用法：timeout [1-3600]")
                 return True
             try:
                 value = self.context.terminal.set_timeout(float(parts[1]))
             except (TypeError, ValueError) as exc:
-                self.output.appendPlainText(current_text("tools_terminal.timeout.failed").format(error=exc))
+                self.output.appendPlainText(f"timeout 失败：{exc}")
             else:
-                self.output.appendPlainText(current_text("tools_terminal.timeout.set").format(seconds=f"{value:g}"))
+                self.output.appendPlainText(f"外部命令超时设置为 {value:g} 秒。")
                 self._refresh_cwd()
             return True
         return False
@@ -722,7 +761,7 @@ class ConsoleCommandMixin:
             return True
         if name == "events":
             if len(parts) not in {2, 3}:
-                self.output.appendPlainText(current_text("tools_terminal.usage.events"))
+                self.output.appendPlainText("用法：events <session_id> [1-10000]")
                 return True
             limit = self._bounded_int(parts[2] if len(parts) == 3 else "1000", 1, 10000, "events")
             if limit is not None:
@@ -738,19 +777,19 @@ class ConsoleCommandMixin:
         """Handle developer validation, stress, and synthetic fault builtins."""
         if name == "test-all":
             if len(parts) != 1:
-                self.output.appendPlainText(current_text("tools_terminal.usage.test_all"))
+                self.output.appendPlainText("用法：test-all")
             else:
                 self._run_full_validation()
             return True
         if name == "stress-test":
             if len(parts) > 2:
-                self.output.appendPlainText(current_text("tools_terminal.usage.stress_test"))
+                self.output.appendPlainText("用法：stress-test [quick|standard|extreme]")
             else:
                 self._run_stress_validation(parts[1].casefold() if len(parts) == 2 else "standard")
             return True
         if name == "fault-injection":
             if len(parts) > 2:
-                self.output.appendPlainText(current_text("tools_terminal.usage.fault_injection"))
+                self.output.appendPlainText("用法：fault-injection [transient|recoverable|configuration|permission|corruption|fatal|all]")
             else:
                 self._run_fault_injection(parts[1].casefold() if len(parts) == 2 else "all")
             return True
@@ -767,45 +806,48 @@ class ConsoleCommandMixin:
             else:
                 self.output.appendPlainText(str(value))
         def failed(message: str) -> None:
-            self.output.appendPlainText(current_text("tools_terminal.control_plane.failed").format(message=message))
+            self.output.appendPlainText(f"Arenyxa CLI failed: {message}")
         run_background(worker, completed, failed)
 
     def _send_persistent_command(self, command: str, mode: TerminalMode) -> None:
         if self.context.terminal.active_mode != mode:
-            self.output.appendPlainText(current_text("tools_terminal.persistent.other_active"))
+            self.output.appendPlainText("当前已有另一个 Persistent Shell 正在运行；请先 stop。")
             return
         risk = self.context.terminal.detect_risk(command, mode)
         if risk:
             box = QMessageBox(self)
-            box.setWindowTitle(current_text("tools_terminal.persistent.risk_title"))
+            box.setWindowTitle("确认 Persistent Shell 高风险命令")
             box.setIcon(QMessageBox.Icon.Warning)
             box.setText(f"⚠ {risk}\n\n{self.context.terminal.redact_command(command)}")
             box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             box.setDefaultButton(QMessageBox.StandardButton.No)
             if box.exec() != QMessageBox.StandardButton.Yes:
-                self.output.appendPlainText(current_text("tools_terminal.common.cancelled"))
+                self.output.appendPlainText("已取消。")
                 return
         try:
             sent = self.context.terminal.send_input(command)
         except ValueError as exc:
-            self.output.appendPlainText(current_text("tools_terminal.persistent.input_failed").format(error=exc))
+            self.output.appendPlainText(f"Shell input failed: {exc}")
             return
-        self.output.appendPlainText("[sent to persistent shell]" if sent else current_text("tools_terminal.persistent.not_accepting_input"))
+        self.output.appendPlainText("[sent to persistent shell]" if sent else "Persistent shell is not accepting input.")
 
     def _developer_validation_authorized(self) -> bool:
         if self._root_workstation_active():
             if self._developer_test_running:
-                self.output.appendPlainText(current_text("tools_terminal.validation.already_running"))
+                self.output.appendPlainText("已有开发者验证任务正在运行，请等待完成后再启动新的测试。")
                 return False
             return True
         authorization = authorization_from_settings(self.context.settings)
         if not authorization.developer_mode:
-            self.output.appendPlainText(current_text("tools_terminal.validation.developer_mode_required"))
+            self.output.appendPlainText("命令已锁定：请先在设置 → 高级设置中启用 Developer Mode。")
             return False
         if not authorization.valid:
-            self.output.appendPlainText(current_text("tools_terminal.validation.terms_required"))
+            self.output.appendPlainText(
+                "命令已锁定：当前 Developer Mode 没有有效的风险协议与免责协议授权。"
+                "请关闭 Developer Mode 后重新启用，并完成双协议确认。"
+            )
             return False
         if self._developer_test_running:
-            self.output.appendPlainText(current_text("tools_terminal.validation.already_running"))
+            self.output.appendPlainText("已有开发者验证任务正在运行，请等待完成后再启动新的测试。")
             return False
         return True

@@ -10,6 +10,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
+try:
+    from scripts.build_source_manifest import is_generated_or_ephemeral
+except ModuleNotFoundError:
+    from build_source_manifest import is_generated_or_ephemeral
+
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -48,7 +53,7 @@ def _package_candidates(package: Path) -> Iterable[Path]:
         if not path.is_file():
             continue
         relative = path.relative_to(package).as_posix()
-        if "__pycache__" in path.parts or path.suffix in {".pyc", ".pyo"}:
+        if is_generated_or_ephemeral(path.relative_to(package)):
             continue
         if relative in {"resources/repair_seed.zip", "resources/repair_manifest.json"}:
             continue

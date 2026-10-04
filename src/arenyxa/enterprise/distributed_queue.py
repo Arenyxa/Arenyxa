@@ -26,10 +26,11 @@ from arenyxa.enterprise.identity import LocalEnterpriseIdentityService
 from arenyxa.application.runner import RunOrchestrator
 from arenyxa.security.worker_identity import ED25519, normalize_algorithm, validate_public_key
 from arenyxa.observability.trace_context import persisted_trace_fields
-from arenyxa.infrastructure.timebase import PROCESS_CLOCK, StableEpochClock
+from arenyxa.infrastructure.timebase import PROCESS_CLOCK, StableEpochClock, boot_clock_domain
 from arenyxa.enterprise.distributed_rows import distributed_job_row
 from arenyxa.enterprise.distributed_health import DistributedQueueHealthMixin
 from arenyxa.enterprise.distributed_queue_workers import DistributedQueueWorkerMixin
+from arenyxa.enterprise.distributed_queue_maintenance import DistributedQueueMaintenanceMixin
 
 LOGGER = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ from arenyxa.enterprise.distributed_protocol import (
     _NoopLock,
 )
 
-class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealthMixin):
+class DurableDistributedQueue(DistributedQueueMaintenanceMixin, DistributedQueueWorkerMixin, DistributedQueueHealthMixin):
 
     def __init__(
         self, path: Path | str, *, storage_backend: DistributedRuntimeStorageBackend | None = None,
@@ -115,9 +116,21 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
     def initialize(self) -> None:
         with self._lock:
             self._storage.initialize_schema(DISTRIBUTED_SCHEMA, CURRENT_PROTOCOL, MIN_COMPATIBLE_PROTOCOL)
+        self._initialize_lease_clock()
+        self._idempotency_backfill_complete = False
+        with self._lock, self._connection() as connection:
+            self._begin(connection)
+            for row in connection.execute("SELECT * FROM distributed_jobs WHERE state IN ('completed','failed','cancelled')").fetchall():
+                self._store_terminal_fence(connection, row)
+            connection.commit()
+        self._idempotency_backfill_complete = True
         self._last_reconciliation = self.reconcile_durable_state()
         self._last_reconciliation["stale_worker_leases_recovered"] = self.recover_stale_worker_leases()
         self._last_reconciliation["expired_leases_recovered"] = self.recover_expired_leases()
+
+    @staticmethod
+    def _boot_clock_domain() -> str:
+        return boot_clock_domain()
 
     @property
     def storage_capabilities(self) -> dict[str, Any]:
@@ -136,6 +149,9 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
             raise _fail("DISTRIBUTED_STATE_TRANSITION_INVALID", "Distributed job state transition is not permitted", from_state=source, to_state=target, event_type=str(event_type))
         event = _clean_token(event_type, "event type", 96)
         detail_json, _ = _bounded_json(details or {}, MAX_EVENT_DETAILS_BYTES, "distributed event details")
+        if target in {"completed", "failed", "cancelled"}:
+            row = connection.execute("SELECT * FROM distributed_jobs WHERE job_id=?", (str(job_id),)).fetchone()
+            self._store_terminal_fence(connection, row)
         self._storage.record_event(
             connection,
             (str(job_id), event, str(from_state), str(to_state), str(worker_id), str(code)[:128], detail_json, utc_now()),
@@ -153,9 +169,10 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
     def reconcile_durable_state(self) -> dict[str, int]:
 
         summary = {"worker_counters_repaired": 0, "leases_recovered": 0}
-        current_wall = self._clock.stable_epoch()
         with self._lock, self._connection() as connection:
             self._begin(connection)
+            self._lock_all_workers(connection)
+            current_wall = self._now(connection)
             invalid = connection.execute(
                 self._storage.invalid_lease_candidates_sql(),
                 (current_wall + MAX_LEASE_SECONDS + 60.0,),
@@ -269,13 +286,10 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
     def _job_count_guard(self, connection: Any) -> None:
         count = int(connection.execute("SELECT count(*) FROM distributed_jobs").fetchone()[0])
         if count >= MAX_JOBS:
+            self._retain_terminal_locked(connection, max(0, MAX_JOBS // 2 - 1), MAX_JOBS)
+            count = int(connection.execute("SELECT count(*) FROM distributed_jobs").fetchone()[0])
+        if count >= MAX_JOBS:
             raise _fail("DISTRIBUTED_QUEUE_FULL", "Distributed job queue reached its configured safety bound")
-
-    def job_for_idempotency(self, key: str) -> dict[str, Any] | None:
-        token = _clean_token(key, "idempotency key", 192)
-        with self._connection() as connection:
-            row = connection.execute("SELECT * FROM distributed_jobs WHERE idempotency_key=?", (token,)).fetchone()
-            return None if row is None else distributed_job_row(row)
 
     def enqueue(
         self,
@@ -311,16 +325,23 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
         now = utc_now()
         with self._lock, self._connection() as connection:
             self._begin(connection)
+            if self._storage.capabilities.multi_host_writers:
+                # Serialize admission and its capacity/idempotency checks within
+                # this schema, including inserts for a key absent on both hosts.
+                connection.execute("SELECT value FROM distributed_meta WHERE key='schema' FOR UPDATE").fetchone()
             existing = connection.execute(
-                "SELECT job_id,kind,payload_sha256,resource_id,permission FROM distributed_jobs WHERE idempotency_key=?",
+                "SELECT job_id,kind,payload_sha256,resource_id,permission,side_effect_mode FROM distributed_jobs WHERE idempotency_key=?",
                 (idem,),
             ).fetchone()
+            if existing is None:
+                existing = connection.execute("SELECT * FROM distributed_job_idempotency WHERE idempotency_key=?", (idem,)).fetchone()
             if existing is not None:
                 if (
                     str(existing["kind"]) == kind_id
                     and str(existing["payload_sha256"]) == payload_sha
                     and str(existing["resource_id"]) == resource
                     and str(existing["permission"]) == capability
+                    and str(existing["side_effect_mode"]) == mode
                 ):
                     connection.commit()
                     return str(existing["job_id"])
@@ -449,7 +470,6 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
         if fast_sql is not None:
             token = secrets.token_urlsafe(32)
             digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
-            expires = self._clock.deadline_epoch(duration)
             now = utc_now()
             detail_created = utc_now()
             with self._storage.lease_admission_guard():
@@ -458,29 +478,27 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
                         fast_sql,
                         (
                             worker,
-                            self._clock.stable_epoch(),
                             now,
                             worker,
                             worker,
                             digest,
-                            expires,
+                            duration,
                             now,
                             worker,
                             "",
                             duration,
                             detail_created,
-                            MAX_JOB_EVENTS_PER_JOB - 1,
                         ),
                     ).fetchone()
             if row is not None:
-                return self._lease_from_row(row, worker, token, expires, int(row["attempt"]))
+                return self._lease_from_row(row, worker, token, float(row["lease_expires_at"]), int(row["attempt"]))
 
         with self._lock, self._connection() as connection:
             self._begin(connection)
             atomic_slot_sql = self._storage.claim_worker_slot_for_lease_sql()
             if atomic_slot_sql is not None:
                 worker_row = connection.execute(
-                    atomic_slot_sql, (self._clock.stable_epoch(), utc_now(), worker)
+                    atomic_slot_sql, ((utc_now(), worker) if self._storage.capabilities.external_server else (self._now(connection), utc_now(), worker))
                 ).fetchone()
                 if worker_row is None:
                     state_row = connection.execute(
@@ -523,7 +541,7 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
                 return None
             token = secrets.token_urlsafe(32)
             digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
-            expires = self._clock.deadline_epoch(duration)
+            expires = self._now(connection) + duration
             job_id = str(row["job_id"])
             attempt = int(row["attempt"]) + 1
             updated_at = utc_now()
@@ -538,7 +556,7 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
             if not slot_claimed:
                 slot_cursor = connection.execute(
                     self._storage.claim_worker_slot_sql(),
-                    (self._clock.stable_epoch(), updated_at, worker),
+                    (self._now(connection), updated_at, worker),
                 )
                 if slot_cursor.rowcount != 1:
                     connection.rollback()
@@ -598,7 +616,7 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
                     break
                 token = secrets.token_urlsafe(32)
                 digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
-                expires = self._clock.deadline_epoch(duration)
+                expires = self._now(connection) + duration
                 job_id = str(row["job_id"])
                 attempt = int(row["attempt"]) + 1
                 updated_at = utc_now()
@@ -611,7 +629,7 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
                     continue
                 slot_cursor = connection.execute(
                     self._storage.claim_worker_slot_sql(),
-                    (self._clock.stable_epoch(), updated_at, worker),
+                    (self._now(connection), updated_at, worker),
                 )
                 if slot_cursor.rowcount != 1:
                     connection.rollback()
@@ -644,17 +662,18 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
     def _require_lease_locked(
         self, connection: Any, job_id: str, worker_id: str, lease_token: str, *, row: Any | None = None,
     ) -> Any:
+        worker = self._lock_worker(connection, worker_id)
         if row is None:
             row = connection.execute(self._storage.lease_for_update_sql(), (str(job_id),)).fetchone()
         if row is None:
             raise _fail("DISTRIBUTED_JOB_UNKNOWN", "Distributed job does not exist")
-        if str(row["state"]) not in {"leased", "running"} or str(row["lease_worker_id"]) != str(worker_id):
+        if worker is None or str(worker["state"]) == "revoked" or str(row["state"]) not in {"leased", "running"} or str(row["lease_worker_id"]) != str(worker_id):
             raise _fail("DISTRIBUTED_LEASE_STALE", "Distributed job lease is no longer owned by this worker")
         expected = str(row["lease_token_sha256"])
         actual = hashlib.sha256(str(lease_token).encode("utf-8")).hexdigest()
         if not expected or not hmac.compare_digest(expected, actual):
             raise _fail("DISTRIBUTED_LEASE_STALE", "Distributed job lease token is invalid")
-        now = self._clock.stable_epoch()
+        now = self._now(connection)
         expires = float(row["lease_expires_at"])
         if expires <= now:
             raise _fail(
@@ -679,13 +698,12 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
             fast_sql = self._storage.start_job_fast_sql()
             if fast_sql is not None:
                 token_sha = hashlib.sha256(str(lease_token).encode("utf-8")).hexdigest()
-                now = self._clock.stable_epoch()
                 updated_at = utc_now()
                 cursor = connection.execute(
                     fast_sql,
                     (
-                        str(job_id), str(worker_id), token_sha, now, updated_at,
-                        str(worker_id), "", "{}", utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,
+                        str(worker_id), str(job_id), updated_at, str(worker_id), token_sha,
+                        str(worker_id), "", "{}", utc_now(),
                     ),
                 )
                 if cursor.fetchone() is not None:
@@ -703,14 +721,14 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
         with self._lock, self._connection() as connection:
             self._begin(connection)
             self._require_lease_locked(connection, job_id, worker_id, lease_token)
-            expires = self._clock.deadline_epoch(duration)
+            expires = self._now(connection) + duration
             connection.execute(
                 "UPDATE distributed_jobs SET lease_expires_at=?,updated_at=? WHERE job_id=?",
                 (expires, utc_now(), str(job_id)),
             )
             connection.execute(
                 "UPDATE distributed_workers SET heartbeat_at=?,updated_at=? WHERE worker_id=?",
-                (self._clock.stable_epoch(), utc_now(), str(worker_id)),
+                (self._now(connection), utc_now(), str(worker_id)),
             )
             connection.commit()
         return expires
@@ -739,7 +757,7 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
             )
             connection.execute(
                 "UPDATE distributed_workers SET active_leases=max(0,active_leases-1),heartbeat_at=?,updated_at=? WHERE worker_id=?",
-                (self._clock.stable_epoch(), utc_now(), str(worker_id)),
+                (self._now(connection), utc_now(), str(worker_id)),
             )
             self._record_event_locked(
                 connection, str(job_id), "lease_handover", previous, target, worker_id=str(worker_id), code=code,
@@ -796,23 +814,32 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
         with self._lock, self._connection() as connection:
             fast_sql = self._storage.complete_fast_sql()
             if fast_sql is not None:
-                now = self._clock.stable_epoch()
                 terminal_at = utc_now()
                 details_json, _ = _bounded_json({"result_sha256": result_sha}, MAX_EVENT_DETAILS_BYTES, "distributed event details")
                 cursor = connection.execute(
                     fast_sql,
                     (
-                        str(job_id), str(worker_id), token_sha, now,
+                        str(worker_id), str(job_id), str(worker_id), token_sha,
                         result_json, result_sha, str(worker_id), token_sha, terminal_at, terminal_at,
-                        self._clock.stable_epoch(), utc_now(), str(worker_id),
-                        str(worker_id), "", details_json, utc_now(), MAX_JOB_EVENTS_PER_JOB - 1,
+                        utc_now(), str(worker_id),
+                        str(worker_id), "", details_json, utc_now(),
                     ),
                 )
                 if cursor.fetchone() is not None:
                     return
             self._begin(connection)
+            self._lock_worker(connection, worker_id)
             existing = connection.execute(self._storage.lease_for_update_sql(), (str(job_id),)).fetchone()
             if existing is None:
+                fence = connection.execute("SELECT terminal_state,terminal_receipt FROM distributed_job_idempotency WHERE job_id=?",
+                                           (str(job_id),)).fetchone()
+                if fence is not None and str(fence["terminal_state"]) == "completed":
+                    receipt = json.loads(str(fence["terminal_receipt"]) or "[]")
+                    presented = [str(worker_id), token_sha, result_sha]
+                    if len(receipt) == 3 and all(hmac.compare_digest(str(a), b) for a, b in zip(receipt, presented)):
+                        connection.commit()
+                        return
+                    raise _fail("DISTRIBUTED_TERMINAL_CONFLICT", "Retained terminal receipt does not match Worker/lease/result")
                 connection.rollback()
                 raise _fail("DISTRIBUTED_JOB_UNKNOWN", "Distributed job does not exist")
             if str(existing["state"]) == "completed":
@@ -845,7 +872,7 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
                 raise _fail("DISTRIBUTED_TERMINAL_CONFLICT", "Distributed job completion lost its fenced lease")
             connection.execute(
                 "UPDATE distributed_workers SET active_leases=max(0,active_leases-1),heartbeat_at=?,updated_at=? WHERE worker_id=?",
-                (self._clock.stable_epoch(), utc_now(), str(worker_id)),
+                (self._now(connection), utc_now(), str(worker_id)),
             )
             self._record_event_locked(
                 connection, str(job_id), "completed", previous, "completed", worker_id=str(worker_id),
@@ -883,7 +910,7 @@ class DurableDistributedQueue(DistributedQueueWorkerMixin, DistributedQueueHealt
             )
             connection.execute(
                 "UPDATE distributed_workers SET active_leases=max(0,active_leases-1),heartbeat_at=?,updated_at=? WHERE worker_id=?",
-                (self._clock.stable_epoch(), utc_now(), str(worker_id)),
+                (self._now(connection), utc_now(), str(worker_id)),
             )
             connection.commit()
             return state

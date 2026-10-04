@@ -1,6 +1,5 @@
-"""Compatibility entry point retained for the beta19 regression lane; current stable identity is v8.2."""
-
-from verify_v82_release_identity import main
+"""Historical command alias for the current public product identity gate."""
+from verify_release_identity import main
 
 if __name__ == "__main__":
     raise SystemExit(main())

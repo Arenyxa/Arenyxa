@@ -346,7 +346,8 @@ def test_terminal_packet_protocol_catalog_and_native_decode(context) -> None:
     assert decoded["protocols"][:2] == ("ethernet", "arp") or decoded["protocols"][:2] == ["ethernet", "arp"]
 
 
-def test_terminal_can_inspect_capture_info_frames_summaries_and_stats(context, tmp_path: Path) -> None:
+def test_terminal_can_inspect_capture_info_frames_summaries_and_stats(context, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("arenyxa.infrastructure.capture.packet_analysis.shutil.which", lambda _name: None)
     import struct
 
     dns_name = b"\x05stats\x07example\x00"

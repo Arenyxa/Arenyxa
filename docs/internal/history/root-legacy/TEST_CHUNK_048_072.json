@@ -1,0 +1,170 @@
+[
+  {
+    "file": "tests/test_phase4_security_foundation.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.326,
+    "output": "...........                                                              [100%]\n11 passed in 0.05s\n"
+  },
+  {
+    "file": "tests/test_phase6_developer_access.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.157,
+    "output": "......................                                                   [100%]\n22 passed in 0.64s\n"
+  },
+  {
+    "file": "tests/test_phase7_local_enterprise_identity.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 15.984,
+    "output": ".....................                                                    [100%]\n21 passed in 13.02s\n"
+  },
+  {
+    "file": "tests/test_phase8_10_enterprise_platform.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 13.326,
+    "output": ".............                                                            [100%]\n13 passed in 11.24s\n"
+  },
+  {
+    "file": "tests/test_posix_plugin_process_tree.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.781,
+    "output": ".                                                                        [100%]\n1 passed in 1.28s\n"
+  },
+  {
+    "file": "tests/test_production_validation.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 7.801,
+    "output": "......                                                                   [100%]\n6 passed in 5.32s\n"
+  },
+  {
+    "file": "tests/test_professional_analysis_suite.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.978,
+    "output": ".....                                                                    [100%]\n5 passed in 0.11s\n"
+  },
+  {
+    "file": "tests/test_professional_completion_round.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.482,
+    "output": ".........................                                                [100%]\n25 passed in 1.25s\n"
+  },
+  {
+    "file": "tests/test_professional_depth_round3.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.486,
+    "output": ".......                                                                  [100%]\n7 passed in 1.29s\n"
+  },
+  {
+    "file": "tests/test_professional_navigation_names.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.224,
+    "output": "...                                                                      [100%]\n3 passed in 0.04s\n"
+  },
+  {
+    "file": "tests/test_professional_pivot.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 7.303,
+    "output": "..                                                                       [100%]\n2 passed in 5.02s\n"
+  },
+  {
+    "file": "tests/test_professional_suite_integration.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.697,
+    "output": ".                                                                        [100%]\n1 passed in 0.04s\n"
+  },
+  {
+    "file": "tests/test_protocol_intelligence_depth.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.537,
+    "output": ".......................                                                  [100%]\n23 passed in 0.17s\n"
+  },
+  {
+    "file": "tests/test_protocol_length_boundary_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.635,
+    "output": ".......                                                                  [100%]\n7 passed in 0.08s\n"
+  },
+  {
+    "file": "tests/test_protocol_stream_budget_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.261,
+    "output": ".......                                                                  [100%]\n7 passed in 0.09s\n"
+  },
+  {
+    "file": "tests/test_proxy_capture.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 6.516,
+    "output": ".......                                                                  [100%]\n7 passed in 3.86s\n"
+  },
+  {
+    "file": "tests/test_proxy_transport_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 4.391,
+    "output": ".........................                                                [100%]\n25 passed in 2.20s\n"
+  },
+  {
+    "file": "tests/test_release_provenance.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 1.802,
+    "output": "..........                                                               [100%]\n10 passed in 0.06s\n"
+  },
+  {
+    "file": "tests/test_release_static_and_posix_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.526,
+    "output": ".....                                                                    [100%]\n5 passed in 0.37s\n"
+  },
+  {
+    "file": "tests/test_reliability_stability_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.331,
+    "output": ".......................                                                  [100%]\n23 passed in 1.28s\n"
+  },
+  {
+    "file": "tests/test_repair_center.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.451,
+    "output": ".....................                                                    [100%]\n21 passed in 0.26s\n"
+  },
+  {
+    "file": "tests/test_replay_api_map_v63.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.505,
+    "output": "..........                                                               [100%]\n10 passed in 0.52s\n"
+  },
+  {
+    "file": "tests/test_runtime_security_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.049,
+    "output": ".....                                                                    [100%]\n5 passed in 0.05s\n"
+  },
+  {
+    "file": "tests/test_scheduler_adapter.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 1.916,
+    "output": "....                                                                     [100%]\n4 passed in 0.13s\n"
+  }
+]

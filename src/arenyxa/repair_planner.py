@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -29,7 +30,7 @@ def create_repair_plan(
         relaunch=relaunch,
         source_mode=source_mode(),
     )
-    return plan.save(repair_dir / "pending_repair_plan.json")
+    return plan.save(repair_dir / f"pending_repair_plan-{secrets.token_hex(16)}.json")
 
 
 def validate_repair_plan_origin(plan: RepairPlan, plan_path: Path) -> None:

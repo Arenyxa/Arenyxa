@@ -220,8 +220,9 @@ def test_phase9_device_persists_only_verified_coordinator_binding_not_session_se
     assert "private_key" in raw                                                                                
 
 
-def test_phase8_device_key_prefers_provisioned_hardware_provider(tmp_path: Path) -> None:
-    from arenyxa.security.key_protection import CNGKeyProtectionAdapter, KeyProtectionRegistry
+def test_phase8_device_key_prefers_provisioned_hardware_provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from arenyxa.security.key_protection import CNGKeyProtectionAdapter, KeyProtectionRegistry, TPMKeyProtectionAdapter
+    monkeypatch.setattr(TPMKeyProtectionAdapter, "_native_available", lambda self: False)
     registry = KeyProtectionRegistry()
     registry.adapters["cng"] = CNGKeyProtectionAdapter(
         protect_callback=lambda raw, _purpose: b"wrapped:" + raw,

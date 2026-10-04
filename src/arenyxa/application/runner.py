@@ -19,6 +19,7 @@ from arenyxa.domain.models import RequestSpec, ResultRecord, Run, Task, utc_now
 from arenyxa.infrastructure.database import SQLiteStore
 from arenyxa.infrastructure.http_client import CancellationToken, HttpFetcher
 from arenyxa.infrastructure.parsers import FieldExtractor
+from arenyxa.infrastructure.shutdown import ShutdownDeadline
 
 ProgressCallback = Callable[[Run], None]
 
@@ -36,19 +37,8 @@ from arenyxa.application.runner_support import (
 from arenyxa.application.run_execution import RunExecutionMixin, _RunExecutionState
 
 
-
 class RunOrchestrator(RunExecutionMixin):
     """Execute task runs with bounded concurrency, host fairness, persistence, and cancellation."""
-    
-
-
-
-
-
-
-
-
-
 
 
     def __init__(
@@ -76,9 +66,8 @@ class RunOrchestrator(RunExecutionMixin):
         self.result_write_batch_size = max(1, int(result_write_batch_size))
         self._dynamic_result_write_batch_size = self.result_write_batch_size
         self._max_result_write_batch_size = max(self.result_write_batch_size, min(4096, self.result_write_batch_size * 8))
-                                                                                                
-                                                                                                 
-                                             
+
+
         self.result_flush_interval_seconds = max(0.05, int(result_flush_interval_ms) / 1000.0)
 
         self.executor = ThreadPoolExecutor(
@@ -89,10 +78,8 @@ class RunOrchestrator(RunExecutionMixin):
             max_workers=self.request_workers,
             thread_name_prefix="arenyxa-fetch",
         )
-                                                                                           
-                                                                                          
-                                                                                           
-                                                                                          
+
+
         self._request_gate = _DynamicRequestGate(self.request_workers)
         self._adaptive_requests = _AdaptiveRequestController(
             self._request_gate,
@@ -113,15 +100,38 @@ class RunOrchestrator(RunExecutionMixin):
         self._host_limiter = _HostLimiter(self.per_host_workers)
         self._adaptive_rate = _AdaptiveRateCoordinator(self.per_host_workers)
         self._handles: dict[str, RunHandle] = {}
+        self._retiring_runs: set[str] = set()
+        self._failed_run_retirements: set[str] = set()
+        self._pending_submissions = 0
         self._request_futures: set[Future[_RequestOutcome]] = set()
         self._lock = threading.RLock()
+        self._drain_condition = threading.Condition(self._lock)
+        self._shutdown_lock = threading.Lock()
         self._closed = False
+        self._fetcher_closed = False
+        self._shutdown_started = False
+        self._shutdown_cancelling = False
+        self._shutdown_failed = False
         self.logger = logging.getLogger("arenyxa.runner")
 
     def submit(
         self, task: Task, on_progress: ProgressCallback | None = None, preview: bool = False
     ) -> RunHandle:
         """Submit a task run after concurrency, resource, and enterprise authorization checks."""
+        with self._drain_condition:
+            if self._closed:
+                raise ArenyxaError("RUNNER_SHUTDOWN", "运行器已关闭，不能再提交任务。", domain="RUN")
+            self._pending_submissions += 1
+        try:
+            return self._submit(task, on_progress, preview)
+        finally:
+            with self._drain_condition:
+                self._pending_submissions -= 1
+                self._drain_condition.notify_all()
+
+    def _submit(
+        self, task: Task, on_progress: ProgressCallback | None, preview: bool
+    ) -> RunHandle:
         errors = task.validate()
         if errors:
             raise ArenyxaError("TASK_INVALID", "；".join(errors), domain="TASK")
@@ -133,9 +143,8 @@ class RunOrchestrator(RunExecutionMixin):
                 context={"task_id": task.id, "status": task.status.value},
             )
         if self._enterprise_operations is not None:
-                                                                                               
-                                                                                           
-                                                                                             
+
+
             self._enterprise_operations.authorize_if_bound(
                 "workflow", task.id, "workflow.execute",
                 correlation_id=f"task-run:{task.id}",
@@ -163,36 +172,44 @@ class RunOrchestrator(RunExecutionMixin):
                     domain="RESOURCE",
                     context={"active_runs": len(self._handles), "worker_ceiling": decision.worker_ceiling},
                 )
-            try:
-                self.store.save_run(run)
-            except Exception as exc:
-                raise ArenyxaError(
-                    "RUN_STORAGE_FAILED",
-                    "无法创建运行记录；任务尚未开始。",
-                    domain="RUN",
-                    context={"task_id": task.id},
-                ) from exc
-            try:
+        # Slow durable admission is counted by submit(), but never holds the
+        # handoff lock needed to stop intake and take an ownership snapshot.
+        try:
+            self.store.save_run(run)
+        except Exception as exc:
+            raise ArenyxaError(
+                "RUN_STORAGE_FAILED", "无法创建运行记录；任务尚未开始。",
+                domain="RUN", context={"task_id": task.id},
+            ) from exc
+        try:
+            with self._lock:
+                if self._closed:
+                    raise ArenyxaError("RUNNER_SHUTDOWN", "运行器已关闭，不能再提交任务。", domain="RUN")
+                if decision is not None and len(self._handles) >= decision.worker_ceiling:
+                    raise ArenyxaError(
+                        "RESOURCE_WORKER_PRESSURE", "当前运行任务数已达到 Resource Governor 的动态上限。",
+                        domain="RESOURCE", context={"active_runs": len(self._handles), "worker_ceiling": decision.worker_ceiling},
+                    )
                 future = self.executor.submit(
                     self._execute, task, run, token, on_progress, preview, state_lock=state_lock
                 )
-            except RuntimeError as exc:
-                run.status = RunStatus.FAILED
-                run.error_code = "RUNNER_SHUTDOWN"
-                run.stage = "failed"
-                run.finished_at = utc_now()
-                try:
-                    self.store.save_run(run)
-                except Exception:
-                    self.logger.exception("Unable to persist RUNNER_SHUTDOWN terminal state")
-                raise ArenyxaError(
-                    "RUNNER_SHUTDOWN", "运行器正在关闭，任务未能启动。", domain="RUN"
-                ) from exc
-            handle = RunHandle(
-                run=run, token=token, future=future, persist_status=self.store.update_run_control_status,
-                state_lock=state_lock,
-            )
-            self._handles[run.id] = handle
+                handle = RunHandle(
+                    run=run, token=token, future=future, persist_status=self.store.update_run_control_status,
+                    state_lock=state_lock,
+                )
+                self._handles[run.id] = handle
+        except (ArenyxaError, RuntimeError) as exc:
+            run.status = RunStatus.FAILED
+            run.error_code = exc.code if isinstance(exc, ArenyxaError) else "RUNNER_SHUTDOWN"
+            run.stage = "failed"
+            run.finished_at = utc_now()
+            try:
+                self.store.save_run(run)
+            except Exception:
+                self.logger.exception("Unable to persist rejected run terminal state")
+            if isinstance(exc, ArenyxaError):
+                raise
+            raise ArenyxaError("RUNNER_SHUTDOWN", "运行器正在关闭，任务未能启动。", domain="RUN") from exc
         future.add_done_callback(
             WeakMethodFutureCallback(self, "_on_run_done", prefix=(run,), suffix=(state_lock,))
         )
@@ -294,10 +311,6 @@ class RunOrchestrator(RunExecutionMixin):
         return self._request_gate.limit()
 
     def set_request_limit(self, limit: int) -> int:
-        
-
-
-
 
 
         """Set the bounded request concurrency limit and return the applied value."""
@@ -308,43 +321,114 @@ class RunOrchestrator(RunExecutionMixin):
         """Enable or disable adaptive request concurrency control."""
         return self._adaptive_requests.enable_auto()
 
-    def shutdown(self, wait_for_runs: bool = True, **legacy: object) -> None:
-                                                                                        
-                                                                                            
-        """Stop accepting work, cancel outstanding requests, and close worker pools safely."""
-        if "wait" in legacy:
-            wait_for_runs = bool(legacy["wait"])
+    def begin_shutdown(self) -> None:
+        """Close intake before cancelling the registered runs and requests."""
         with self._lock:
             self._closed = True
+            if self._shutdown_cancelling or (self._shutdown_started and not self._failed_run_retirements):
+                return
+            self._shutdown_started = True
+            self._shutdown_cancelling = True
+            self._shutdown_failed = False
             handles = list(self._handles.values())
+            retries = [self._handles[run_id] for run_id in self._failed_run_retirements]
             request_futures = list(self._request_futures)
-        self.cancel_all()
-                                                                                             
-                                                                                             
-                                                                                            
+        for handle in handles:
+            handle.token.cancel()
         for future in request_futures:
             future.cancel()
-        if not wait_for_runs:
-            for handle in handles:
-                handle.future.cancel()
-                                                                                   
-        shutdown_executor(self.executor, wait=wait_for_runs, cancel_futures=not wait_for_runs)
-        shutdown_executor(self.request_executor, wait=wait_for_runs, cancel_futures=True)
-        close_fetcher = getattr(self.fetcher, "close", None)
-        if callable(close_fetcher):
-            close_fetcher()
 
+        def cancel_owned() -> None:
+            failed = False
+            try:
+                for handle in retries:
+                    self._on_run_done(handle.run, handle.future, handle.state_lock)
+                for handle in handles:
+                    handle.cancel()
+                shutdown_executor(self.executor, wait=False, cancel_futures=True)
+                shutdown_executor(self.request_executor, wait=False, cancel_futures=True)
+            # broad-exception-boundary: failed pool cleanup must remain retryable.
+            except Exception:
+                failed = True
+                self.logger.exception("Unable to cancel runner work")
+            finally:
+                with self._drain_condition:
+                    failed = failed or bool(self._failed_run_retirements)
+                    self._shutdown_started = not failed
+                    self._shutdown_failed = failed
+                    self._shutdown_cancelling = False
+                    self._drain_condition.notify_all()
 
+        # Cancelling a queued run invokes its persistent retirement callback.
+        if handles:
+            try:
+                threading.Thread(target=cancel_owned, name="arenyxa-run-shutdown", daemon=True).start()
+            except RuntimeError:
+                with self._drain_condition:
+                    self._shutdown_started = False
+                    self._shutdown_cancelling = False
+                    self._shutdown_failed = True
+                    self._drain_condition.notify_all()
+                raise
+        else:
+            cancel_owned()
 
+    def shutdown_snapshot(self) -> dict[str, object]:
+        with self._lock:
+            return {
+                "accepting": not self._closed,
+                "active_runs": len(self._handles),
+                "pending_submissions": self._pending_submissions,
+                "pending_request_futures": len(self._request_futures),
+                "cancelling": self._shutdown_cancelling,
+                "retiring_callbacks": len(self._retiring_runs),
+                "failed_retirements": len(self._failed_run_retirements),
+            }
 
+    def drain(self, timeout: float = 10.0) -> bool:
+        return self._drain(ShutdownDeadline.from_timeout(timeout))
 
+    def _drain(self, deadline: ShutdownDeadline) -> bool:
+        with self._drain_condition:
+            while (
+                self._handles or self._request_futures
+                or self._pending_submissions or self._shutdown_cancelling
+            ):
+                if self._failed_run_retirements and not self._shutdown_cancelling:
+                    return False
+                remaining = deadline.remaining()
+                if remaining <= 0.0:
+                    return False
+                self._drain_condition.wait(remaining)
+            return not self._shutdown_failed
 
-
-
-
-
-
-
+    def shutdown(
+        self, wait_for_runs: bool = True, timeout: float = 10.0, **legacy: object
+    ) -> bool:
+        """Cancel work and report whether its cleanup finished within the wait budget."""
+        if "wait" in legacy:
+            wait_for_runs = bool(legacy["wait"])
+        deadline = ShutdownDeadline.from_timeout(timeout if wait_for_runs else 0.0)
+        self.begin_shutdown()
+        if not self._drain(deadline):
+            return False
+        if not self._shutdown_lock.acquire(timeout=deadline.remaining()):
+            return False
+        try:
+            if self._fetcher_closed:
+                return True
+            close_fetcher = getattr(self.fetcher, "close", None)
+            try:
+                if callable(close_fetcher):
+                    close_fetcher()
+            # broad-exception-boundary: failed transport cleanup remains retryable.
+            except Exception:
+                self.logger.exception("Unable to close runner fetcher")
+                return False
+            self._fetcher_closed = True
+            return True
+        finally:
+            self._shutdown_lock.release()
 
 
     def _persist_progress(self, run: Run, callback: ProgressCallback | None) -> None:
@@ -382,27 +466,11 @@ class RunOrchestrator(RunExecutionMixin):
         return host
 
     def _forget_request_future(self, future: Future[_RequestOutcome]) -> None:
-        with self._lock:
+        with self._drain_condition:
             self._request_futures.discard(future)
-
-    def _on_run_done(
-        self, run: Run, future: Future[Run], state_lock: threading.RLock
-    ) -> None:
-        if future.cancelled():
-            with state_lock:
-                if run.status not in RunHandle._TERMINAL:
-                    run.status = RunStatus.CANCELLED
-                    run.stage = "cancelled"
-                    run.finished_at = utc_now()
-                    try:
-                        self.store.save_run(run)
-                    except Exception:
-                        self.logger.exception(
-                            "failed to persist cancelled queued run", extra={"run_id": run.id}
-                        )
-        self._forget(run.id)
+            self._drain_condition.notify_all()
 
     def _forget(self, run_id: str) -> None:
-        with self._lock:
+        with self._drain_condition:
             self._handles.pop(run_id, None)
-
+            self._drain_condition.notify_all()

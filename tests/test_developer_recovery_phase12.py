@@ -156,4 +156,3 @@ def test_plugin_sandbox_shortcut_remains_registered_and_routes_to_existing_plugi
     )[0]
     assert 'elif action_id == "dev_sandbox":' in method
     assert 'self.navigate("plugins")' in method
-

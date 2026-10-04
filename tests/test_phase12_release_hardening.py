@@ -197,4 +197,3 @@ def test_release_private_key_generator_uses_exclusive_restrictive_creation() -> 
     assert "0o600" in source
     assert "os.fsync(fd)" in source
     assert "private_key.write_bytes" not in source
-

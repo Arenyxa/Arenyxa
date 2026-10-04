@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import select
 import sqlite3
 import threading
 import time
@@ -15,8 +16,28 @@ from arenyxa.compat import dataclass
 from arenyxa.domain.errors import ArenyxaError
 from arenyxa.infrastructure.database_stability import DatabaseRetryPolicy, retry_database_operation
 from arenyxa.security.sql_safety import sql_identifier
+from arenyxa.enterprise.runtime_storage_schema import _SQLITE_SCHEMA, _POSTGRES_SCHEMA, _POSTGRES_EPOCH_MIGRATIONS
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _is_postgresql_target(target: Path | str) -> bool:
+    text = str(target).strip()
+    if text.casefold().startswith(("postgresql://", "postgres://")):
+        return True
+    if "=" not in text:
+        return False
+    try:
+        import psycopg
+        from psycopg.conninfo import conninfo_to_dict
+    except ImportError:
+        return False
+    try:
+        parsed = conninfo_to_dict(text)
+    except psycopg.Error:
+        return False
+    return bool(parsed)
+
 
 @dataclass(frozen=True, slots=True)
 class RuntimeStorageCapabilities:
@@ -48,112 +69,6 @@ class RuntimeStorageCapabilities:
 
 def _storage_fail(code: str, message: str, **context: Any) -> ArenyxaError:
     return ArenyxaError(code, message, domain="ENTERPRISE_DISTRIBUTED_STORAGE", context=context)
-
-
-_SQLITE_SCHEMA = """
-CREATE TABLE IF NOT EXISTS distributed_meta(
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS distributed_workers(
-    worker_id TEXT PRIMARY KEY,
-    display_name TEXT NOT NULL,
-    public_key TEXT NOT NULL,
-    identity_algorithm TEXT NOT NULL DEFAULT 'ED25519',
-    identity_metadata_json TEXT NOT NULL DEFAULT '{}',
-    protocol_min INTEGER NOT NULL,
-    protocol_max INTEGER NOT NULL,
-    negotiated_protocol INTEGER NOT NULL,
-    app_compat_version TEXT NOT NULL,
-    resources_json TEXT NOT NULL,
-    max_slots INTEGER NOT NULL,
-    active_leases INTEGER NOT NULL DEFAULT 0,
-    state TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    heartbeat_at REAL NOT NULL,
-    revoked_at TEXT NOT NULL DEFAULT ''
-);
-CREATE TABLE IF NOT EXISTS distributed_jobs(
-    job_id TEXT PRIMARY KEY,
-    kind TEXT NOT NULL,
-    state TEXT NOT NULL,
-    payload_json TEXT NOT NULL,
-    payload_sha256 TEXT NOT NULL,
-    traceparent TEXT NOT NULL DEFAULT '',
-    tracestate TEXT NOT NULL DEFAULT '',
-    resource_id TEXT NOT NULL,
-    permission TEXT NOT NULL,
-    idempotency_key TEXT NOT NULL UNIQUE,
-    side_effect_mode TEXT NOT NULL,
-    side_effect_state TEXT NOT NULL,
-    attempt INTEGER NOT NULL,
-    max_attempts INTEGER NOT NULL,
-    protocol_version INTEGER NOT NULL,
-    priority INTEGER NOT NULL,
-    lease_worker_id TEXT NOT NULL DEFAULT '',
-    lease_token_sha256 TEXT NOT NULL DEFAULT '',
-    lease_expires_at REAL NOT NULL DEFAULT 0,
-    checkpoint_json TEXT NOT NULL DEFAULT '{}',
-    checkpoint_seq INTEGER NOT NULL DEFAULT 0,
-    result_json TEXT NOT NULL DEFAULT '{}',
-    result_sha256 TEXT NOT NULL DEFAULT '',
-    terminal_worker_id TEXT NOT NULL DEFAULT '',
-    terminal_lease_token_sha256 TEXT NOT NULL DEFAULT '',
-    terminal_at TEXT NOT NULL DEFAULT '',
-    error_code TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS distributed_job_events(
-    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    job_id TEXT NOT NULL,
-    event_type TEXT NOT NULL,
-    from_state TEXT NOT NULL,
-    to_state TEXT NOT NULL,
-    worker_id TEXT NOT NULL DEFAULT '',
-    code TEXT NOT NULL DEFAULT '',
-    details_json TEXT NOT NULL DEFAULT '{}',
-    created_at TEXT NOT NULL,
-    FOREIGN KEY(job_id) REFERENCES distributed_jobs(job_id) ON DELETE CASCADE
-);
-CREATE INDEX IF NOT EXISTS idx_distributed_job_events_job
-    ON distributed_job_events(job_id,event_id DESC);
-CREATE INDEX IF NOT EXISTS idx_distributed_jobs_state_priority
-    ON distributed_jobs(state, priority DESC, created_at ASC);
-CREATE INDEX IF NOT EXISTS idx_distributed_jobs_worker
-    ON distributed_jobs(lease_worker_id, state);
-"""
-
-_POSTGRES_SCHEMA = (
-    _SQLITE_SCHEMA.replace(
-        "event_id INTEGER PRIMARY KEY AUTOINCREMENT", "event_id BIGSERIAL PRIMARY KEY"
-    )
-    # SQLite REAL is an 8-byte IEEE-754 value, while PostgreSQL REAL is only 4 bytes.
-    # Epoch timestamps need float8 precision so short leases and heartbeats are not rounded
-    # by roughly a minute at contemporary epoch values.
-    .replace("heartbeat_at REAL", "heartbeat_at DOUBLE PRECISION")
-    .replace("lease_expires_at REAL", "lease_expires_at DOUBLE PRECISION")
-)
-
-_POSTGRES_EPOCH_MIGRATIONS = (
-    (
-        "distributed_workers",
-        "heartbeat_at",
-        (
-            "ALTER TABLE distributed_workers ALTER COLUMN heartbeat_at TYPE DOUBLE PRECISION "
-            "USING heartbeat_at::DOUBLE PRECISION"
-        ),
-    ),
-    (
-        "distributed_jobs",
-        "lease_expires_at",
-        (
-            "ALTER TABLE distributed_jobs ALTER COLUMN lease_expires_at TYPE DOUBLE PRECISION "
-            "USING lease_expires_at::DOUBLE PRECISION"
-        ),
-    ),
-)
 
 
 class _MappingRow:
@@ -306,6 +221,12 @@ class DistributedRuntimeStorageBackend(ABC):
     def lease_for_update_sql(self) -> str:
         return "SELECT * FROM distributed_jobs WHERE job_id=?"
 
+    def current_epoch(self, connection: _ConnectionFacade, clock: Any) -> float:
+        return clock.stable_epoch()
+
+    def lock_workers_sql(self) -> str:
+        return "SELECT worker_id FROM distributed_workers ORDER BY worker_id"
+
     def claim_worker_slot_sql(self) -> str:
         return (
             "UPDATE distributed_workers SET active_leases=active_leases+1,heartbeat_at=?,updated_at=? "
@@ -410,6 +331,9 @@ class SQLiteDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
             if journal is None or str(journal[0]).casefold() != "wal":
                 raise _storage_fail("DISTRIBUTED_WAL_UNAVAILABLE", "Distributed queue requires SQLite WAL mode")
             connection.executescript(_SQLITE_SCHEMA)
+            fence_columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(distributed_job_idempotency)").fetchall()}
+            if "terminal_receipt" not in fence_columns:
+                connection.execute("ALTER TABLE distributed_job_idempotency ADD COLUMN terminal_receipt TEXT NOT NULL DEFAULT ''")
             schema_row = connection.execute("SELECT value FROM distributed_meta WHERE key='schema'").fetchone()
             if schema_row is None:
                 connection.execute("INSERT INTO distributed_meta(key,value) VALUES('schema',?)", (schema,))
@@ -471,7 +395,7 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
 
     def __init__(self, dsn: str) -> None:
         text = str(dsn).strip()
-        if not text.casefold().startswith(("postgresql://", "postgres://")):
+        if not _is_postgresql_target(text):
             raise _storage_fail("DISTRIBUTED_STORAGE_DSN_INVALID", "PostgreSQL runtime DSN is invalid")
         self.dsn = text
         self._pool: Any | None = None
@@ -528,9 +452,27 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
         connection.execute("SET lock_timeout = '10s'")
         connection.execute("SET statement_timeout = '60s'")
         connection.execute("SET idle_in_transaction_session_timeout = '60s'")
+    _POOL_HEALTH_IDLE_SECONDS = 5.0
+
     @staticmethod
-    def _check_pool_connection(connection: Any) -> None:
-        """Validate a checked-in/out PostgreSQL connection without relying on pool internals."""
+    def _mark_pool_connection_idle(connection: Any) -> None:
+        setattr(connection, "_arenyxa_pool_idle_since", time.monotonic())
+
+    @classmethod
+    def _check_pool_connection(cls, connection: Any) -> None:
+        """Use fd readiness first; probe SQL only after suspicious I/O or 5s idle."""
+        idle_since = getattr(connection, "_arenyxa_pool_idle_since", None)
+        try:
+            readable, _writable, exceptional = select.select((connection,), (), (connection,), 0.0)
+        except (OSError, TypeError, ValueError):
+            probe = True
+        else:
+            probe = bool(
+                readable or exceptional or idle_since is None
+                or time.monotonic() - float(idle_since) >= cls._POOL_HEALTH_IDLE_SECONDS
+            )
+        if not probe:
+            return
         cursor = connection.execute("SELECT 1 AS arenyxa_pool_health")
         fetchone = getattr(cursor, "fetchone", None)
         if callable(fetchone):
@@ -590,7 +532,7 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
             # Warm the bounded client pool before high-concurrency work;
             # lazy connection expansion during the release gate inflates
             # tail latency even when every database operation succeeds.
-            min_size=4,
+            min_size=8,
             max_size=8,
             timeout=15.0,
             max_idle=300.0,
@@ -653,6 +595,8 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                     except psycopg.Error as rollback_exc:
                         LOGGER.warning("PostgreSQL rollback failed after runtime error: %s", rollback_exc)
                     raise
+                finally:
+                    self._mark_pool_connection_idle(raw)
         except (psycopg.Error, OSError, TimeoutError, RuntimeError) as exc:
             with self._pool_metrics_lock:
                 self._pool_acquisition_failures += 1
@@ -663,8 +607,9 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                 self._active_connections -= 1
                 self._pool_condition.notify_all()
 
-    def close(self) -> None:
-        """Drain admitted connections and make this storage instance terminally closed."""
+    def close(self, timeout: float | None = None) -> None:
+        """Drain admitted connections, bounded by timeout when explicitly requested."""
+        deadline = None if timeout is None else time.monotonic() + max(0.0, float(timeout))
         with self._pool_condition:
             while True:
                 if self._lifecycle_state == self._CLOSED:
@@ -674,9 +619,21 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                 if not self._close_owner:
                     self._close_owner = True
                     break
-                self._pool_condition.wait()
+                if deadline is None:
+                    self._pool_condition.wait()
+                    continue
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return
+                self._pool_condition.wait(remaining)
             while self._active_connections:
-                self._pool_condition.wait()
+                if deadline is None:
+                    self._pool_condition.wait()
+                    continue
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                self._pool_condition.wait(remaining)
             pool = self._pool
 
         try:
@@ -736,6 +693,7 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
                                          
             connection.execute("SELECT pg_advisory_xact_lock(?)", (self._SCHEMA_ADVISORY_LOCK,))
             connection.executescript(_POSTGRES_SCHEMA)
+            connection.execute("ALTER TABLE distributed_job_idempotency ADD COLUMN IF NOT EXISTS terminal_receipt TEXT NOT NULL DEFAULT ''")
             self._migrate_epoch_columns_to_float8(connection)
             schema_row = connection.execute("SELECT value FROM distributed_meta WHERE key='schema'").fetchone()
             if schema_row is None:
@@ -810,143 +768,124 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
             "ORDER BY priority DESC, created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED"
         )
 
+    def current_epoch(self, connection: _ConnectionFacade, clock: Any) -> float:
+        return float(connection.execute("SELECT EXTRACT(EPOCH FROM clock_timestamp())::double precision").fetchone()[0])
+
+    def lock_workers_sql(self) -> str:
+        return "SELECT worker_id FROM distributed_workers ORDER BY worker_id FOR UPDATE"
+
     def worker_for_lease_sql(self) -> str:
         return "SELECT * FROM distributed_workers WHERE worker_id=? FOR UPDATE"
 
     def claim_worker_slot_for_lease_sql(self) -> str:
         return (
-            "UPDATE distributed_workers SET active_leases=active_leases+1,heartbeat_at=?,updated_at=? "
+            "UPDATE distributed_workers SET active_leases=active_leases+1,"
+            "heartbeat_at=EXTRACT(EPOCH FROM clock_timestamp())::double precision,updated_at=? "
             "WHERE worker_id=? AND state='active' AND active_leases<max_slots "
             "RETURNING protocol_min,protocol_max"
         )
 
     def lease_next_fast_sql(self) -> str:
         return """
-            WITH eligible_worker AS (
+            WITH eligible_worker AS MATERIALIZED (
                 SELECT worker_id,protocol_min,protocol_max
                 FROM distributed_workers
                 WHERE worker_id=? AND state='active' AND active_leases<max_slots
-            ), candidate AS (
-                SELECT j.*
-                FROM distributed_jobs AS j
-                JOIN eligible_worker AS w
+                FOR UPDATE
+            ), candidate AS MATERIALIZED (
+                SELECT j.* FROM distributed_jobs AS j JOIN eligible_worker AS w
                   ON j.protocol_version BETWEEN w.protocol_min AND w.protocol_max
                 WHERE j.state='queued'
-                ORDER BY j.priority DESC,j.created_at ASC
-                LIMIT 1
+                ORDER BY j.priority DESC,j.created_at ASC LIMIT 1
                 FOR UPDATE OF j SKIP LOCKED
             ), claimed_worker AS (
                 UPDATE distributed_workers AS w
-                SET active_leases=w.active_leases+1,heartbeat_at=?,updated_at=?
+                SET active_leases=w.active_leases+1,
+                    heartbeat_at=EXTRACT(EPOCH FROM clock_timestamp())::double precision,updated_at=?
                 FROM candidate AS c
                 WHERE w.worker_id=? AND w.state='active' AND w.active_leases<w.max_slots
                 RETURNING w.worker_id
             ), leased AS (
                 UPDATE distributed_jobs AS j
                 SET state='leased',attempt=j.attempt+1,lease_worker_id=?,lease_token_sha256=?,
-                    lease_expires_at=?,error_code='',updated_at=?
-                FROM candidate AS c
-                CROSS JOIN claimed_worker AS w
-                WHERE j.job_id=c.job_id AND j.state='queued'
-                RETURNING j.*
+                    lease_expires_at=EXTRACT(EPOCH FROM clock_timestamp())::double precision+?,
+                    error_code='',updated_at=?
+                FROM candidate AS c CROSS JOIN claimed_worker AS w
+                WHERE j.job_id=c.job_id AND j.state='queued' RETURNING j.*
             ), event AS (
                 INSERT INTO distributed_job_events(
                     job_id,event_type,from_state,to_state,worker_id,code,details_json,created_at
                 )
                 SELECT job_id,'leased','queued','leased',?,?,
                        json_build_object('attempt',attempt,'lease_seconds',?)::text,?
-                FROM leased
-                RETURNING job_id
-            ), trimmed AS (
-                DELETE FROM distributed_job_events
-                WHERE job_id=(SELECT job_id FROM event)
-                  AND event_id NOT IN (
-                      SELECT event_id FROM distributed_job_events
-                      WHERE job_id=(SELECT job_id FROM event)
-                      ORDER BY event_id DESC LIMIT ?
-                  )
-            )
-            SELECT * FROM leased
+                FROM leased RETURNING job_id
+            ) SELECT * FROM leased
         """
 
     def start_job_fast_sql(self) -> str:
         return """
-            WITH candidate AS (
-                SELECT job_id,state
-                FROM distributed_jobs
-                WHERE job_id=? AND state='leased' AND lease_worker_id=?
-                  AND lease_token_sha256=? AND lease_expires_at>?
-                FOR UPDATE
+            WITH worker_locked AS MATERIALIZED (
+                SELECT worker_id FROM distributed_workers WHERE worker_id=? AND state<>'revoked' FOR UPDATE
+            ), candidate AS MATERIALIZED (
+                SELECT j.* FROM distributed_jobs AS j CROSS JOIN worker_locked AS w
+                WHERE j.job_id=? AND j.lease_worker_id=w.worker_id FOR UPDATE OF j
             ), updated AS (
-                UPDATE distributed_jobs AS j
-                SET state='running',updated_at=?
+                UPDATE distributed_jobs AS j SET state='running',updated_at=?
                 FROM candidate AS c
-                WHERE j.job_id=c.job_id
+                WHERE j.job_id=c.job_id AND c.state='leased'
+                  AND c.lease_worker_id=? AND c.lease_token_sha256=?
+                  AND c.lease_expires_at>EXTRACT(EPOCH FROM clock_timestamp())::double precision
                 RETURNING j.job_id
             ), event AS (
                 INSERT INTO distributed_job_events(
                     job_id,event_type,from_state,to_state,worker_id,code,details_json,created_at
-                )
-                SELECT c.job_id,'started',c.state,'running',?,?,?,?
-                FROM candidate AS c
-                JOIN updated AS u ON u.job_id=c.job_id
-                RETURNING job_id
-            ), trimmed AS (
-                DELETE FROM distributed_job_events
-                WHERE job_id=(SELECT job_id FROM event)
-                  AND event_id NOT IN (
-                      SELECT event_id FROM distributed_job_events
-                      WHERE job_id=(SELECT job_id FROM event)
-                      ORDER BY event_id DESC LIMIT ?
-                  )
-            )
-            SELECT * FROM updated
+                ) SELECT u.job_id,'started','leased','running',?,?,?,? FROM updated AS u RETURNING job_id
+            ) SELECT * FROM updated
         """
 
     def complete_fast_sql(self) -> str:
         return """
-            WITH candidate AS (
-                SELECT job_id,state,side_effect_state
-                FROM distributed_jobs
-                WHERE job_id=? AND state IN ('leased','running')
-                  AND lease_worker_id=? AND lease_token_sha256=? AND lease_expires_at>?
-                FOR UPDATE
+            WITH worker_locked AS MATERIALIZED (
+                SELECT worker_id FROM distributed_workers WHERE worker_id=? AND state<>'revoked' FOR UPDATE
+            ), locked_job AS MATERIALIZED (
+                SELECT j.* FROM distributed_jobs AS j CROSS JOIN worker_locked AS w
+                WHERE j.job_id=? AND j.lease_worker_id=w.worker_id FOR UPDATE OF j
+            ), candidate AS MATERIALIZED (
+                SELECT j.* FROM locked_job AS j
+                WHERE j.state IN ('leased','running') AND j.lease_worker_id=? AND j.lease_token_sha256=?
+                  AND j.lease_expires_at>EXTRACT(EPOCH FROM clock_timestamp())::double precision
+                  AND NOT EXISTS (
+                    SELECT 1 FROM distributed_job_idempotency AS f WHERE f.idempotency_key=j.idempotency_key
+                    AND (f.job_id<>j.job_id OR f.kind<>j.kind OR f.payload_sha256<>j.payload_sha256
+                         OR f.resource_id<>j.resource_id OR f.permission<>j.permission OR f.side_effect_mode<>j.side_effect_mode)
+                  )
             ), updated AS (
                 UPDATE distributed_jobs AS j
                 SET state='completed',result_json=?,result_sha256=?,
-                    side_effect_state=CASE WHEN c.side_effect_state='started' THEN 'completed'
-                                           ELSE c.side_effect_state END,
+                    side_effect_state=CASE WHEN c.side_effect_state='started' THEN 'completed' ELSE c.side_effect_state END,
                     terminal_worker_id=?,terminal_lease_token_sha256=?,terminal_at=?,
-                    lease_worker_id='',lease_token_sha256='',lease_expires_at=0,
-                    error_code='',updated_at=?
-                FROM candidate AS c
-                WHERE j.job_id=c.job_id
-                RETURNING j.job_id
+                    lease_worker_id='',lease_token_sha256='',lease_expires_at=0,error_code='',updated_at=?
+                FROM candidate AS c WHERE j.job_id=c.job_id RETURNING j.*
+            ), fence AS (
+                INSERT INTO distributed_job_idempotency(
+                    idempotency_key,job_id,kind,payload_sha256,resource_id,permission,side_effect_mode,
+                    terminal_state,created_at,terminal_at,updated_at,terminal_receipt
+                ) SELECT idempotency_key,job_id,kind,payload_sha256,resource_id,permission,side_effect_mode,
+                         state,created_at,terminal_at,updated_at,
+                         json_build_array(terminal_worker_id,terminal_lease_token_sha256,result_sha256)::text FROM updated
+                ON CONFLICT(idempotency_key) DO UPDATE SET terminal_state=EXCLUDED.terminal_state,
+                    terminal_at=EXCLUDED.terminal_at,updated_at=EXCLUDED.updated_at,terminal_receipt=EXCLUDED.terminal_receipt
+                RETURNING job_id
             ), worker_updated AS (
-                UPDATE distributed_workers AS w
-                SET active_leases=GREATEST(0,w.active_leases-1),heartbeat_at=?,updated_at=?
-                WHERE w.worker_id=? AND EXISTS (SELECT 1 FROM updated)
-                RETURNING w.worker_id
+                UPDATE distributed_workers AS w SET active_leases=GREATEST(0,w.active_leases-1),
+                    heartbeat_at=EXTRACT(EPOCH FROM clock_timestamp())::double precision,updated_at=?
+                WHERE w.worker_id=? AND EXISTS (SELECT 1 FROM fence) RETURNING w.worker_id
             ), event AS (
                 INSERT INTO distributed_job_events(
                     job_id,event_type,from_state,to_state,worker_id,code,details_json,created_at
-                )
-                SELECT c.job_id,'completed',c.state,'completed',?,?,?,?
-                FROM candidate AS c
-                JOIN updated AS u ON u.job_id=c.job_id
-                RETURNING job_id
-            ), trimmed AS (
-                DELETE FROM distributed_job_events
-                WHERE job_id=(SELECT job_id FROM event)
-                  AND event_id NOT IN (
-                      SELECT event_id FROM distributed_job_events
-                      WHERE job_id=(SELECT job_id FROM event)
-                      ORDER BY event_id DESC LIMIT ?
-                  )
-            )
-            SELECT c.state AS previous_state
-            FROM candidate AS c
-            JOIN updated AS u ON u.job_id=c.job_id
+                ) SELECT c.job_id,'completed',c.state,'completed',?,?,?,?
+                FROM candidate AS c JOIN updated AS u ON u.job_id=c.job_id RETURNING job_id
+            ) SELECT c.state AS previous_state FROM candidate AS c JOIN updated AS u ON u.job_id=c.job_id
         """
 
     def record_event(
@@ -995,6 +934,6 @@ class PostgreSQLDistributedRuntimeStorage(DistributedRuntimeStorageBackend):
 
 def storage_backend_for(target: Path | str) -> DistributedRuntimeStorageBackend:
     text = str(target).strip()
-    if text.casefold().startswith(("postgresql://", "postgres://")):
+    if _is_postgresql_target(text):
         return PostgreSQLDistributedRuntimeStorage(text)
     return SQLiteDistributedRuntimeStorage(Path(target))

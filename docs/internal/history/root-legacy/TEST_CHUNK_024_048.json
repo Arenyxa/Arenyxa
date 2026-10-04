@@ -1,0 +1,170 @@
+[
+  {
+    "file": "tests/test_extraction_dry_run.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.63,
+    "output": "...                                                                      [100%]\n3 passed in 0.12s\n"
+  },
+  {
+    "file": "tests/test_hot_path_memory.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.196,
+    "output": ".                                                                        [100%]\n1 passed in 0.10s\n"
+  },
+  {
+    "file": "tests/test_http_redirect_network_guard.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 5.209,
+    "output": "....                                                                     [100%]\n4 passed in 1.46s\n"
+  },
+  {
+    "file": "tests/test_http_resilience.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.736,
+    "output": "......                                                                   [100%]\n6 passed in 0.18s\n"
+  },
+  {
+    "file": "tests/test_i18n_motion_refinement.py",
+    "rc": 5,
+    "timeout": false,
+    "seconds": 2.532,
+    "output": "\n=========================== short test summary info ============================\nSKIPPED [1] tests/test_i18n_motion_refinement.py:9: No supported Qt binding is installed\n1 skipped in 0.04s\n"
+  },
+  {
+    "file": "tests/test_mitm_professional.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.278,
+    "output": ".........                                                                [100%]\n9 passed in 0.11s\n"
+  },
+  {
+    "file": "tests/test_native_capture_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.72,
+    "output": "......                                                                   [100%]\n6 passed in 0.12s\n"
+  },
+  {
+    "file": "tests/test_navigation_settings_config.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.568,
+    "output": "...                                                                      [100%]\n3 passed in 0.09s\n"
+  },
+  {
+    "file": "tests/test_network_advanced.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.844,
+    "output": "...                                                                      [100%]\n3 passed in 0.12s\n"
+  },
+  {
+    "file": "tests/test_network_capture_v62.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 4.514,
+    "output": ".......                                                                  [100%]\n7 passed in 0.81s\n"
+  },
+  {
+    "file": "tests/test_network_core_v61.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 4.429,
+    "output": ".........                                                                [100%]\n9 passed in 1.40s\n"
+  },
+  {
+    "file": "tests/test_network_guard_resolution_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.507,
+    "output": "...                                                                      [100%]\n3 passed in 0.04s\n"
+  },
+  {
+    "file": "tests/test_nextgen_intelligence_studio.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.285,
+    "output": "................                                                         [100%]\n16 passed in 0.14s\n"
+  },
+  {
+    "file": "tests/test_packet_intelligence.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.578,
+    "output": ".....                                                                    [100%]\n5 passed in 0.14s\n"
+  },
+  {
+    "file": "tests/test_parsing_http_export.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 4.285,
+    "output": "......                                                                   [100%]\n6 passed in 1.12s\n"
+  },
+  {
+    "file": "tests/test_peak_performance_resilience_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 4.373,
+    "output": ".........                                                                [100%]\n9 passed in 1.82s\n"
+  },
+  {
+    "file": "tests/test_performance_policy.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.614,
+    "output": ".......                                                                  [100%]\n7 passed in 0.05s\n"
+  },
+  {
+    "file": "tests/test_phase11_12_root_ui_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.457,
+    "output": "...........                                                              [100%]\n11 passed in 0.52s\n"
+  },
+  {
+    "file": "tests/test_phase11_distributed_runtime.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 9.889,
+    "output": "...........                                                              [100%]\n11 passed in 7.19s\n"
+  },
+  {
+    "file": "tests/test_phase12_release_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.645,
+    "output": ".............                                                            [100%]\n13 passed in 0.20s\n"
+  },
+  {
+    "file": "tests/test_phase1_architecture_contracts.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.951,
+    "output": ".....                                                                    [100%]\n5 passed in 1.62s\n"
+  },
+  {
+    "file": "tests/test_phase2_web_intelligence.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.448,
+    "output": ".......                                                                  [100%]\n7 passed in 0.12s\n"
+  },
+  {
+    "file": "tests/test_phase3_reliability_resource_governance.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.358,
+    "output": "..............                                                           [100%]\n14 passed in 0.17s\n"
+  },
+  {
+    "file": "tests/test_phase45_experience_and_security_integration.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.531,
+    "output": ".....                                                                    [100%]\n5 passed in 0.41s\n"
+  }
+]

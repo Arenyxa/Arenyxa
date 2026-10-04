@@ -36,7 +36,6 @@ from arenyxa.domain.enums import CaptureSource
 from arenyxa.domain.models import NetworkEvent, RequestSpec, RetryPolicy, Workflow, WorkflowNode
 from arenyxa.infrastructure.atomic_io import atomic_write_json
 from arenyxa.presentation.background import run_background
-from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.widgets import PageHeader
 
@@ -61,8 +60,8 @@ class IntelligenceStudioPage(StudioIntelligenceMixin, StudioOperationsMixin, Wor
         self._last_autopilot_plan: dict[str, Any] | None = None
         layout = page_layout(self)
         header = QHBoxLayout()
-        header.addWidget(PageHeader(source_text("studio_intelligence.page.title"), source_text("studio_intelligence.page.subtitle"), title_key="studio_intelligence.page.title", subtitle_key="studio_intelligence.page.subtitle"), 1)
-        self.refresh_live_button = QPushButton(source_text("studio_intelligence.action.refresh_live")); self.refresh_live_button.setProperty("i18n_key_text", "studio_intelligence.action.refresh_live")
+        header.addWidget(PageHeader("Web Intelligence", "Explainable Blueprint · SmartPath 2.0 · Context Bridge · Selector Self-Healing · Compatibility Lab · Portable Workflows · Debugger"), 1)
+        self.refresh_live_button = QPushButton("Refresh Live Center")
         header.addWidget(self.refresh_live_button)
         layout.addLayout(header)
         self.tabs = QTabWidget()
@@ -120,17 +119,17 @@ class IntelligenceStudioPage(StudioIntelligenceMixin, StudioOperationsMixin, Wor
             events.append(NetworkEvent(**{key: value for key, value in normalized.items() if key in NetworkEvent.__dataclass_fields__}))
         return events
 
-    def _async(self, fn, output: QPlainTextEdit, success_message: str | None = None) -> None:
+    def _async(self, fn, output: QPlainTextEdit, success_message: str = "完成") -> None:
         output.setPlainText("Working…")
         def completed(value: object) -> None:
             if isinstance(value, str):
                 output.setPlainText(value)
             else:
                 output.setPlainText(json.dumps(value, ensure_ascii=False, indent=2, default=str))
-            self.statusMessage.emit(success_message or current_text("studio_intelligence.status.completed"))
+            self.statusMessage.emit(success_message)
         def failed(message: str) -> None:
             output.setPlainText(message)
-            self.statusMessage.emit(current_text("studio_intelligence.status.failed"))
+            self.statusMessage.emit("操作失败")
         run_background(fn, completed, failed)
 
                                                

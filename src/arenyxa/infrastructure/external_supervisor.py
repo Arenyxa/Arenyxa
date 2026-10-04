@@ -97,6 +97,10 @@ class ExternalSupervisorClient:
 
     def start(self) -> None:
         with self._lock:
+            if self._stop.is_set() and any(
+                thread is not None and thread.is_alive() for thread in (self._sender_thread, self._ticker_thread)
+            ):
+                raise RuntimeError("External supervisor generation is still draining")
             if self._process is not None and self._process.poll() is None:
                 return
             # A sender/ticker from a child that exited independently may still be
@@ -170,7 +174,8 @@ class ExternalSupervisorClient:
             self._ticker_thread.start()
         self.heartbeat("process", {"pid": os.getpid(), "executable": sys.executable})
 
-    def stop(self, timeout: float = 3.0) -> None:
+    def stop(self, timeout: float = 3.0) -> bool:
+        deadline = time.monotonic() + max(0.0, float(timeout))
         with self._lock:
             stop_event = self._stop
             outbound_queue = self._queue
@@ -179,23 +184,30 @@ class ExternalSupervisorClient:
             process = self._process
             stop_event.set()
             self._enqueue(_SENTINEL, outbound_queue)
-            self._sender_thread = None
-            self._ticker_thread = None
-            self._process = None
         if ticker is not None and ticker is not threading.current_thread():
-            ticker.join(max(0.0, min(float(timeout), 1.0)))
+            ticker.join(max(0.0, deadline - time.monotonic()))
         if sender is not None and sender is not threading.current_thread():
-            sender.join(max(0.0, min(float(timeout), 1.5)))
+            sender.join(max(0.0, deadline - time.monotonic()))
         if process is not None:
             try:
-                process.wait(timeout=max(0.1, float(timeout)))
+                process.wait(timeout=max(0.0, deadline - time.monotonic()))
             except subprocess.TimeoutExpired:
                 process.terminate()
                 try:
-                    process.wait(timeout=1.0)
+                    process.wait(timeout=max(0.0, deadline - time.monotonic()))
                 except subprocess.TimeoutExpired:
                     process.kill()
-                    process.wait(timeout=1.0)
+        completed = (
+            not any(thread is not None and thread.is_alive() for thread in (sender, ticker))
+            and (process is None or process.poll() is not None)
+        )
+        if completed:
+            with self._lock:
+                if self._process is process and self._sender_thread is sender and self._ticker_thread is ticker:
+                    self._sender_thread = None
+                    self._ticker_thread = None
+                    self._process = None
+        return completed
 
     def heartbeat(self, component: str, state: Mapping[str, Any] | None = None) -> None:
         payload = {

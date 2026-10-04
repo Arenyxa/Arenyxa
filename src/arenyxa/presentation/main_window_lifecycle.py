@@ -41,7 +41,6 @@ from arenyxa.domain.enums import MotionIntent
 from arenyxa.domain.models import MotionProfile
 from arenyxa.presentation.background import begin_background_shutdown, run_background
 from arenyxa.presentation.glass import GlassPanel
-from arenyxa.presentation.i18n_runtime import current_text
 from arenyxa.presentation.language import LanguageManager
 from arenyxa.presentation.launch_geometry import LaunchGeometryPlan
 from arenyxa.presentation.motion import MotionOrchestrator
@@ -143,23 +142,15 @@ class MainWindowLifecycleMixin:
         personalization_page = self.pages.get("personalization")
         if isinstance(personalization_page, PersonalizationPage):
             personalization_page.refresh_localized_previews()
-        network_page = self.pages.get("network")
-        if isinstance(network_page, NetworkPage):
-            network_page.refresh_localized_previews()
 
                                                                                            
                                                                                              
         for surface in (self.nav, self.topbar, self.inspector, self.statusBar()):
             if isinstance(surface, QWidget):
                 self.language.translate_tree(surface)
-        if bool(self.inspector_content.property("shellInspectorEmpty")):
-            self.inspector_content.setPlainText(current_text("shell.inspector.empty"))
         current = self.pages.get(self.current_page_id)
         if isinstance(current, QWidget):
             self.language.translate_tree(current)
-            refresh_localized = getattr(current, "refresh_localized_previews", None)
-            if callable(refresh_localized):
-                refresh_localized()
         self.ui_scale.scale_tree(self.nav)
         if isinstance(current, QWidget):
             self.ui_scale.scale_tree(current)
@@ -170,10 +161,10 @@ class MainWindowLifecycleMixin:
     def open_project(self, project_path: Path) -> None:
         try:
             manifest = self.context.projects.validate(project_path)
-            self.show_status(current_text("shell.project.verified").format(name=manifest.name, version=manifest.version))
+            self.show_status(f"项目已验证：{manifest.name} {manifest.version}")
             self.update_inspector(".arenyxa Project", manifest)
         except Exception as exc:                                                                     
-            QMessageBox.critical(self, current_text("shell.project.open_failed_title"), str(exc))
+            QMessageBox.critical(self, "项目无法打开", str(exc))
 
     def restore_window_state(self) -> None:
         settings = QSettings(str(self.context.paths.root / "window.ini"), QSettings.Format.IniFormat)
@@ -211,8 +202,8 @@ class MainWindowLifecycleMixin:
         if active and not self._repair_exit_requested:
             choice = QMessageBox.question(
                 self,
-                current_text("shell.shutdown.title"),
-                current_text("shell.shutdown.active_tasks").format(count=len(active)),
+                "安全关闭",
+                f"仍有 {len(active)} 个后台任务。停止任务并退出？",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             )
             if choice != QMessageBox.StandardButton.Yes:
@@ -223,19 +214,28 @@ class MainWindowLifecycleMixin:
         self._status_generation += 1
         self.save_window_state()
         try:
-            if self.tray is not None:
-                self.tray.hide()
-            self.taskbar_progress.clear()
-            self.taskbar_progress.close()
                                                                                           
                                                                                          
                                                                                           
             if not begin_background_shutdown(timeout_ms=2500):
                 LOGGER.warning("UI background jobs did not fully quiesce before context shutdown")
-            self.context.shutdown()
+                event.ignore()
+                self.show_status("后台任务尚未结束，请稍后重试关闭。")
+                return
+            if self.context.shutdown() is False:
+                event.ignore()
+                self.show_status("运行时尚未完成安全关闭，请稍后重试。")
+                return
             self.crash_marker.unlink(missing_ok=True)
-        finally:
+            if self.tray is not None:
+                self.tray.hide()
+            self.taskbar_progress.clear()
+            self.taskbar_progress.close()
             event.accept()
+        except Exception:
+            LOGGER.exception("Window shutdown failed; retaining recovery marker")
+            event.ignore()
+            self.show_status("关闭失败，恢复标记已保留，请重试关闭。")
 
     def showEvent(self, event: Any) -> None:
         super().showEvent(event)

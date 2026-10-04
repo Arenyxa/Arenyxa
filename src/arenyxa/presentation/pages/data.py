@@ -25,7 +25,6 @@ from arenyxa.qt_compat.QtWidgets import (
 
 from arenyxa.domain.models import DatasetRevision
 from arenyxa.presentation.background import run_background
-from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.virtual_table import VirtualTableModel
 from arenyxa.presentation.widgets import PageHeader, ScrollSafeComboBox, connect_current_row_changed, set_table_header_stretch_last
@@ -36,15 +35,15 @@ class DataPage(WorkspacePage):
         super().__init__(context, theme, motion, parent)
         layout = page_layout(self)
         header = QHBoxLayout()
-        header.addWidget(PageHeader(source_text("data.page.title"), source_text("data.page.subtitle"), title_key="data.page.title", subtitle_key="data.page.subtitle"), 1)
+        header.addWidget(PageHeader("数据管理", "分页浏览、来源追踪、版本化、流式导出与用户控制存储"), 1)
         self.run_selector = ScrollSafeComboBox()
         self.run_selector.setMinimumWidth(260)
         self.format = QComboBox()
         self.format.addItems(["CSV", "JSONL", "JSON", "XLSX"])
-        self.export_button = QPushButton(source_text("data.action.export")); self.export_button.setProperty("i18n_key_text", "data.action.export")
+        self.export_button = QPushButton("导出")
         self.export_button.setProperty("primary", True)
-        self.version_button = QPushButton(source_text("data.action.create_revision")); self.version_button.setProperty("i18n_key_text", "data.action.create_revision")
-        run_label = QLabel(source_text("data.run.label")); run_label.setProperty("i18n_key_text", "data.run.label"); header.addWidget(run_label)
+        self.version_button = QPushButton("创建 Revision")
+        header.addWidget(QLabel("Run"))
         header.addWidget(self.run_selector)
         header.addWidget(self.format)
         header.addWidget(self.export_button)
@@ -71,7 +70,7 @@ class DataPage(WorkspacePage):
         splitter.addWidget(self.detail)
         splitter.setSizes([850, 320])
         layout.addWidget(splitter, 1)
-        self.footer = QLabel(source_text("data.footer.empty"))
+        self.footer = QLabel("0 records")
         self.footer.setProperty("muted", True)
         layout.addWidget(self.footer)
         self.run_selector.currentIndexChanged.connect(self.load_run)
@@ -85,20 +84,13 @@ class DataPage(WorkspacePage):
         self.run_selector.clear()
         for run in self.context.store.list_runs(limit=500):
             self.run_selector.addItem(
-                current_text("data.run.item").format(
-                    created=run["created_at"][:19],
-                    status=run["status"],
-                    count=run["result_count"],
-                ),
+                f"{run['created_at'][:19]} · {run['status']} · {run['result_count']} rows",
                 run["id"],
             )
             if run["id"] == selected:
                 self.run_selector.setCurrentIndex(self.run_selector.count() - 1)
         self.run_selector.blockSignals(False)
         self.load_run()
-
-    def refresh_localized_previews(self) -> None:
-        self.activated()
 
     def current_run_id(self) -> str | None:
         return self.run_selector.currentData()
@@ -108,8 +100,8 @@ class DataPage(WorkspacePage):
         self._active_run_id = str(run_id) if run_id else None
         total = self.context.store.count_results(run_id) if run_id else 0
         self.model.reset_query(total)
-        self.footer.setText(current_text("data.footer.summary").format(total=f"{total:,}", page_size=self.model.page_size))
-        self.inspectorChanged.emit(current_text("data.inspector.dataset"), {"run_id": run_id, "records": total})
+        self.footer.setText(f"{total:,} records · virtualized pages of {self.model.page_size}")
+        self.inspectorChanged.emit("数据集", {"run_id": run_id, "records": total})
 
     def _load_page(self, offset: int, limit: int) -> list[dict]:
         run_id = self._active_run_id
@@ -120,29 +112,29 @@ class DataPage(WorkspacePage):
         row = self.model.row_at(current.row())
         if row is not None:
             self.detail.setPlainText(json.dumps(row, ensure_ascii=False, indent=2, default=str))
-            self.inspectorChanged.emit(current_text("data.inspector.record"), row)
+            self.inspectorChanged.emit("Result Record", row)
 
     def export_current(self) -> None:
         run_id = self.current_run_id()
         if not run_id:
-            QMessageBox.information(self, current_text("data.export.title"), current_text("data.export.select_run"))
+            QMessageBox.information(self, "导出", "请选择包含结果的 Run。")
             return
         format_name = self.format.currentText().lower()
         extension = "xlsx" if format_name == "xlsx" else format_name
         default = self.context.paths.exports / f"{run_id}.{extension}"
-        path, _ = QFileDialog.getSaveFileName(self, current_text("data.export.save_title"), str(default), current_text("data.common.all_files"))
+        path, _ = QFileDialog.getSaveFileName(self, "导出结果", str(default), "All Files (*)")
         if not path:
             return
         self.export_button.setEnabled(False)
-        self.statusMessage.emit(current_text("data.export.running"))
+        self.statusMessage.emit("正在后台流式导出…")
 
         def completed(count: object) -> None:
             self.export_button.setEnabled(True)
-            self.statusMessage.emit(current_text("data.export.completed").format(count=f"{int(count):,}", path=path))
+            self.statusMessage.emit(f"导出完成：{int(count):,} rows → {path}")
 
         def failed(message: str) -> None:
             self.export_button.setEnabled(True)
-            QMessageBox.critical(self, current_text("data.export.failed_title"), message)
+            QMessageBox.critical(self, "导出失败", message)
 
         run_background(
             lambda: self.context.exporter.export_run(run_id, Path(path), format_name), completed, failed
@@ -153,7 +145,7 @@ class DataPage(WorkspacePage):
         if not run_id:
             return
         self.version_button.setEnabled(False)
-        self.statusMessage.emit(current_text("data.revision.building"))
+        self.statusMessage.emit("正在后台构建数据版本…")
 
         def build_revision() -> tuple[DatasetRevision, int]:
             records = {
@@ -180,11 +172,11 @@ class DataPage(WorkspacePage):
         def completed(value: object) -> None:
             revision, count = value
             self.version_button.setEnabled(True)
-            self.statusMessage.emit(current_text("data.revision.created").format(revision_id=revision.id, count=f"{count:,}"))
+            self.statusMessage.emit(f"已创建 Dataset Revision：{revision.id} · {count:,} records")
 
         def failed(message: str) -> None:
             self.version_button.setEnabled(True)
-            QMessageBox.critical(self, current_text("data.revision.create_failed_title"), message)
+            QMessageBox.critical(self, "版本创建失败", message)
 
         run_background(build_revision, completed, failed)
 
@@ -193,11 +185,11 @@ class SearchPage(WorkspacePage):
     def __init__(self, context: Any, theme: Any, motion: Any, parent: QWidget | None = None) -> None:
         super().__init__(context, theme, motion, parent)
         layout = page_layout(self)
-        layout.addWidget(PageHeader(source_text("search.page.title"), source_text("search.page.subtitle"), title_key="search.page.title", subtitle_key="search.page.subtitle"))
+        layout.addWidget(PageHeader("搜索中心", "本地搜索已索引任务、运行摘要与结构化结果"))
         bar = QHBoxLayout()
         self.query = QLineEdit()
-        self.query.setPlaceholderText(source_text("search.query.placeholder")); self.query.setProperty("i18n_key_placeholder", "search.query.placeholder")
-        button = QPushButton(source_text("search.action.search")); button.setProperty("i18n_key_text", "search.action.search")
+        self.query.setPlaceholderText("输入关键词；不向网络发送搜索内容")
+        button = QPushButton("搜索")
         button.setProperty("primary", True)
         bar.addWidget(self.query, 1)
         bar.addWidget(button)
@@ -220,24 +212,24 @@ class SearchPage(WorkspacePage):
         try:
             self._items = self.context.store.search(self.query.text())
         except (sqlite3.Error, ValueError) as exc:
-            QMessageBox.warning(self, current_text("search.error.failed_title"), str(exc))
+            QMessageBox.warning(self, "搜索失败", str(exc))
             return
         self.results.clear()
         for item in self._items:
             self.results.addItem(f"{item['title']}\n{item['object_type']} · {item['url']}")
-        self.statusMessage.emit(current_text("search.status.matches").format(count=f"{len(self._items):,}"))
+        self.statusMessage.emit(f"本地搜索命中 {len(self._items):,} 项")
 
     def show_result(self, row: int) -> None:
         if 0 <= row < len(self._items):
             self.preview.setPlainText(json.dumps(self._items[row], ensure_ascii=False, indent=2))
-            self.inspectorChanged.emit(current_text("search.inspector.result"), self._items[row])
+            self.inspectorChanged.emit("搜索结果", self._items[row])
 
 
 class VersionPage(WorkspacePage):
     def __init__(self, context: Any, theme: Any, motion: Any, parent: QWidget | None = None) -> None:
         super().__init__(context, theme, motion, parent)
         layout = page_layout(self)
-        layout.addWidget(PageHeader(source_text("version.page.title"), source_text("version.page.subtitle"), title_key="version.page.title", subtitle_key="version.page.subtitle"))
+        layout.addWidget(PageHeader("数据版本控制", "Revision / Change / Schema 可追踪；回滚产生新 Revision"))
         self.list = QListWidget()
         self.detail = QPlainTextEdit()
         self.detail.setReadOnly(True)
@@ -246,7 +238,7 @@ class VersionPage(WorkspacePage):
         splitter.addWidget(self.detail)
         splitter.setSizes([380, 760])
         layout.addWidget(splitter, 1)
-        compare = QPushButton(source_text("version.action.compare")); compare.setProperty("i18n_key_text", "version.action.compare")
+        compare = QPushButton("比较所选两个 Revision")
         layout.addWidget(compare)
         self.list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.list.currentRowChanged.connect(self.show_revision)
@@ -290,7 +282,7 @@ class VersionPage(WorkspacePage):
         finally:
             self._revision_selection_guard = False
         self._revision_selection_order = [row for row in self._revision_selection_order if row in keep]
-        self.statusMessage.emit(current_text("version.status.max_two"))
+        self.statusMessage.emit("Revision 比较最多选择两个版本")
 
     def show_revision(self, row: int) -> None:
         if not (0 <= row < len(self._revisions)):
@@ -299,7 +291,7 @@ class VersionPage(WorkspacePage):
         revision_id = str(revision["id"])
         self._revision_load_token += 1
         token = self._revision_load_token
-        self.detail.setPlainText(current_text("version.status.loading_metadata"))
+        self.detail.setPlainText("正在后台读取 Revision 元数据…")
 
         def completed(value: object) -> None:
             if token != self._revision_load_token:
@@ -310,7 +302,7 @@ class VersionPage(WorkspacePage):
 
         def failed(message: str) -> None:
             if token == self._revision_load_token:
-                self.detail.setPlainText(current_text("version.status.load_failed").format(message=message))
+                self.detail.setPlainText(f"Revision 读取失败：{message}")
 
         run_background(
             lambda: self.context.store.count_revision_records(revision_id),
@@ -321,10 +313,10 @@ class VersionPage(WorkspacePage):
     def compare_selected(self) -> None:
         rows = sorted({index.row() for index in self.list.selectedIndexes()})
         if len(rows) != 2:
-            QMessageBox.information(self, current_text("version.compare.title"), current_text("version.compare.select_two"))
+            QMessageBox.information(self, "比较", "请选择两个 Revision。")
             return
         left_meta, right_meta = (dict(self._revisions[index]) for index in rows)
-        self.detail.setPlainText(current_text("version.compare.running"))
+        self.detail.setPlainText("正在后台比较两个 Revision…")
 
         def worker() -> dict[str, object]:
             left = DatasetRevision(
@@ -360,5 +352,5 @@ class VersionPage(WorkspacePage):
             lambda result: self.detail.setPlainText(
                 json.dumps(result, ensure_ascii=False, indent=2, default=str)
             ),
-            lambda message: self.detail.setPlainText(current_text("version.compare.failed").format(message=message)),
+            lambda message: self.detail.setPlainText(f"Revision 比较失败：{message}"),
         )

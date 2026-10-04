@@ -149,7 +149,10 @@ def test_runtime_protocol_registry_is_integrated_into_native_application_decode(
         registry.unregister("runtime-demo", source=source)
 
 
-def test_unified_protocol_and_field_registry_has_native_catalog_without_tshark() -> None:
+def test_unified_protocol_and_field_registry_has_native_catalog_without_tshark(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("arenyxa.infrastructure.capture.packet_analysis.shutil.which", lambda _name: None)
+    native_registry = DynamicProtocolRegistry()
+    monkeypatch.setattr("arenyxa.infrastructure.capture.packet_analysis.global_protocol_registry", lambda: native_registry)
     engine = PacketAnalysisEngine(executable="")
     registry = engine.unified_protocol_registry(include_external=False)
     snapshot = registry.snapshot()

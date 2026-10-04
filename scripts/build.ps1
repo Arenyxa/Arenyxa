@@ -43,7 +43,7 @@ try {
     if ($VersionRaw -match '"(.*)"') {
         $ProjectVersion = $Matches[1]
     } else {
-    $ProjectVersion = '0.1.0'
+        throw 'Unable to read the candidate distribution version from src/arenyxa/__init__.py.'
     }
 
     if ($ReleaseChannel -eq 'official' -and -not $SigningKey) {

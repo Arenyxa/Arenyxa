@@ -5,14 +5,17 @@
   "package_version": "0.1.0",
   "windows_file_version": "0.1.0.0",
   "release_channel": "stable",
-  "completed_phase": 8,
   "artifact_name": "Arenyxa_v0.1",
   "baseline": "internal-engineering-v8.2.0",
   "compatibility_identity": "6.8.0",
-  "promotion_source": "public_version_reset_2026_09_26",
-  "release_status": "formal_public_release",
+  "promotion_source": "v0.1-public-source-promotion-2026-10-04",
+  "release_status": "public",
+  "release_readiness": "READY FOR SOURCE PUBLICATION",
   "github_public_release": true,
   "engineering_baseline": "v8.2.0",
   "internal_version": "8.2.0",
-  "versioning_note": "GitHub public release numbering starts at v0.1. Historical v6/v7/v8 labels are internal engineering milestones only."
+  "distribution_channel": "community",
+  "signing_status": "unsigned",
+  "legacy_validation": "NOT TESTED",
+  "engineering_phase": 8
 }

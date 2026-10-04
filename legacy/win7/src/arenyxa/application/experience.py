@@ -44,6 +44,11 @@ def get_experience_profile(profile_id: str) -> ExperienceProfile:
 
 
 def apply_experience_profile(settings: AppSettings, profile_id: str) -> ExperienceProfile:
+
+
+
+
+
     profile = get_experience_profile(profile_id)
     settings.experience_profile = profile.id
     settings.experience_setup_completed = True

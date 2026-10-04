@@ -48,7 +48,6 @@ from arenyxa.infrastructure.capture.professional import ProfessionalAnalysisSuit
 from arenyxa.infrastructure.capture.packet_analysis import PacketAnalysisEngine
 from arenyxa.presentation.background import run_background
 from arenyxa.presentation.packet_intelligence_workbench import PacketIntelligenceWorkbenchDialog
-from arenyxa.presentation.i18n_runtime import current_text
 from arenyxa.presentation.language import literal_for_locale
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.widgets import PageHeader, connect_current_row_changed, set_table_header_stretch_last
@@ -153,7 +152,7 @@ class WaterfallWidget(QWidget):
             painter.setPen(QColor(tokens.text_muted))
             app = QApplication.instance()
             locale = str(app.property("arenyxa_locale") or "zh_CN") if app is not None else "zh_CN"
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, current_text("network.waterfall.waiting"))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, literal_for_locale("等待网络事件", locale))
             return
         durations = [
             max(
@@ -177,8 +176,61 @@ class WaterfallWidget(QWidget):
 
 
 class NetworkAnalysisActionsMixin:
+    @staticmethod
+    def _captured_protocol_details(event: dict[str, Any]) -> dict[str, Any]:
+        """Project public TLS/DNS fields already captured, without active inspection."""
+        metadata = event.get("metadata")
+        if not isinstance(metadata, dict):
+            return {}
+        public_fields = {
+            "content_type", "legacy_version", "record_length", "handshake_type", "handshake_length",
+            "cipher_suites", "extension_types", "supported_groups", "ec_point_formats",
+            "signature_algorithms", "supported_versions", "key_share_groups", "server_name", "alpn",
+            "ja3", "ja3_md5", "ja4", "ja4_raw", "tls_semantic_sha256", "malformed_extensions",
+            "transaction_id", "response", "opcode", "authoritative", "truncated", "rcode",
+            "questions", "answers", "authorities", "additionals",
+        }
+
+        def public_value(value: Any) -> Any:
+            if isinstance(value, str):
+                return value[:4096]
+            if value is None or isinstance(value, (bool, int, float)):
+                return value
+            if isinstance(value, list):
+                return [public_value(item) for item in value[:256] if not isinstance(item, (dict, list))]
+            return None
+
+        details: dict[str, Any] = {}
+        layers = metadata.get("native_layers", [])
+        for layer in layers[:64] if isinstance(layers, list) else []:
+            if not isinstance(layer, dict) or layer.get("name") not in {"tls", "dns", "mdns"}:
+                continue
+            fields = layer.get("fields")
+            if not isinstance(fields, dict):
+                continue
+            selected = {key: public_value(value) for key, value in fields.items() if key in public_fields}
+            for key in ("question_records", "answer_records"):
+                records = fields.get(key)
+                if layer["name"] in {"dns", "mdns"} and isinstance(records, list):
+                    selected[key] = [
+                        {name: public_value(value) for name, value in row.items() if name in {"name", "type", "class", "ttl"}}
+                        for row in records[:256] if isinstance(row, dict)
+                    ]
+            if selected:
+                details[layer["name"]] = selected
+        external = metadata.get("dissector_fields")
+        if isinstance(external, dict):
+            allowed = {name for name in PacketAnalysisEngine.SUMMARY_FIELDS if name.startswith(("tls.", "dns."))}
+            selected = {name: public_value(value) for name, value in external.items() if name in allowed}
+            if selected:
+                details["dissector_fields"] = selected
+        if details and event.get("host"):
+            details["host"] = public_value(event["host"])
+        return details
+
     def inspect_event(self, current: QModelIndex, previous: QModelIndex) -> None:
         del previous
+        self.protocol_view.setPlainText("")
         if not current.isValid() or current.row() >= len(self.model.events):
             return
         event = self.model.events[current.row()]
@@ -207,7 +259,10 @@ class NetworkAnalysisActionsMixin:
             )
         )
         self.timing_view.setPlainText(json.dumps(event.get("timing", {}), ensure_ascii=False, indent=2))
-        self.inspectorChanged.emit(current_text("network.inspector.event"), overview)
+        protocol_details = self._captured_protocol_details(event)
+        if protocol_details:
+            self.protocol_view.setPlainText(json.dumps(protocol_details, ensure_ascii=False, indent=2))
+        self.inspectorChanged.emit("Network Event", overview)
 
     def selected_event(self) -> dict | None:
         row = self.table.currentIndex().row()
@@ -216,7 +271,7 @@ class NetworkAnalysisActionsMixin:
     def replay_selected(self) -> None:
         event = self.selected_event()
         if not event or not event.get("url"):
-            QMessageBox.information(self, current_text("network.replay.title"), current_text("network.replay.select_url"))
+            QMessageBox.information(self, "Request Replay", "请选择包含 URL 的网络请求。")
             return
         service = RequestReplayService()
         exchange = self.context.store.get_http_exchange_by_event(str(event.get("id") or ""))
@@ -234,23 +289,24 @@ class NetworkAnalysisActionsMixin:
                     })
                 )
         except Exception as exc:
-            QMessageBox.critical(self, current_text("network.replay.title"), str(exc))
+            QMessageBox.critical(self, "Request Replay", str(exc))
             return
 
         if draft.secret_refs:
             anonymous = (
                 QMessageBox.question(
                     self,
-                    current_text("network.replay.secret_title"),
-                    current_text("network.replay.secret_prompt"),
+                    "敏感凭据保护",
+                    "该请求包含认证/Cookie 等敏感 Header。Arenyxa 不会从捕获记录自动重放明文凭据。\n\n"
+                    "是否移除这些敏感字段并以匿名方式 Replay？",
                 )
                 == QMessageBox.StandardButton.Yes
             )
             if not anonymous:
                 QMessageBox.information(
                     self,
-                    current_text("network.replay.title"),
-                    current_text("network.replay.cancelled_secret"),
+                    "Request Replay",
+                    "已取消。需要认证的 Replay 可在 HTTP Builder 中显式绑定 Secrets 后执行。",
                 )
                 return
             draft = service.without_secrets(draft)
@@ -259,7 +315,7 @@ class NetworkAnalysisActionsMixin:
         confirmed = method not in {"POST", "PUT", "PATCH", "DELETE"}
         if not confirmed:
             confirmed = (
-                QMessageBox.question(self, current_text("network.replay.side_effect_title"), current_text("network.replay.side_effect_prompt").format(method=method))
+                QMessageBox.question(self, "副作用确认", f"{method} 可能修改目标系统，是否继续？")
                 == QMessageBox.StandardButton.Yes
             )
         if not confirmed:
@@ -267,8 +323,8 @@ class NetworkAnalysisActionsMixin:
         if draft.request_body_truncated:
             QMessageBox.warning(
                 self,
-                current_text("network.replay.title"),
-                current_text("network.replay.truncated_body"),
+                "Request Replay",
+                "捕获到的请求正文已被截断。为避免发送不完整写请求，本次 Replay 已阻止。",
             )
             return
 
@@ -283,9 +339,9 @@ class NetworkAnalysisActionsMixin:
             self.replay.setEnabled(True)
             if result.state != "completed" or result.response is None:
                 QMessageBox.critical(
-                    self, current_text("network.replay.failed_title"), result.error_message or result.error_code or current_text("network.replay.failed_fallback")
+                    self, "Replay 失败", result.error_message or result.error_code or "Replay failed"
                 )
-                self.statusMessage.emit(current_text("network.replay.failed_status").format(code=result.error_code or "unknown"))
+                self.statusMessage.emit(f"Replay 失败：{result.error_code or 'unknown'}")
                 return
             response = result.response
             overview = {
@@ -300,11 +356,11 @@ class NetworkAnalysisActionsMixin:
                 "comparison": result.comparison,
             }
             self.overview.setPlainText(json.dumps(overview, ensure_ascii=False, indent=2, default=str))
-            self.statusMessage.emit(current_text("network.replay.completed").format(status=response.status, elapsed=f"{response.elapsed_ms:.0f}"))
+            self.statusMessage.emit(f"Replay 完成：HTTP {response.status} · {response.elapsed_ms:.0f} ms")
 
         def failed(message: str) -> None:
             self.replay.setEnabled(True)
-            QMessageBox.critical(self, current_text("network.replay.failed_title"), message)
+            QMessageBox.critical(self, "Replay 失败", message)
 
         run_background(run_replay, completed, failed)
 
@@ -315,7 +371,7 @@ class NetworkAnalysisActionsMixin:
     def inspect_tls(self) -> None:
         host = self._selected_host()
         if not host:
-            QMessageBox.information(self, current_text("network.tls.title"), current_text("network.tls.select_host"))
+            QMessageBox.information(self, "TLS Inspector", "请先选择包含 Host 的事件。")
             return
         self.tls.setEnabled(False)
 
@@ -325,14 +381,14 @@ class NetworkAnalysisActionsMixin:
 
         def failed(message: str) -> None:
             self.tls.setEnabled(True)
-            QMessageBox.warning(self, current_text("network.tls.failed_title"), message)
+            QMessageBox.warning(self, "TLS 检查失败", message)
 
         run_background(lambda: TlsInspector.inspect(host), completed, failed)
 
     def inspect_dns(self) -> None:
         host = self._selected_host()
         if not host:
-            QMessageBox.information(self, current_text("network.dns.title"), current_text("network.dns.select_host"))
+            QMessageBox.information(self, "DNS Analyzer", "请先选择包含 Host 的事件。")
             return
         self.dns.setEnabled(False)
 
@@ -342,14 +398,14 @@ class NetworkAnalysisActionsMixin:
 
         def failed(message: str) -> None:
             self.dns.setEnabled(True)
-            QMessageBox.warning(self, current_text("network.dns.failed_title"), message)
+            QMessageBox.warning(self, "DNS 查询失败", message)
 
         run_background(lambda: DnsAnalyzer.resolve(host), completed, failed)
 
     def run_professional_analysis(self) -> None:
         rows = list(self.model.events)
         if not rows:
-            QMessageBox.information(self, current_text("network.professional.title"), current_text("network.professional.no_events"))
+            QMessageBox.information(self, "Professional Analysis", "当前会话没有可分析的网络事件。")
             return
         events: list[NetworkEvent] = []
         for row in rows:
@@ -363,7 +419,7 @@ class NetworkAnalysisActionsMixin:
             except (TypeError, ValueError):
                 continue
         if not events:
-            QMessageBox.warning(self, current_text("network.professional.title"), current_text("network.professional.invalid_format"))
+            QMessageBox.warning(self, "Professional Analysis", "当前会话的数据格式无法安全分析。")
             return
         self.professional.setEnabled(False)
         display_filter = self.filter.text().strip()
@@ -376,11 +432,11 @@ class NetworkAnalysisActionsMixin:
         def completed(result: object) -> None:
             self.professional.setEnabled(True)
             self.professional_view.setPlainText(json.dumps(asdict(result), ensure_ascii=False, indent=2, default=str))
-            self.statusMessage.emit(current_text("network.professional.completed"))
+            self.statusMessage.emit("Professional Analysis 已完成")
 
         def failed(message: str) -> None:
             self.professional.setEnabled(True)
-            QMessageBox.warning(self, current_text("network.professional.title"), message)
+            QMessageBox.warning(self, "Professional Analysis", message)
 
         run_background(run_analysis, completed, failed)
 
@@ -440,11 +496,7 @@ class NetworkAnalysisActionsMixin:
                 })
                 self.overview.setPlainText(json.dumps(payload, ensure_ascii=False, indent=2, default=str))
                 self.statusMessage.emit(
-                    current_text("network.pcap.analysis_completed").format(
-                        risk=payload["risk"],
-                        score=payload["score"],
-                        backend=backend,
-                    )
+                    f"PCAP 分析完成 · Risk {payload['risk']} · Score {payload['score']}/100 · {backend}"
                 )
             else:
                 self.overview.setPlainText(json.dumps({
@@ -457,7 +509,7 @@ class NetworkAnalysisActionsMixin:
                     "persistence_batch_size": 1000,
                     "backend": backend,
                 }, ensure_ascii=False, indent=2))
-                self.statusMessage.emit(current_text("network.pcap.imported").format(count=f"{decoded_count:,}", backend=backend))
+                self.statusMessage.emit(f"PCAP 已导入：{decoded_count:,} packets · {backend}")
             self.context.nextgen.activity.publish(
                 "capture-import",
                 "PCAP imported",
@@ -472,7 +524,7 @@ class NetworkAnalysisActionsMixin:
             self.start_button.setEnabled(True)
             self.operationProgress.emit("PCAP Import", 0, 0, "clear")
             self.refresh_sessions()
-            QMessageBox.critical(self, current_text("network.pcap.import_failed_title"), message)
+            QMessageBox.critical(self, "PCAP 导入失败", message)
 
         run_background(run_import, completed, failed)
 
@@ -500,8 +552,8 @@ class NetworkAnalysisActionsMixin:
         if not files:
             QMessageBox.information(
                 self,
-                current_text("network.packet.title"),
-                current_text("network.packet.no_raw_capture"),
+                "Packet Intelligence",
+                "当前会话没有原始 PCAP/PCAPNG。请使用 System Packet Capture 或 Import PCAP / PCAPNG。",
             )
             return
         self.packet_analysis.setEnabled(False)
@@ -519,13 +571,13 @@ class NetworkAnalysisActionsMixin:
 
         def failed(message: str) -> None:
             self.packet_analysis.setEnabled(True)
-            QMessageBox.warning(self, current_text("network.packet.title"), message)
+            QMessageBox.warning(self, "Packet Intelligence", message)
 
         run_background(prepare_capture, completed, failed)
 
     def run_packet_analytics(self) -> None:
         if not self._visible_session_id:
-            QMessageBox.information(self, current_text("network.packet.title"), current_text("network.packet.select_session"))
+            QMessageBox.information(self, "Packet Intelligence", "Select a capture session first.")
             return
         session_id = str(self._visible_session_id)
         self.packet_analytics.setEnabled(False)
@@ -543,10 +595,10 @@ class NetworkAnalysisActionsMixin:
         def completed(value: object) -> None:
             self.packet_analytics.setEnabled(True)
             self.professional_view.setPlainText(json.dumps(value, ensure_ascii=False, indent=2, default=str))
-            self.statusMessage.emit(current_text("network.packet.analytics_completed"))
+            self.statusMessage.emit("Packet Intelligence advanced analytics completed")
         def failed(message: str) -> None:
             self.packet_analytics.setEnabled(True)
-            QMessageBox.warning(self, current_text("network.packet.title"), message)
+            QMessageBox.warning(self, "Packet Intelligence", message)
         run_background(analyze, completed, failed)
 
     def process_snapshot(self) -> None:
@@ -556,10 +608,10 @@ class NetworkAnalysisActionsMixin:
             rows = value
             self.processes.setEnabled(True)
             self.overview.setPlainText(json.dumps(rows[:1000], ensure_ascii=False, indent=2))
-            self.statusMessage.emit(current_text("network.process.snapshot").format(count=f"{len(rows):,}"))
+            self.statusMessage.emit(f"进程连接快照：{len(rows):,} connections")
 
         def failed(message: str) -> None:
             self.processes.setEnabled(True)
-            QMessageBox.warning(self, current_text("network.process.failed_title"), message)
+            QMessageBox.warning(self, "进程监控失败", message)
 
         run_background(ProcessNetworkMonitor().snapshot, completed, failed)

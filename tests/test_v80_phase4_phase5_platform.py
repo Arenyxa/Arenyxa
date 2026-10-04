@@ -71,6 +71,17 @@ class _Queue:
         return 2
 
     @staticmethod
+    def retain_terminal_jobs():
+        return {
+            "jobs_pruned": 3,
+            "idempotent_tombstones_pruned": 1,
+            "jobs_remaining": 7,
+            "idempotent_tombstones_remaining": 8,
+            "non_idempotent_tombstones_remaining": 2,
+            "pruning_disabled": False,
+        }
+
+    @staticmethod
     def health():
         return {"backend": "test", "healthy": True}
 
@@ -150,7 +161,10 @@ def test_phase4_enterprise_control_plane_is_real_bounded_and_does_not_leak_servi
     assert server.drains == [("worker-1", True)]
     assert control.worker_revoke("worker-1")["recovered_jobs"] == 3
     assert control.retry_review_required("job-1")["state"] == "queued"
-    assert control.recover_expired_leases()["recovered_leases"] == 2
+    recovery = control.recover_expired_leases()
+    assert recovery["recovered_leases"] == 2
+    assert recovery["retention_maintenance"]["jobs_pruned"] == 3
+    assert recovery["retention_maintenance"]["non_idempotent_tombstones_remaining"] == 2
     started = control.server_authority_start(ttl_seconds=600)
     assert "super-secret-enterprise-service-lease" not in json.dumps(started)
     assert started["lease_fingerprint"] == hashlib.sha256(b"super-secret-enterprise-service-lease").hexdigest()

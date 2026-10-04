@@ -44,7 +44,6 @@ from arenyxa.domain.enums import CaptureSource, MotionIntent
 from arenyxa.domain.models import MotionProfile
 from arenyxa.presentation.background import begin_background_shutdown, run_background
 from arenyxa.presentation.glass import GlassPanel
-from arenyxa.presentation.i18n_runtime import current_text
 from arenyxa.presentation.language import LanguageManager
 from arenyxa.presentation.launch_geometry import LaunchGeometryPlan
 from arenyxa.presentation.motion import MotionOrchestrator
@@ -90,9 +89,9 @@ class MainWindowOperationsMixin:
         generation = self._status_generation
                                                                                   
         lowered = message.casefold()
-        if any(token in message for token in ("\u5931\u8d25", "\u9519\u8bef")) or any(token in lowered for token in ("failed", "error")):
+        if any(token in message for token in ("失败", "错误")) or any(token in lowered for token in ("failed", "error")):
             self.motion.emphasize(self.status_text, MotionIntent.ERROR)
-        elif any(token in message for token in ("\u5b8c\u6210", "\u6210\u529f")) or any(token in lowered for token in ("completed", "success")):
+        elif any(token in message for token in ("完成", "成功")) or any(token in lowered for token in ("completed", "success")):
             self.motion.emphasize(self.status_text, MotionIntent.SUCCESS)
 
         def clear_if_current() -> None:
@@ -113,11 +112,14 @@ class MainWindowOperationsMixin:
         handles = self.context.runner.active_handles()
         capture = self.context.capture.session
         capture_text = capture.state.value if capture else "idle"
-        frame = self.motion.profiler.snapshot()
-        self.worker_status.setText(
-            f"{len(handles)} background · capture {capture_text} · DB ready · "
-            f"{self.motion.refresh_hz:.0f}Hz · {self.motion.effective_quality()} · p95 {float(frame['p95_ms']):.1f}ms"
-        )
+        if is_general_user(self.context.settings):
+            self.worker_status.setText(f"{len(handles)} background · capture {capture_text} · DB ready")
+        else:
+            frame = self.motion.profiler.snapshot()
+            self.worker_status.setText(
+                f"{len(handles)} background · capture {capture_text} · DB ready · "
+                f"{self.motion.refresh_hz:.0f}Hz · {self.motion.effective_quality()} · p95 {float(frame['p95_ms']):.1f}ms"
+            )
         active = [handle for handle in handles if not handle.future.done()]
         if active:
             completed = sum(max(0, int(handle.run.completed_units)) for handle in active)
@@ -241,7 +243,7 @@ class MainWindowOperationsMixin:
             return
         workflow = GeneralUserIntentRouter().resolve(text)
         if workflow is not None:
-            self.show_status(current_text("shell.simple.recognized").format(title=current_text(f"task_center.workflow.{workflow.id}.title")))
+            self.show_status(f"简单模式已识别：{workflow.title}")
 
     def _general_user_task_center(self) -> TaskCenterPage | None:
         try:
@@ -258,7 +260,7 @@ class MainWindowOperationsMixin:
             if index >= 0:
                 page.source.setCurrentIndex(index)
             backend = "Arenyxa Native" if not caps["packet.deep"].executable else "Native + TShark Deep"
-            self.show_status(current_text("shell.simple.pcap_ready").format(backend=backend))
+            self.show_status(f"PCAP 分析已准备 · {backend}")
             QTimer.singleShot(0, page.start_capture)
 
     def _simple_prepare_capture(self, caps: dict[str, Any], task_center: TaskCenterPage | None) -> None:
@@ -268,19 +270,19 @@ class MainWindowOperationsMixin:
             return
         source = CaptureSource.SYSTEM if caps["capture.system"].state in {"ready", "degraded"} else CaptureSource.BROWSER
         if source is CaptureSource.BROWSER and caps["browser.automation"].state == "unavailable":
-            self.show_status(current_text("shell.simple.capture_unavailable"))
+            self.show_status("实时抓包组件不可用；仍可使用 PCAP/HAR 离线分析。")
             if task_center:
-                task_center.show_result(current_text("task_center.capability.title"), {key: value.snapshot() for key, value in caps.items()})
+                task_center.show_result("运行能力", {key: value.snapshot() for key, value in caps.items()})
             return
         index = page.source.findData(source)
         if index >= 0:
             page.source.setCurrentIndex(index)
-        self.show_status(current_text("shell.simple.capture_selected"))
+        self.show_status("已自动选择当前可用的捕获方式；点击开始即可继续。")
 
     def _simple_security_check(self, task_center: TaskCenterPage | None) -> None:
         captures = self.context.store.list_captures(limit=1)
         if not captures:
-            self.show_status(current_text("shell.simple.no_traffic"))
+            self.show_status("还没有可分析的流量；请先抓包或导入 PCAP/HAR。")
             return
         session_id = str(captures[0].get("id") or "")
         rows = list(self.context.store.iter_network_events(session_id, 50_000))
@@ -291,27 +293,27 @@ class MainWindowOperationsMixin:
             try:
                 payload["threat_intelligence"] = pipeline.analyze_events(session_id, rows, limit=50_000)
             except (RuntimeError, TypeError, ValueError, OSError) as exc:
-                payload["intelligence_note"] = current_text("shell.simple.intelligence_incomplete").format(error=type(exc).__name__)
+                payload["intelligence_note"] = f"高级关联分析未完成：{type(exc).__name__}"
         self.navigate("task_center")
         if task_center:
             task_center.show_result("Security Check", payload)
-        self.show_status(current_text("shell.simple.security_complete").format(risk=summary.risk, score=summary.score))
+        self.show_status(f"安全检查完成 · Risk {summary.risk} · Score {summary.score}/100")
 
     def _simple_network_diagnose(self, caps: dict[str, Any], task_center: TaskCenterPage | None) -> None:
         payload = {
             "capabilities": {key: value.snapshot() for key, value in caps.items()},
             "capture_session": getattr(getattr(self.context, "capture", None), "session", None),
-            "recommendation": current_text("shell.simple.network_recommendation"),
+            "recommendation": "优先使用 Arenyxa native PCAP analysis；实时系统抓包、浏览器自动化和高级 MITM 才需要对应可选运行时。",
         }
         self.navigate("task_center")
         if task_center:
             task_center.show_result("Network Diagnosis", payload)
-        self.show_status(current_text("shell.simple.network_diagnosis_complete"))
+        self.show_status("网络诊断完成")
 
     def run_general_user_workflow(self, workflow_id: str) -> None:
         """Run a task-oriented workflow only for the Personal/Simple profile."""
         if not is_general_user(self.context.settings):
-            self.show_status(current_text("shell.simple.guided_only"))
+            self.show_status("Guided Workflow 仅用于一般用户 · 简单模式。")
             return
         try:
             workflow = GeneralUserIntentRouter().get(workflow_id)
@@ -330,7 +332,7 @@ class MainWindowOperationsMixin:
             self._simple_security_check(task_center)
             return
         if workflow.auto_action == "open_project":
-            path, _ = QFileDialog.getOpenFileName(self, current_text("shell.project.open_title"), "", current_text("shell.project.filter"))
+            path, _ = QFileDialog.getOpenFileName(self, "打开 Arenyxa 项目", "", "Arenyxa Project (*.arenyxa *.zip);;All Files (*)")
             if path:
                 self.open_project(Path(path))
             return
@@ -340,14 +342,14 @@ class MainWindowOperationsMixin:
         route = {"open_api": "network", "open_extraction": "tasks"}.get(workflow.auto_action, workflow.page_id)
         if self._page_allowed(route):
             self.navigate(route)
-            self.show_status(current_text("shell.simple.entry_opened").format(title=current_text(f"task_center.workflow.{workflow.id}.title")))
+            self.show_status(f"{workflow.title} · 已打开简化入口")
         else:
             self.navigate("task_center")
             if task_center:
                 task_center.show_result(workflow.title, {
                     "steps": list(workflow.steps), "note": workflow.fallback_note,
                     "advanced_workbench": workflow.page_id,
-                    "message": current_text("shell.simple.advanced_hidden")})
+                    "message": "简单模式隐藏高级工作台；切换到 Professional Profile 后可访问完整控制面。"})
 
     def _run_diagnostics_command(self) -> None:
         page = self._ensure_page("settings")
@@ -361,21 +363,55 @@ class MainWindowOperationsMixin:
     def request_repair_exit(self) -> None:
         
         self._repair_exit_requested = True
-        self.close()
+        if self.close() is not False:
+            shell_close = getattr(self, "shellCloseRequested", None)
+            if shell_close is not None:
+                shell_close.emit()
+
+    def _repair_preparation_failed(self) -> None:
+        self.context.mark_repair_shutdown_failed()
+        self.setEnabled(False)
+        self.show_status("修复接管未完成，运行时已停止接收新任务。")
+        self.request_repair_exit()
+
+    def prepare_for_repair_shutdown(self) -> bool:
+        try:
+            context_ready = self.context.prepare_for_repair_shutdown(timeout=8.0)
+            background_ready = begin_background_shutdown(timeout_ms=2500)
+            if context_ready and background_ready:
+                return True
+        except Exception:
+            LOGGER.exception("Repair preparation failed")
+        self._repair_preparation_failed()
+        return False
+
+    def handoff_repair(self, plan_path: Path) -> bool:
+        from arenyxa import repair as repair_module
+
+        if not self.prepare_for_repair_shutdown():
+            return False
+        try:
+            repair_module.launch_repair_worker(plan_path)
+        except Exception:
+            self._repair_preparation_failed()
+            raise
+        self.context.mark_repair_handoff_committed()
+        self.request_repair_exit()
+        return True
 
     def launch_repair_center(self) -> None:
         from arenyxa.presentation.repair_dialog import RepairSelectionDialog
-        from arenyxa.repair import StartupHealthScanner, create_repair_plan, installation_root, launch_repair_worker
+        from arenyxa.repair import StartupHealthScanner, create_repair_plan, installation_root
 
         if self._repair_scan_in_progress:
-            self.show_status(current_text("shell.repair.scanning"))
+            self.show_status("Repair Center 正在后台检查安装与运行状态…")
             return
 
                                                                                        
                                                                                          
                                                
         self._repair_scan_in_progress = True
-        self.show_status(current_text("shell.repair.scanning"))
+        self.show_status("Repair Center 正在后台检查安装与运行状态…")
 
         def worker() -> object:
             from arenyxa.repair import append_feature_integration_findings
@@ -392,18 +428,18 @@ class MainWindowOperationsMixin:
             try:
                 selector = RepairSelectionDialog(report, self.language.locale, self)
                 if selector.exec() != selector.DialogCode.Accepted:
-                    self.show_status(current_text("shell.repair.cancelled"))
+                    self.show_status("Repair Center 已取消")
                     return
                 active = self.context.runner.active_handles()
                 if active:
                     choice = QMessageBox.question(
                         self,
                         "Repair Center",
-                        current_text("shell.repair.active_tasks").format(count=len(active)),
+                        f"仍有 {len(active)} 个后台任务。执行修复将停止任务并退出 Arenyxa。继续？",
                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
                     )
                     if choice != QMessageBox.StandardButton.Yes:
-                        self.show_status(current_text("shell.repair.cancelled_keep_running"))
+                        self.show_status("Repair Center 已取消；后台任务保持运行")
                         return
                     self.context.runner.cancel_all()
                 plan_path = create_repair_plan(
@@ -413,16 +449,15 @@ class MainWindowOperationsMixin:
                     parent_pid=__import__("os").getpid(),
                     relaunch=True,
                 )
-                launch_repair_worker(plan_path)
+                self.handoff_repair(plan_path)
             except Exception as exc:                                                                   
                 QMessageBox.critical(self, "Repair Center", str(exc))
                 return
-            self.request_repair_exit()
 
         def failed(message: str) -> None:
             self._repair_scan_in_progress = False
             QMessageBox.critical(self, "Repair Center", message)
-            self.show_status(current_text("shell.repair.failed"))
+            self.show_status("Repair Center 诊断失败")
 
                                                                                             
         run_background(worker, completed, failed)
@@ -439,26 +474,13 @@ class MainWindowOperationsMixin:
         self.runnerProgress.emit()
 
     def run_selected_task(self) -> None:
-        tasks = self.context.store.list_tasks(limit=1)
-        if not tasks:
+        page = self.pages.get("tasks")
+        task = page.selected_task() if isinstance(page, TasksPage) else None
+        if task is None:
             self.navigate("tasks")
-            self.show_status(current_text("shell.tasks.create_first"))
+            self.show_status("请先选择要运行的任务")
             return
-        try:
-            handle = self.context.runner.submit(
-                tasks[0], lambda _run: self._emit_runner_progress()
-            )
-            self.context.nextgen.activity.publish("run", f"Started {tasks[0].name}", details={"run_id": handle.run.id, "task_id": tasks[0].id})
-            handle.future.add_done_callback(
-                WeakMethodFutureCallback(
-                    self,
-                    "_publish_main_run_completion",
-                    prefix=(handle.run, tasks[0].name),
-                )
-            )
-            self.show_status(current_text("shell.tasks.started").format(name=tasks[0].name, run_id=handle.run.id))
-        except Exception as exc:                                          
-            QMessageBox.warning(self, current_text("shell.tasks.run_failed_title"), str(exc))
+        page.run_task(task, False)
 
     def _publish_main_run_completion(self, run: Any, task_name: str, _future: Any) -> None:
         level = (
@@ -485,13 +507,13 @@ class MainWindowOperationsMixin:
                 handle.resume()
             else:
                 handle.pause()
-        self.show_status(current_text("shell.tasks.pause_resume_updated"))
+        self.show_status("活动任务暂停/恢复状态已更新")
 
     def stop_active(self) -> None:
         self.context.runner.cancel_all()
-        self.show_status(current_text("shell.tasks.cancel_requested"))
+        self.show_status("已请求协作式取消所有活动任务")
 
     def open_data_folder(self) -> None:
         target = QUrl.fromLocalFile(str(self.context.paths.root.resolve()))
         if not QDesktopServices.openUrl(target):
-            QMessageBox.warning(self, current_text("shell.data_folder.open_failed_title"), str(self.context.paths.root))
+            QMessageBox.warning(self, "无法打开文件夹", str(self.context.paths.root))

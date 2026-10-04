@@ -7,6 +7,7 @@ from typing import Any
 
 from arenyxa.compat import UTC, StrEnum, dataclass
 from arenyxa.domain.models import new_id
+from arenyxa.domain.errors import ArenyxaError
 
 
 class TrustDomain(StrEnum):
@@ -120,13 +121,17 @@ class SecurityState:
 
     def disable_identity(self, identity_id: str) -> None:
         with self._lock:
-            identity = self._identities[str(identity_id)]
+            identity = self._identities.get(str(identity_id))
+            if identity is None:
+                raise ArenyxaError("IDENTITY_INVALID", "identity is missing", domain="SECURITY")
             identity.enabled = False
             identity.generation += 1
 
     def bump_identity_generation(self, identity_id: str) -> int:
         with self._lock:
-            identity = self._identities[str(identity_id)]
+            identity = self._identities.get(str(identity_id))
+            if identity is None:
+                raise ArenyxaError("IDENTITY_INVALID", "identity is missing", domain="SECURITY")
             identity.generation += 1
             return identity.generation
 
@@ -147,7 +152,9 @@ class SecurityState:
 
     def revoke_device(self, device_id: str) -> None:
         with self._lock:
-            device = self._devices[str(device_id)]
+            device = self._devices.get(str(device_id))
+            if device is None:
+                raise ArenyxaError("DEVICE_INVALID", "device is missing", domain="SECURITY")
             device.revoked = True
             device.generation += 1
 

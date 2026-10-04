@@ -1,0 +1,27 @@
+Arenyxa v7.0 Windows build-gate hotfix
+=====================================
+
+Issue
+-----
+The release-blocking test
+`test_plugin_output_budget_is_enforced_while_child_is_running` used a 64 MiB
+plugin-process memory budget while attempting to isolate the 1 KiB stdout/stderr
+budget. On some Windows CPython builds, the Windows Job Object can enforce that
+independent memory ceiling before the worker reaches the intended output-limit
+path. The release gate then reports PLUGIN_EXECUTION_FAILED instead of the
+expected PLUGIN_BUDGET_EXCEEDED.
+
+Resolution
+----------
+The test now uses the production-like 256 MiB memory allowance while retaining
+the 1 KiB output limit. This makes the test deterministic across supported
+Windows/Linux validation environments and keeps the test focused on the output
+budget it is intended to verify. Production PluginSandbox behavior and default
+budgets are unchanged.
+
+Validation
+----------
+- targeted output-budget test: PASS
+- complete test_deep_runtime_resilience.py: PASS (32 tests)
+- v7.0 product/package/installer identity remains unchanged
+- startup animation sources unchanged

@@ -207,14 +207,23 @@ class TrafficAutomationEngine:
             self._rules = [rule for rule in self._rules if rule.id != str(rule_id)]
             changed = before != len(self._rules)
             if changed:
+                self._clear_execution_state(str(rule_id))
                 self._save()
             return changed
+
+    def _clear_execution_state(self, rule_id: str) -> None:
+        for state in (self._execution_windows, self._last_executed, self._success_count, self._failure_count):
+            state.pop(rule_id, None)
+
+    def _current_rule(self, rule: TrafficAutomationRule) -> bool:
+        return any(current is rule for current in self._rules)
 
     def set_enabled(self, rule_id: str, enabled: bool) -> bool:
         with self._lock:
             for index, rule in enumerate(self._rules):
                 if rule.id == str(rule_id):
                     self._rules[index] = replace(rule, enabled=bool(enabled))
+                    self._clear_execution_state(rule.id)
                     self._save()
                     return True
         return False
@@ -253,6 +262,7 @@ class TrafficAutomationEngine:
                 candidate = replace(rule, **normalized)
                 candidate.validate()
                 self._rules[index] = candidate
+                self._clear_execution_state(rule.id)
                 self._save()
                 return candidate.snapshot()
         return None
@@ -290,6 +300,8 @@ class TrafficAutomationEngine:
 
     def _reserve_execution(self, rule: TrafficAutomationRule, now: float) -> tuple[bool, str]:
         with self._lock:
+            if not self._current_rule(rule):
+                return False, "retired"
             last = self._last_executed.get(rule.id)
             if last is not None and rule.cooldown_seconds > 0 and now - last < rule.cooldown_seconds:
                 return False, "cooldown"
@@ -326,10 +338,14 @@ class TrafficAutomationEngine:
 
             stop_event = False
             for action in rule.actions:
+                with self._lock:
+                    if not self._current_rule(rule):
+                        break
                 callback = callbacks.get(action)
                 if callback is None:
                     with self._lock:
-                        self._failure_count[rule.id] = self._failure_count.get(rule.id, 0) + 1
+                        if self._current_rule(rule):
+                            self._failure_count[rule.id] = self._failure_count.get(rule.id, 0) + 1
                     results.append({
                         "rule_id": rule.id,
                         "action": action.value,
@@ -343,7 +359,8 @@ class TrafficAutomationEngine:
                 try:
                     value = callback(payload, rule.parameters)
                     with self._lock:
-                        self._success_count[rule.id] = self._success_count.get(rule.id, 0) + 1
+                        if self._current_rule(rule):
+                            self._success_count[rule.id] = self._success_count.get(rule.id, 0) + 1
                     results.append({
                         "rule_id": rule.id,
                         "action": action.value,
@@ -352,7 +369,8 @@ class TrafficAutomationEngine:
                     })
                 except Exception as exc:
                     with self._lock:
-                        self._failure_count[rule.id] = self._failure_count.get(rule.id, 0) + 1
+                        if self._current_rule(rule):
+                            self._failure_count[rule.id] = self._failure_count.get(rule.id, 0) + 1
                     LOGGER.exception(
                         "Traffic automation action %s failed for rule %s",
                         action.value,

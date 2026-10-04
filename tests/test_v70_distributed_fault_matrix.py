@@ -98,12 +98,13 @@ def test_postgresql_fast_path_hooks_short_circuit_portable_fallback(tmp_path: Pa
     lease_queue = _queue(tmp_path / "lease", workers=1)
     lease_job = _job(lease_queue, "fast-lease")
     lease_sql = (
-        "UPDATE distributed_jobs SET state='leased',attempt=attempt+1 "
-        "WHERE state='queued' " + " AND ? IS NOT NULL" * 13 + " RETURNING *"
+        "UPDATE distributed_jobs SET state='leased',attempt=attempt+1,lease_expires_at=12345 "
+        "WHERE state='queued' " + " AND ? IS NOT NULL" * 11 + " RETURNING *"
     )
     monkeypatch.setattr(lease_queue._storage, "lease_next_fast_sql", lambda: lease_sql)
     lease = lease_queue.lease_next("worker-0")
     assert lease is not None and lease.job_id == lease_job
+    assert lease.lease_expires_at == 12345
 
     queue = _queue(tmp_path / "start-complete", workers=1)
     job = _job(queue, "fast-start-complete")
@@ -111,11 +112,11 @@ def test_postgresql_fast_path_hooks_short_circuit_portable_fallback(tmp_path: Pa
     assert normal_lease is not None
     start_sql = (
         "UPDATE distributed_jobs SET state='running' "
-        "WHERE job_id=? AND state='leased' " + " AND ? IS NOT NULL" * 9 + " RETURNING job_id"
+        "WHERE ? IS NOT NULL AND job_id=? AND state='leased' " + " AND ? IS NOT NULL" * 7 + " RETURNING job_id"
     )
     complete_sql = (
         "UPDATE distributed_jobs SET state='completed' "
-        "WHERE job_id=? AND state='running' " + " AND ? IS NOT NULL" * 17 + " RETURNING state"
+        "WHERE ? IS NOT NULL AND job_id=? AND state='running' " + " AND ? IS NOT NULL" * 14 + " RETURNING state"
     )
     monkeypatch.setattr(queue._storage, "start_job_fast_sql", lambda: start_sql)
     monkeypatch.setattr(queue._storage, "complete_fast_sql", lambda: complete_sql)

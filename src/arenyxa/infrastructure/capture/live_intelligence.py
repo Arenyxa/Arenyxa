@@ -78,6 +78,12 @@ class LiveIntelligencePipeline:
             rows = tuple(self._alerts.get(str(session_id), ()))
         return [item.snapshot() for item in rows[-bounded:]]
 
+    def retire_session(self, session_id: str) -> None:
+        """Release live aggregates after the capture writer has delivered its final batch."""
+        with self._lock:
+            for state in (self._alerts, self._event_counts, self._protocol_counts, self._host_counts, self._byte_counts):
+                state.pop(str(session_id), None)
+
     def analyze_events(self, session_id: str, events: Iterable[NetworkEvent | Mapping[str, Any]], *, limit: int = 100_000) -> dict[str, Any]:
         normalized: list[NetworkEvent] = []
         protocols: Counter[str] = Counter()
@@ -119,10 +125,10 @@ class LiveIntelligencePipeline:
                     "session_id": session_id,
                     "events": self._event_counts[session_id],
                     "bytes": self._byte_counts[session_id],
-                    "protocols": dict(self._protocol_counts[session_id].most_common()),
+                    "protocols": dict(self._protocol_counts.get(session_id, Counter()).most_common()),
                     "top_hosts": [
                         {"host": host, "events": count}
-                        for host, count in self._host_counts[session_id].most_common(20)
+                        for host, count in self._host_counts.get(session_id, Counter()).most_common(20)
                     ],
                     "alerts": len(self._alerts.get(session_id, ())),
                     "stream": self.stream.stats(),

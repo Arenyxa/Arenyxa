@@ -172,8 +172,11 @@ class CommandPlatformMixin:
             }
         if action == "repair":
             self._expect_count(args, 0, 0, "recovery repair")
-            result = service.recover()
-            return result.to_dict()
+            raise CommandRuntimeError(
+                "LIVE_RUNTIME_RECOVERY_FORBIDDEN",
+                "Runtime recovery requires exclusive ownership. Use Repair Center to stop the application safely first.",
+                exit_code=5,
+            )
         raise CommandRuntimeError("UNKNOWN_ACTION", f"Unknown recovery action: {action}")
 
     def _traffic_automation_engine(self) -> TrafficAutomationEngine:

@@ -1,0 +1,26 @@
+{
+  "schema": "arenyxa.phase6-gate/v1",
+  "overall": "PASS WITH LIMITATIONS",
+  "production_source_modified": false,
+  "host": {"vcpu": 2, "ram_gib": 1.9, "os": "linux"},
+  "gates": {
+    "6A_postgresql_official_64w_128c": "NOT AVAILABLE",
+    "6B_connection_ownership_production_api": "NOT APPLICABLE / DESIGN-ONLY",
+    "6C_known_bug_regression": "NEEDS REVALIDATION",
+    "6D_windows_runtime": "NOT AVAILABLE",
+    "6E_navigation_discoverability": "ARCHITECTURAL SUSPECT / NEEDS PRODUCT CONTRACT",
+    "6F_git_source_integrity": "NOT AVAILABLE"
+  },
+  "official_gate_script": "scripts/postgresql_64_worker_128_concurrency_gate.py",
+  "design_a_path": "artifacts/phase5_2/safe_facade.py",
+  "bugs": {
+    "BUG-DS-001": "NEEDS REVALIDATION",
+    "BUG-DS-002": "NEEDS REVALIDATION",
+    "BUG-DS-003": "NEEDS REVALIDATION",
+    "BUG-DS-004": "NEEDS REVALIDATION",
+    "BUG-DS-005": "NEEDS REVALIDATION",
+    "BUG-DS-006": "NEEDS REVALIDATION",
+    "BUG-DS-007": "NEEDS REVALIDATION",
+    "BUG-WIN-0001": "ARCHITECTURAL SUSPECT / NEEDS PRODUCT CONTRACT"
+  }
+}

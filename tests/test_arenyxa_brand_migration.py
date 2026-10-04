@@ -4,6 +4,8 @@ import struct
 import zipfile
 from pathlib import Path
 
+from scripts.build_source_manifest import iter_source_files
+
 from arenyxa import __version__
 from arenyxa.branding import APP_NAME, PROJECT_FORMAT
 from arenyxa.config import AppPaths
@@ -14,14 +16,10 @@ REMOVED_NAMESPACE = "n" + "exora"
 
 def test_removed_namespace_is_absent_from_source_paths_text_and_repair_archives() -> None:
     offenders: list[str] = []
-    for path in ROOT.rglob("*"):
-        if ".git" in path.parts:
-            continue
+    for path in iter_source_files(ROOT):
         relative = path.relative_to(ROOT).as_posix()
         if REMOVED_NAMESPACE in relative.casefold():
             offenders.append(relative)
-        if not path.is_file() or "__pycache__" in path.parts:
-            continue
         if path.suffix.casefold() == ".zip":
             try:
                 with zipfile.ZipFile(path) as archive:
@@ -33,7 +31,7 @@ def test_removed_namespace_is_absent_from_source_paths_text_and_repair_archives(
         if path.suffix.casefold() in {".png", ".ico", ".jpg", ".jpeg", ".webp", ".pyc", ".exe", ".dll"}:
             continue
         try:
-            text = path.read_text(encoding="utf-8")
+            text = path.read_text(encoding="utf-8-sig")
         except (UnicodeDecodeError, OSError):
             continue
         if REMOVED_NAMESPACE in text.casefold():

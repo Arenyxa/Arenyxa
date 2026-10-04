@@ -95,4 +95,3 @@ The main toolbar adds `◆ Blueprint`. Command Palette and System Tray gain Blue
 - inline-secret rejection;
 - deterministic Compatibility Lab baseline;
 - Reliability Advisor action ordering.
-

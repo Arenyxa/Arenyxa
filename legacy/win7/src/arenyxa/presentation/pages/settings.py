@@ -1184,4 +1184,3 @@ class AboutPage(WorkspacePage):
             return f"{binding_name()} {binding_version()}"
         except (ImportError, AttributeError):
             return "unknown"
-

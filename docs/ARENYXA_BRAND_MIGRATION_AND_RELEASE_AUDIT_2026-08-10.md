@@ -106,4 +106,3 @@ Linux 审查中的 Qt skip 不得描述成 Windows GUI 已验证。
 ## 10. 最终完整回归
 
 源码冻结阶段再次以单一 pytest 进程执行完整收集集，最终结果为 **377 passed、6 skipped、0 failed，40.39 秒**。测试进程自然退出，退出后没有残留 pytest/Arenyxa 子进程。6 个 skip 均来自当前环境没有受支持 Qt binding 的 GUI/visual smoke。
-

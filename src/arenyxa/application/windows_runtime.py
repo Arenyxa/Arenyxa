@@ -27,6 +27,8 @@ def _bounded_process(argv: list[str], *, timeout: float = 5.0) -> dict[str, Any]
             validated_argv(argv),
             capture_output=True,
             text=True,
+            encoding="mbcs" if os.name == "nt" else "utf-8",
+            errors="replace",
             timeout=max(0.5, min(30.0, float(timeout))),
             check=False,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0,

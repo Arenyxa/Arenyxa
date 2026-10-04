@@ -48,21 +48,20 @@ from arenyxa.infrastructure.capture.professional import ProfessionalAnalysisSuit
 from arenyxa.infrastructure.capture.packet_analysis import PacketAnalysisEngine
 from arenyxa.presentation.background import run_background
 from arenyxa.presentation.packet_intelligence_workbench import PacketIntelligenceWorkbenchDialog
-from arenyxa.presentation.i18n_runtime import current_text, source_text
 from arenyxa.presentation.language import literal_for_locale
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.widgets import PageHeader, connect_current_row_changed, set_table_header_stretch_last
 
 class NetworkEventModel(QAbstractTableModel):
-    column_keys: ClassVar[list[str]] = [
-        "network.table.time",
-        "network.table.method",
-        "network.table.status",
-        "network.table.protocol",
-        "network.table.host",
-        "network.table.path",
-        "network.table.size",
-        "network.table.duration",
+    columns: ClassVar[list[str]] = [
+        "Time",
+        "Method",
+        "Status",
+        "Protocol",
+        "Host",
+        "Path",
+        "Size",
+        "Duration",
     ]
 
     def __init__(self, max_rows: int = 20_000) -> None:
@@ -74,11 +73,11 @@ class NetworkEventModel(QAbstractTableModel):
         return 0 if parent.isValid() else len(self.events)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return 0 if parent.isValid() else len(self.column_keys)
+        return 0 if parent.isValid() else len(self.columns)
 
     def headerData(self, section: int, orientation: Any, role: Any = Qt.ItemDataRole.DisplayRole) -> Any:
         if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
-            return current_text(self.column_keys[section])
+            return self.columns[section]
         return super().headerData(section, orientation, role)
 
     def data(self, index: QModelIndex, role: Any = Qt.ItemDataRole.DisplayRole) -> Any:
@@ -153,7 +152,7 @@ class WaterfallWidget(QWidget):
             painter.setPen(QColor(tokens.text_muted))
             app = QApplication.instance()
             locale = str(app.property("arenyxa_locale") or "zh_CN") if app is not None else "zh_CN"
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, current_text("network.waterfall.waiting"))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, literal_for_locale("等待网络事件", locale))
             return
         durations = [
             max(
@@ -183,49 +182,27 @@ class NetworkPage(NetworkCaptureActionsMixin, NetworkAnalysisActionsMixin, Works
         layout = page_layout(self)
         header = QHBoxLayout()
         header.addWidget(
-            PageHeader(
-                source_text("network.page.title"),
-                source_text("network.page.subtitle"),
-                title_key="network.page.title",
-                subtitle_key="network.page.subtitle",
-            ), 1
+            PageHeader("Network Analysis", "Browser Capture / Packet Capture / HAR / Replay / TLS / DNS"), 1
         )
         self.simple_mode = is_general_user(context.settings)
         self.source = QComboBox()
-        source_items = (
-            ("network.source.browser", CaptureSource.BROWSER),
-            (
-                "network.source.system_simple" if self.simple_mode else "network.source.system",
-                CaptureSource.SYSTEM,
-            ),
-            ("network.source.har", CaptureSource.HAR_IMPORT),
-            (
-                "network.source.pcap_simple" if self.simple_mode else "network.source.pcap",
-                CaptureSource.PCAP_IMPORT,
-            ),
-        )
-        for index, (key, value) in enumerate(source_items):
-            self.source.addItem(source_text(key), value)
-            self.source.setProperty(f"i18n_item_key_{index}", key)
+        self.source.addItem("Browser Capture", CaptureSource.BROWSER)
+        self.source.addItem("System Capture" if self.simple_mode else "System Packet (tshark)", CaptureSource.SYSTEM)
+        self.source.addItem("Import HAR", CaptureSource.HAR_IMPORT)
+        self.source.addItem("Analyze PCAP / PCAPNG" if self.simple_mode else "Import PCAP / PCAPNG", CaptureSource.PCAP_IMPORT)
         self.filter = QLineEdit()
-        self.filter.setPlaceholderText(source_text("network.filter.placeholder"))
-        self.filter.setProperty("i18n_key_placeholder", "network.filter.placeholder")
+        self.filter.setPlaceholderText('http.host endsWith ".example.com" && http.status >= 400')
         self.filter.setMinimumWidth(250)
         self.capture_filter = QLineEdit()
-        self.capture_filter.setPlaceholderText(source_text("network.capture_filter.placeholder"))
-        self.capture_filter.setProperty("i18n_key_placeholder", "network.capture_filter.placeholder")
+        self.capture_filter.setPlaceholderText("Capture filter (BPF): tcp port 443")
         self.capture_filter.setMinimumWidth(210)
-        self.start_button = QPushButton(source_text("network.action.start"))
-        self.start_button.setProperty("i18n_key_text", "network.action.start")
+        self.start_button = QPushButton("开始捕获")
         self.start_button.setProperty("primary", True)
-        self.pause_button = QPushButton(source_text("network.action.pause"))
-        self.pause_button.setProperty("i18n_key_text", "network.action.pause")
+        self.pause_button = QPushButton("暂停")
         self.pause_button.setEnabled(False)
-        self.stop_button = QPushButton(source_text("network.action.stop"))
-        self.stop_button.setProperty("i18n_key_text", "network.action.stop")
+        self.stop_button = QPushButton("停止")
         self.stop_button.setEnabled(False)
-        self.simple_advanced_button = QPushButton(source_text("network.action.advanced"))
-        self.simple_advanced_button.setProperty("i18n_key_text", "network.action.advanced")
+        self.simple_advanced_button = QPushButton("高级选项")
         self.simple_advanced_button.setCheckable(True)
         self.simple_advanced_button.setVisible(self.simple_mode)
         header.addWidget(self.source)
@@ -272,40 +249,24 @@ class NetworkPage(NetworkCaptureActionsMixin, NetworkAnalysisActionsMixin, Works
         self.professional_view.setReadOnly(True)
         self.intelligence_view = QPlainTextEdit()
         self.intelligence_view.setReadOnly(True)
-        inspector.addTab(self.overview, source_text("network.tab.overview"))
-        inspector.addTab(self.headers_view, source_text("network.tab.headers"))
-        inspector.addTab(self.timing_view, source_text("network.tab.timing"))
-        inspector.addTab(self.protocol_view, source_text("network.tab.protocol"))
-        inspector.addTab(self.professional_view, source_text("network.tab.professional"))
-        inspector.addTab(self.intelligence_view, source_text("network.tab.intelligence"))
-        for index, key in enumerate((
-            "network.tab.overview",
-            "network.tab.headers",
-            "network.tab.timing",
-            "network.tab.protocol",
-            "network.tab.professional",
-            "network.tab.intelligence",
-        )):
-            inspector.setProperty(f"i18n_tab_key_{index}", key)
+        inspector.addTab(self.overview, "Overview")
+        inspector.addTab(self.headers_view, "Headers")
+        inspector.addTab(self.timing_view, "Timing")
+        inspector.addTab(self.protocol_view, "TLS / DNS")
+        inspector.addTab(self.professional_view, "Professional")
+        inspector.addTab(self.intelligence_view, "Live Intelligence")
         splitter.addWidget(inspector)
         splitter.setSizes([210, 760, 340])
         layout.addWidget(splitter, 1)
 
         actions = QHBoxLayout()
-        self.replay = QPushButton(source_text("network.action.replay"))
-        self.replay.setProperty("i18n_key_text", "network.action.replay")
-        self.tls = QPushButton(source_text("network.action.tls"))
-        self.tls.setProperty("i18n_key_text", "network.action.tls")
-        self.dns = QPushButton(source_text("network.action.dns"))
-        self.dns.setProperty("i18n_key_text", "network.action.dns")
-        self.processes = QPushButton(source_text("network.action.process"))
-        self.processes.setProperty("i18n_key_text", "network.action.process")
-        self.professional = QPushButton(source_text("network.action.professional"))
-        self.professional.setProperty("i18n_key_text", "network.action.professional")
-        self.packet_analysis = QPushButton(source_text("network.action.packet_intelligence"))
-        self.packet_analysis.setProperty("i18n_key_text", "network.action.packet_intelligence")
-        self.packet_analytics = QPushButton(source_text("network.action.advanced_analytics"))
-        self.packet_analytics.setProperty("i18n_key_text", "network.action.advanced_analytics")
+        self.replay = QPushButton("Request Replay")
+        self.tls = QPushButton("TLS Inspector")
+        self.dns = QPushButton("DNS Analyzer")
+        self.processes = QPushButton("Process Monitor")
+        self.professional = QPushButton("Professional Analysis")
+        self.packet_analysis = QPushButton("Packet Intelligence")
+        self.packet_analytics = QPushButton("Advanced Analytics")
         actions.addWidget(self.replay)
         actions.addWidget(self.tls)
         actions.addWidget(self.dns)
@@ -314,8 +275,7 @@ class NetworkPage(NetworkCaptureActionsMixin, NetworkAnalysisActionsMixin, Works
         actions.addWidget(self.packet_analysis)
         actions.addWidget(self.packet_analytics)
         actions.addStretch()
-        self.capture_status = QLabel(source_text("network.status.idle"))
-        self.capture_status.setProperty("i18n_key_text", "network.status.idle")
+        self.capture_status = QLabel("IDLE · 0 events · 0 B · Dropped 0 · 权限未要求")
         self.capture_status.setProperty("muted", True)
         actions.addWidget(self.capture_status)
         layout.addLayout(actions)
@@ -358,7 +318,7 @@ class NetworkPage(NetworkCaptureActionsMixin, NetworkAnalysisActionsMixin, Works
         )
         for widget in advanced_widgets:
             widget.setVisible(bool(enabled))
-        self.simple_advanced_button.setText(current_text("network.action.collapse_advanced" if enabled else "network.action.advanced"))
+        self.simple_advanced_button.setText("收起高级选项" if enabled else "高级选项")
 
     def _simple_summary_payload(
         self, rows: list[dict[str, Any]], *, source: str, backend: str = "Arenyxa Native"
@@ -368,7 +328,7 @@ class NetworkPage(NetworkCaptureActionsMixin, NetworkAnalysisActionsMixin, Works
         payload.update({
             "source": source,
             "backend": backend,
-            "message": current_text("network.summary.message"),
+            "message": "结果为自动风险摘要；需要逐包/高级协议细节时可展开高级选项。",
         })
         return payload
 
@@ -380,33 +340,9 @@ class NetworkPage(NetworkCaptureActionsMixin, NetworkAnalysisActionsMixin, Works
         payload = self._simple_summary_payload(rows, source=source, backend=backend)
         self.overview.setPlainText(json.dumps(payload, ensure_ascii=False, indent=2, default=str))
         self.statusMessage.emit(
-            current_text("network.summary.completed").format(
-                risk=payload["risk"],
-                score=payload["score"],
-                count=f"{payload['event_count']:,}",
-            )
+            f"分析完成 · Risk {payload['risk']} · Score {payload['score']}/100 · "
+            f"{payload['event_count']:,} events"
         )
-
-    def refresh_localized_previews(self) -> None:
-        if self.model.columnCount() > 0:
-            self.model.headerDataChanged.emit(
-                Qt.Orientation.Horizontal,
-                0,
-                self.model.columnCount() - 1,
-            )
-        self.waterfall.update()
-        if self.simple_mode:
-            self.simple_advanced_button.setText(
-                current_text(
-                    "network.action.collapse_advanced"
-                    if self.simple_advanced_button.isChecked()
-                    else "network.action.advanced"
-                )
-            )
-        if self.context.capture.session is None:
-            self.capture_status.setText(current_text("network.status.idle"))
-        else:
-            self.update_status()
 
     def activated(self) -> None:
         self.refresh_sessions()

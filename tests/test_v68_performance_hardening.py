@@ -9,7 +9,7 @@ from pathlib import Path
 from arenyxa.application.runner import RunOrchestrator
 from arenyxa.domain.enums import RunStatus, TaskStatus
 from arenyxa.domain.models import FetchResponse, FieldSpec, RequestSpec, Run, Task
-from arenyxa.infrastructure import database as database_module
+from arenyxa.infrastructure import database_tasks as database_module
 from arenyxa.infrastructure.database import SQLiteStore
 from arenyxa.infrastructure.http_client import HttpFetcher
 

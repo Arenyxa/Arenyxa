@@ -134,10 +134,15 @@ def test_general_user_network_page_uses_progressive_disclosure_and_auto_summary(
 def test_simple_navigation_hides_disallowed_system_and_advanced_surfaces() -> None:
     root = Path(__file__).resolve().parents[1]
     source = (root / "src/arenyxa/presentation/main_window_navigation.py").read_text(encoding="utf-8")
-    assert "if simple:\n                button.setVisible(self._page_allowed(page_id))" in source
+    assert "if simple:\n                button.setVisible(page_id in allowed and page_id in simple_visible)" in source
     assert 'advanced_header.setVisible(not simple)' in source
-    assert '"server_ops"' not in source[source.index("simple_visible = {"):source.index("return page_id not in DEVELOPER_PAGE_IDS")]
-    assert '"enterprise"' not in source[source.index("simple_visible = {"):source.index("return page_id not in DEVELOPER_PAGE_IDS")]
+    import ast
+    tree = ast.parse(source)
+    simple_sets = [node.value for node in ast.walk(tree) if isinstance(node, ast.Assign)
+                   and any(isinstance(target, ast.Name) and target.id == "simple_visible" for target in node.targets)]
+    assert simple_sets
+    for node in simple_sets:
+        assert {"server_ops", "enterprise", "console"}.isdisjoint(ast.literal_eval(node))
 
 
 def test_simple_command_palette_returns_before_professional_shortcuts() -> None:

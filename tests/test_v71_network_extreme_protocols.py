@@ -130,7 +130,8 @@ def test_protocol_expert_reports_dns_error_and_tls_legacy_offer_without_false_ne
     assert weak == []  # the fixture offers only modern suites
 
 
-def test_packet_protocol_coverage_is_graded_and_native_deep_is_explicit() -> None:
+def test_packet_protocol_coverage_is_graded_and_native_deep_is_explicit(monkeypatch) -> None:
+    monkeypatch.setattr("arenyxa.infrastructure.capture.packet_analysis.shutil.which", lambda _name: None)
     from arenyxa.infrastructure.capture.packet_analysis import PacketAnalysisEngine
 
     coverage = PacketAnalysisEngine("").protocol_coverage()

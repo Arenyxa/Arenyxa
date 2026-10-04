@@ -261,12 +261,15 @@ def test_settings_and_personalization_are_separate_navigation_surfaces() -> None
 
 
 def test_startup_visual_implementation_matches_current_approved_baseline() -> None:
+    # Modern v8.1/v8.1.1/v8.2 and v8.1.1 ZIP agree; the old math hash was the legacy lane.
+    # Provenance: .release/evidence/approved_asset_source_comparison.json.
     import hashlib
 
     root = Path(__file__).resolve().parents[1]
     expected = {
         "src/arenyxa/presentation/startup_splash.py": "46141636071f7adedabbb8ddacc7faaa9381bfdbc059712a72a85ab6ebea0b33",
-        "src/arenyxa/presentation/startup_motion_math.py": "04488fec32a69741b93dcf5b5806108acc3f265f1ea7cdf2930552190bca77ae",
+        "src/arenyxa/presentation/startup_motion_math.py": "b351ae8df000056b6e0bc27f435136a8f9e2743eb2138171c719e4fa7230072f",
+        "legacy/win7/src/arenyxa/presentation/startup_motion_math.py": "04488fec32a69741b93dcf5b5806108acc3f265f1ea7cdf2930552190bca77ae",
     }
     for relative, digest in expected.items():
         assert hashlib.sha256((root / relative).read_bytes()).hexdigest() == digest

@@ -1,59 +1,24 @@
-# Arenyxa Versioning Policy
+# Arenyxa version identity
 
-Arenyxa uses separate **public release**, **internal engineering**, and **compatibility** version identities. They must not be treated as interchangeable.
+The current public identity is **v0.1**, package **0.1.0**, Windows PE **0.1.0.0**. This is the **public source release** and remains **community unsigned**. `RELEASE_IDENTITY.json` is the machine-readable identity record; source publication does not imply Authenticode or release-attestation signatures, nor independent clean-machine installer qualification.
 
-## Public release version
+| Identity | Value | Meaning |
+| --- | --- | --- |
+| Public display / `__version__` / `__display_version__` | `0.1` | Desktop, CLI and product label |
+| Python package / distribution | `0.1.0` | PEP 440 package, product manifests and exports |
+| Windows numeric file/product tuple | `0.1.0.0` / `(0,1,0,0)` | PE version metadata |
+| Engineering baseline / internal version | `v8.2.0` / `8.2.0` | Retained implementation provenance |
+| Engineering phase | `8` | Retained internal phase identifier |
+| Runtime/plugin compatibility identity | `6.8.0` | Independent compatibility negotiation; not a product display label |
+| Enterprise protocol | Current `2`, minimum `1` | Independent N/N-1 protocol contract |
+| Schema and fixture revisions | Existing values | Each migration/settings/workflow/artifact schema keeps its own contract |
 
-The GitHub release line starts at **v0.1**.
+Modern and legacy package metadata share the public identity. The legacy runtime remains **NOT TESTED** for this candidate; it does not gain modern feature parity through this metadata update.
 
-| Surface | Current value |
-|---|---|
-| GitHub/public display version | `v0.1` |
-| Python package / PEP 440 version | `0.1.0` |
-| Windows product version | `0.1.0` |
-| Windows file version | `0.1.0.0` |
-| Installer label | `Arenyxa_v0.1_...` |
+Run `python scripts/verify_release_identity.py` with the supported environment to verify current source metadata. Historical verifier command names remain compatibility aliases for this current gate. A PASS covers source identity consistency only. It does not certify a PE built previously, authorize release promotion or validate a runtime. Release-status fields may only change with reviewed evidence and a corresponding update to their verification contract.
 
-Only public versions are used for GitHub releases, user-facing product version labels, installer names, package metadata, release attestations, and current release documentation.
+Do not globally replace `8.x`, `6.8.0`, migration numbers or protocol versions. Historical `V8_2_RELEASE_IDENTITY.json`, V8.x/Beta documents, audit dates, compatibility fixture manifests and hashes remain evidence for the inputs they originally described. Tests named after historical engineering phases may assert the current product facade; their filename alone is not a reason to keep a stale current-product assertion.
 
-## Internal engineering versions
+Installer AppId, application data names and file associations are retained. Moving the numeric product version from engineering 8.x to public 0.1 is not a proven in-place upgrade strategy. An older-engineering-version installation, a clean install, migration rollback and uninstall/data retention must be tested explicitly on suitable disposable Windows environments.
 
-The repository contains historical labels such as `v6.x`, `v7.x`, `v8.0`, `v8.1`, and `v8.2`.
-
-These labels are **internal engineering milestones** used while the architecture, compatibility boundaries, performance gates, security model, UI, packaging, and enterprise runtime were being developed. They are retained because they are useful provenance for tests, audit reports, migration records, and design history.
-
-They are **internal engineering identifiers**, not the public version sequence. Historical GitHub Release entries created before this policy are legacy development snapshots; new formal public releases must use the public `v0.x` line.
-
-The current internal engineering baseline is **v8.2.0**.
-
-Historical files may preserve wording such as "stable", "official", or "public" because those documents record the terminology used inside the engineering process at the time. In the current repository versioning model, those terms describe an internal promotion state unless the version is on the public `v0.x` release line.
-
-## Compatibility identities
-
-Compatibility versions are independent from the public product version.
-
-- Runtime/plugin compatibility identity: `6.8.0`
-- Enterprise protocol: current `2`, minimum `1`
-- Workflow schema: `arenyxa.workflow/v1`
-- Settings/schema migration numbers retain their existing values
-
-These values must not be reset to `0.1`. Changing them can affect plugin loading, persisted data, migrations, workers, or protocol negotiation.
-
-## Source constants
-
-The modern and legacy runtimes expose both namespaces:
-
-```python
-__version__ = "0.1"
-__package_version__ = "0.1.0"
-__display_version__ = "0.1"
-__distribution_version__ = "0.1.0"
-
-__engineering_build__ = "v8.2.0"
-__internal_version__ = "8.2.0"
-__compat_version__ = "6.8.0"
-```
-
-## Release rule
-
-A future GitHub release increments the public release line independently of the engineering baseline. Internal engineering milestone names may continue to be used in development evidence, but they must remain explicitly marked as internal and must not replace the public release identity.
+Release signing, Authenticode, Developer identity and Enterprise Root authority are separate trust systems. This community candidate does not use Root/Owner/Enterprise credentials to sign the product. See [SECURITY.md](SECURITY.md) and [historical record](docs/RELEASE_HISTORY.md).

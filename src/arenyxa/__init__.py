@@ -1,5 +1,4 @@
-
-# Public release identity. Internal engineering milestones use a separate namespace.
+# Public product identity is independent from engineering and compatibility versions.
 __version__ = "0.1"
 __package_version__ = "0.1.0"
 __public_version__ = "0.1"

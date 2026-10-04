@@ -46,7 +46,6 @@ from arenyxa.infrastructure.capture.professional import ProfessionalAnalysisSuit
 from arenyxa.infrastructure.capture.packet_analysis import PacketAnalysisEngine
 from arenyxa.presentation.background import run_background
 from arenyxa.presentation.packet_intelligence_workbench import PacketIntelligenceWorkbenchDialog
-from arenyxa.presentation.i18n_runtime import current_text
 from arenyxa.presentation.language import literal_for_locale
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.widgets import PageHeader, connect_current_row_changed, set_table_header_stretch_last
@@ -151,7 +150,7 @@ class WaterfallWidget(QWidget):
             painter.setPen(QColor(tokens.text_muted))
             app = QApplication.instance()
             locale = str(app.property("arenyxa_locale") or "zh_CN") if app is not None else "zh_CN"
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, current_text("network.waterfall.waiting"))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, literal_for_locale("等待网络事件", locale))
             return
         durations = [
             max(
@@ -196,7 +195,8 @@ class NetworkCaptureActionsMixin:
         self.sessions.blockSignals(False)
 
     def start_capture(self) -> None:
-        source = self.source.currentData()
+        # QVariant round-trips StrEnum values as strings on PySide6.
+        source = CaptureSource(self.source.currentData())
         session = CaptureSession(
             name=f"Capture {utc_now()[0:19]}",
             source_type=source,
@@ -206,16 +206,16 @@ class NetworkCaptureActionsMixin:
             if source is CaptureSource.PCAP_IMPORT:
                 path, _ = QFileDialog.getOpenFileName(
                     self,
-                    current_text("network.capture.import_packet_title"),
+                    "导入 Packet Capture",
                     "",
-                    current_text("network.capture.packet_filter"),
+                    "Packet Capture (*.pcap *.pcapng *.cap *.pcap.gz *.pcapng.gz *.cap.gz);;All Files (*)",
                 )
                 if not path:
                     return
                 self._import_pcap_session(session, Path(path))
                 return
             if source is CaptureSource.HAR_IMPORT:
-                path, _ = QFileDialog.getOpenFileName(self, current_text("network.capture.import_har_title"), "", current_text("network.capture.har_filter"))
+                path, _ = QFileDialog.getOpenFileName(self, "导入 HAR", "", "HTTP Archive (*.har *.json)")
                 if not path:
                     return
                 session.state = CaptureState.COMPLETED
@@ -233,13 +233,13 @@ class NetworkCaptureActionsMixin:
                     self._show_simple_summary(rows, source="HAR Import", backend="Arenyxa HAR Analyzer")
                 else:
                     self.overview.setPlainText(json.dumps(asdict(summary), ensure_ascii=False, indent=2))
-                    self.statusMessage.emit(current_text("network.capture.har_imported").format(count=f"{len(events):,}"))
+                    self.statusMessage.emit(f"已导入 HAR：{len(events):,} 个请求")
                 self.context.nextgen.activity.publish("capture-import", "HAR imported", details={"session_id": session.id, "events": len(events)})
                 self.refresh_sessions()
                 return
             if source is CaptureSource.BROWSER:
                 url, ok = QInputDialog.getText(
-                    self, current_text("network.capture.browser_title"), current_text("network.capture.browser_url"), text="https://example.com"
+                    self, "Browser Capture", "受控浏览器入口 URL", text="https://example.com"
                 )
                 if not ok or not url:
                     return
@@ -253,7 +253,7 @@ class NetworkCaptureActionsMixin:
                 )
             else:
                 interface, ok = QInputDialog.getText(
-                    self, current_text("network.capture.system_title"), current_text("network.capture.system_interface"), text="1"
+                    self, "System Packet Capture", "tshark 接口编号或名称", text="1"
                 )
                 if not ok:
                     return
@@ -273,11 +273,11 @@ class NetworkCaptureActionsMixin:
             self.start_button.setEnabled(False)
             self.pause_button.setEnabled(True)
             self.stop_button.setEnabled(True)
-            self.statusMessage.emit(current_text("network.capture.started").format(source=session.source_type.value))
+            self.statusMessage.emit(f"捕获已启动：{session.source_type.value}")
             self.context.nextgen.activity.publish("capture-start", f"Capture started: {session.source_type.value}", details={"session_id": session.id, "source": session.source_type.value})
             self.refresh_sessions()
         except Exception as exc:
-            QMessageBox.critical(self, current_text("network.capture.start_failed_title"), str(exc))
+            QMessageBox.critical(self, "无法开始捕获", str(exc))
 
     def toggle_pause(self) -> None:
         session = self.context.capture.session
@@ -286,11 +286,11 @@ class NetworkCaptureActionsMixin:
         if session.state is CaptureState.CAPTURING:
             self.context.capture.pause()
             self.context.nextgen.activity.publish("capture-pause", "Capture paused", details={"session_id": session.id})
-            self.pause_button.setText(current_text("network.action.resume"))
+            self.pause_button.setText("恢复")
         elif session.state is CaptureState.PAUSED:
             self.context.capture.resume()
             self.context.nextgen.activity.publish("capture-resume", "Capture resumed", details={"session_id": session.id})
-            self.pause_button.setText(current_text("network.action.pause"))
+            self.pause_button.setText("暂停")
 
     def stop_capture(self) -> None:
         self.stop_button.setEnabled(False)
@@ -299,14 +299,11 @@ class NetworkCaptureActionsMixin:
         def completed(value: object) -> None:
             session = value
             self.statusMessage.emit(
-                current_text("network.capture.completed").format(
-                    events=f"{session.event_count:,}",
-                    dropped=f"{session.dropped_events:,}",
-                )
+                f"捕获完成：{session.event_count:,} events，Dropped {session.dropped_events:,}"
             )
             self.context.nextgen.activity.publish("capture-stop", "Capture completed", level="warning" if session.dropped_events else "info", details={"session_id": session.id, "events": session.event_count, "dropped": session.dropped_events})
             self.start_button.setEnabled(True)
-            self.pause_button.setText(current_text("network.action.pause"))
+            self.pause_button.setText("暂停")
             self.operationProgress.emit("Capture", 0, 0, "clear")
             self._last_capture_state = session.state.value
             if self.simple_mode:
@@ -318,11 +315,11 @@ class NetworkCaptureActionsMixin:
             self.start_button.setEnabled(True)
             self.pause_button.setEnabled(False)
             self.stop_button.setEnabled(False)
-            self.pause_button.setText(current_text("network.action.pause"))
+            self.pause_button.setText("暂停")
             self.operationProgress.emit("Capture", 0, 0, "clear")
             session = self.context.capture.session
             self._last_capture_state = session.state.value if session is not None else None
-            QMessageBox.warning(self, current_text("network.capture.stop_failed_title"), message)
+            QMessageBox.warning(self, "停止失败", message)
 
         run_background(self.context.capture.stop, completed, failed)
 
@@ -364,14 +361,8 @@ class NetworkCaptureActionsMixin:
         live = intelligence.live_snapshot(session.id) if intelligence is not None else {}
         alert_count = int(live.get("alerts", 0) or 0)
         self.capture_status.setText(
-            current_text("network.status.live").format(
-                state=state.upper(),
-                events=f"{session.event_count:,}",
-                bytes=f"{session.bytes_captured:,}",
-                alerts=f"{alert_count:,}",
-                dropped=f"{session.dropped_events:,}",
-                permission=session.permission_state,
-            )
+            f"{state.upper()} · {session.event_count:,} events · {session.bytes_captured:,} B · "
+            f"Alerts {alert_count:,} · Dropped {session.dropped_events:,} · {session.permission_state}"
         )
         if intelligence is not None:
             live_payload = dict(live)
@@ -383,7 +374,7 @@ class NetworkCaptureActionsMixin:
             self.start_button.setEnabled(True)
             self.pause_button.setEnabled(False)
             self.stop_button.setEnabled(False)
-            self.pause_button.setText(current_text("network.action.pause"))
+            self.pause_button.setText("暂停")
             self.operationProgress.emit("Capture", 0, 0, "clear")
             self._flush_live_events()
             self.refresh_sessions()
@@ -397,7 +388,7 @@ class NetworkCaptureActionsMixin:
         self._visible_session_id = session_id
         self._session_load_token += 1
         token = self._session_load_token
-        self.statusMessage.emit(current_text("network.capture.loading_session"))
+        self.statusMessage.emit("正在后台加载捕获会话…")
 
         def load_payload() -> dict[str, Any]:
             events = list(
@@ -423,13 +414,13 @@ class NetworkCaptureActionsMixin:
             if self.simple_mode:
                 self._show_simple_summary(events, source="Saved Capture", backend="Arenyxa Native")
             self.inspectorChanged.emit(
-                current_text("network.inspector.capture_session"),
+                "Capture Session",
                 {"id": session_id, "visible_events": len(events), "intelligence": analysis},
             )
-            self.statusMessage.emit(current_text("network.capture.loaded_events").format(count=f"{len(events):,}"))
+            self.statusMessage.emit(f"已加载 {len(events):,} 条网络事件")
 
         def failed(message: str) -> None:
             if token == self._session_load_token:
-                QMessageBox.warning(self, current_text("network.capture.load_failed_title"), message)
+                QMessageBox.warning(self, "加载捕获会话失败", message)
 
         run_background(load_payload, completed, failed)

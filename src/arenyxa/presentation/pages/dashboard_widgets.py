@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 from arenyxa.qt_compat.QtCore import QPointF, QRectF, Qt
 from arenyxa.qt_compat.QtGui import QColor, QPainter, QPainterPath, QPen
 from arenyxa.qt_compat.QtWidgets import (
+    QApplication,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -25,7 +26,7 @@ from arenyxa.qt_compat.QtWidgets import (
 
 from arenyxa.compat import strict_zip
 from arenyxa.presentation.glass import GlassPanel
-from arenyxa.presentation.i18n_runtime import current_text
+from arenyxa.presentation.language import literal_for_locale
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.widgets import RingGauge, SectionCard, format_bytes
 
@@ -267,7 +268,7 @@ class DonutChart(QWidget):
         self.theme = theme
         self.motion = motion
         self.items: list[tuple[str, float, str]] = []
-        self.center_top = "dashboard.stats.file_types"
+        self.center_top = "文件类型"
         self.center_bottom = "0"
         self.setMinimumSize(150, 150)
         self.setMaximumWidth(175)
@@ -320,7 +321,9 @@ class DonutChart(QWidget):
         font.setBold(True)
         font.setPointSize(10)
         painter.setFont(font)
-        painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, current_text(self.center_top))
+        app = QApplication.instance()
+        locale = str(app.property("arenyxa_locale") or "zh_CN") if app is not None else "zh_CN"
+        painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, literal_for_locale(self.center_top, locale))
         font.setBold(False)
         font.setPointSize(8)
         painter.setFont(font)

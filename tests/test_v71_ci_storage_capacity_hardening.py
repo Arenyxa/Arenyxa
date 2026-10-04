@@ -61,7 +61,14 @@ def test_quality_workflows_separate_lightweight_core_from_heavy_capabilities() -
     assert 'ARENYXA_CI_FORBID_ENVIRONMENT_SKIPS: "1"' in workflow
     assert '.[dev,analysis]' in workflow
     assert "tshark" not in workflow.lower()
-    assert "postgres:" not in workflow
+    core = workflow.split("\n  core-quality:", 1)[1].split("\n  windows-desktop:", 1)[0]
+    desktop = workflow.split("\n  windows-desktop:", 1)[1]
+    postgres = workflow.split("\n  postgres-correctness:", 1)[1].split("\n  core-quality:", 1)[0]
+    assert "services:" not in core and "services:" not in desktop
+    assert "postgres:" in postgres
+    assert "ARENYXA_POSTGRES_TEST_DSN:" in postgres
+    assert "verify_postgresql_test_results.py" in postgres
+    assert ".[dev,full]" not in workflow
     assert "playwright install" not in workflow
     assert "tshark" in integration.lower()
     assert "postgres:" in integration

@@ -11,11 +11,16 @@ recovery image, release identity, and the absence of build/cache artefacts.
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
 import zipfile
 from pathlib import Path
 
+try:
+    from scripts.build_source_manifest import is_generated_or_ephemeral, is_preserved_local_artifact, iter_source_files
+except ModuleNotFoundError:
+    from build_source_manifest import is_generated_or_ephemeral, is_preserved_local_artifact, iter_source_files
 
 EXCLUDED_PARTS = {
     ".git",
@@ -56,27 +61,11 @@ def sha256(path: Path) -> str:
 
 
 def is_manifest_excluded(relative: Path) -> bool:
-    if relative.as_posix() in EXCLUDED_FILES:
-        return True
-    if relative.name.startswith(".coverage."):
-        return True
-    if any(part.startswith(".aider") for part in relative.parts):
-        return True
-    if any(part in EXCLUDED_PARTS or part.endswith(".egg-info") for part in relative.parts):
-        return True
-    return relative.suffix in {".pyc", ".pyo"}
+    return is_generated_or_ephemeral(relative)
 
 
 def source_inventory(root: Path) -> set[str]:
-    inventory: set[str] = set()
-    for path in root.rglob("*"):
-        if not path.is_file():
-            continue
-        relative = path.relative_to(root)
-        if is_manifest_excluded(relative):
-            continue
-        inventory.add(relative.as_posix())
-    return inventory
+    return {path.relative_to(root).as_posix() for path in iter_source_files(root)}
 
 
 def verify_source_manifest(root: Path) -> dict[str, object]:
@@ -182,40 +171,49 @@ def verify_release_identity(root: Path) -> dict[str, str]:
         raise RuntimeError(f"Unexpected package version: {package_version}")
 
     namespace = (root / "src" / "arenyxa" / "__init__.py").read_text(encoding="utf-8")
-    required = ('__version__ = "0.1"', '__package_version__ = "0.1.0"', '__engineering_build__ = "v8.2.0"', '__compat_version__ = "6.8.0"')
+    required = ('__version__ = "0.1"', '__package_version__ = "0.1.0"', '__compat_version__ = "6.8.0"')
     for token in required:
         if token not in namespace:
             raise RuntimeError(f"Release identity token missing: {token}")
-    return {"public": "0.1", "package": "0.1.0", "engineering": "v8.2.0", "compat": "6.8.0"}
+    return {"runtime": "0.1", "package": "0.1.0", "compat": "6.8.0"}
 
 
 def verify_clean_tree(root: Path, *, allow_local_artifacts: bool = False) -> dict[str, object]:
     forbidden: list[str] = []
     ignored_local_roots: set[str] = set()
-    for path in root.rglob("*"):
-        relative = path.relative_to(root)
-        local_parts = set(relative.parts) & LOCAL_ARTIFACT_PARTS
-        if allow_local_artifacts and local_parts:
-            ignored_local_roots.update(local_parts)
-            continue
-        if any(part in EXCLUDED_PARTS or part.endswith(".egg-info") for part in relative.parts):
-            forbidden.append(relative.as_posix())
-            continue
-        if path.is_file() and (path.suffix in {".pyc", ".pyo"} or path.name.startswith(".coverage")):
-            forbidden.append(relative.as_posix())
+    for directory, names, files in os.walk(root, followlinks=False):
+        parent = Path(directory)
+        for name in list(names) + files:
+            relative = (parent / name).relative_to(root)
+            local_parts = set(relative.parts) & LOCAL_ARTIFACT_PARTS
+            preserved = is_preserved_local_artifact(relative)
+            root_tool_cache = len(relative.parts) == 1 and (
+                name in {".pytest_cache", ".ruff_cache", ".mypy_cache", ".coverage"}
+                or name.startswith(".coverage.")
+            )
+            if allow_local_artifacts and (local_parts or preserved or root_tool_cache):
+                ignored_local_roots.update(local_parts or {relative.parts[0]})
+                if name in names:
+                    names.remove(name)
+                continue
+            generated = any(part in EXCLUDED_PARTS or part.endswith(".egg-info") for part in relative.parts)
+            if preserved or generated or relative.suffix in {".pyc", ".pyo"} or name == ".coverage" or name.startswith(".coverage."):
+                forbidden.append(relative.as_posix())
+                if name in names:
+                    names.remove(name)
     if forbidden:
         raise RuntimeError("Ephemeral/build artefacts present: " + ", ".join(sorted(forbidden)[:20]))
     return {"forbidden_artifacts": 0, "ignored_local_roots": sorted(ignored_local_roots)}
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Verify Arenyxa v0.1 public release baseline invariants")
+    parser = argparse.ArgumentParser(description="Verify Arenyxa v0.1 release baseline invariants")
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--json", action="store_true", dest="as_json")
     parser.add_argument(
         "--allow-local-artifacts",
         action="store_true",
-        help="ignore .git/.venv/build/dist roots while still rejecting source-tree caches",
+        help="ignore known local build/evidence roots while still rejecting source-tree caches",
     )
     args = parser.parse_args(argv)
     root = args.root.resolve()

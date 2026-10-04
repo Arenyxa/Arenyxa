@@ -150,11 +150,11 @@ FAILURE_RULES: tuple[FailureRule, ...] = (
 
 
 COMPATIBILITY_CONTRACTS: tuple[CompatibilityContract, ...] = (
-    CompatibilityContract("arenyxa", "python-package", "Public facade remains importable and re-exports version metadata.", "7.0"),
-    CompatibilityContract("arenyxa", "legacy-python-package", "Historical implementation namespace remains importable through v7.0.", "7.0"),
-    CompatibilityContract("arenyxa", "cli", "arenyxa -> arenyxa.app:main", "7.0"),
-    CompatibilityContract("arenyxa", "legacy-cli", "arenyxa -> arenyxa.app:main", "7.0"),
-    CompatibilityContract("arenyxa-server", "cli", "arenyxa-server -> arenyxa.infrastructure.server:main", "7.0"),
+    CompatibilityContract("arenyxa", "python-package", "Public facade remains importable and re-exports version metadata.", "0.1"),
+    CompatibilityContract("arenyxa", "legacy-python-package", "Legacy implementation namespace exposes the current public product metadata.", "0.1"),
+    CompatibilityContract("arenyxa", "cli", "arenyxa -> arenyxa.app:main", "0.1"),
+    CompatibilityContract("arenyxa", "legacy-cli", "arenyxa -> arenyxa.app:main", "0.1"),
+    CompatibilityContract("arenyxa-server", "cli", "arenyxa-server -> arenyxa.infrastructure.server:main", "0.1"),
     CompatibilityContract("plugin-api", "plugin", "Existing manifest/API compatibility comparator remains at 6.8.0 unless explicitly migrated.", "6.8.0"),
 )
 

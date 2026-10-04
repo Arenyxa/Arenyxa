@@ -81,6 +81,11 @@ class InterceptingProxy(ProxyResilienceMixin):
         self._client_condition = threading.Condition(self._lock)
         self._active_clients: set[socket.socket] = set()
         self._closed = False
+        self._close_requested = False
+        self._stop_worker: threading.Thread | None = None
+        self._stop_finished = threading.Event()
+        self._stop_finished.set()
+        self._stop_succeeded = True
         recovered_sessions = self.history_store.recover_interrupted()
         if recovered_sessions:
             LOGGER.warning("Recovered %d interrupted Proxy Suite session(s)", recovered_sessions)
@@ -439,7 +444,7 @@ class InterceptingProxy(ProxyResilienceMixin):
                     self.settings,
                 )
             with self._lock:
-                if self._closed:
+                if self._closed or self._close_requested or not self._stop_finished.is_set():
                     raise RuntimeError("Proxy engine is closed")
                 if self._server is not None:
                     return self.address
@@ -449,6 +454,7 @@ class InterceptingProxy(ProxyResilienceMixin):
                 server.engine = self
                 thread = threading.Thread(target=server.serve_forever, name="arenyxa-proxy-listener", daemon=True)
                 self._server = server
+                self._stop_worker = None
                 self._thread = thread
                 self._started_at = utc_now()
                 self._session_id = "proxy_" + uuid.uuid4().hex
@@ -462,85 +468,6 @@ class InterceptingProxy(ProxyResilienceMixin):
                 thread.start()
         self._emit("started", self.status())
         return self.address
-
-    def stop(self) -> None:
-        """Stop listeners and release proxy runtime resources."""
-        with self._lock:
-            server = self._server
-            thread = self._thread
-            self._server = None
-            self._thread = None
-            session_id = self._session_id
-            self._session_id = ""
-            pending = list(self._pending.values())
-            self._pending.clear()
-        for item in pending:
-            item.action = "forward"
-            item.modified_raw = item.raw
-            item.event.set()
-        if server is not None:
-            server.shutdown()
-            server.server_close()
-        with self._client_condition:
-            clients = list(self._active_clients)
-        for client in clients:
-            try:
-                client.shutdown(socket.SHUT_RDWR)
-            except OSError:
-                record_current_exception(__name__, 'InterceptingProxy.stop:487')
-            try:
-                client.close()
-            except OSError:
-                record_current_exception(__name__, 'InterceptingProxy.stop:491')
-        if thread is not None and thread.is_alive() and thread is not threading.current_thread():
-            thread.join(timeout=3.0)
-        deadline = time.monotonic() + 3.0
-        with self._client_condition:
-            while self._active_clients:
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    break
-                self._client_condition.wait(timeout=remaining)
-        if session_id:
-            if not self.flush_persistence():
-                self._emit(
-                    "error",
-                    {
-                        "code": "PROXY_PERSISTENCE_DRAIN_TIMEOUT",
-                        "session_id": session_id,
-                        "message": "Proxy persistence queue did not drain before session finalization",
-                    },
-                )
-            try:
-                self.history_store.finish_session(session_id)
-            except ArenyxaError:
-                LOGGER.exception("Proxy Suite session finalization failed")
-                self._emit("error", {"code": "PROXY_SESSION_FINALIZE_FAILED", "session_id": session_id})
-        self._emit("stopped", self.status())
-
-    def close(self) -> None:
-        """Permanently stop the proxy and close its durable history database."""
-        with self._lock:
-            if self._closed:
-                return
-        self.stop()
-        with self._client_condition:
-            if self._active_clients:
-                LOGGER.warning(
-                    "Proxy history database remains open because %d client handler(s) did not quiesce",
-                    len(self._active_clients),
-                )
-                return
-        with self._persistence_lifecycle_lock:
-            with self._lock:
-                if self._closed:
-                    return
-            if not self.persistence.close(float(self.settings.persistence_flush_timeout_seconds)):
-                LOGGER.warning("Proxy persistence writer did not quiesce before close")
-                return
-            self.history_store.close()
-            with self._lock:
-                self._closed = True
 
     def _client_started(self, client: socket.socket) -> None:
         with self._client_condition:

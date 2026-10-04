@@ -20,6 +20,7 @@ from arenyxa.domain.errors import ArenyxaError
 from arenyxa.infrastructure.timebase import PROCESS_CLOCK
 from arenyxa.domain.models import Task, new_id, utc_now
 from arenyxa.enterprise.governance import EnterpriseGovernanceService
+from arenyxa.enterprise.job_lifecycle import JobLifecycle
 from arenyxa.enterprise.runtime_storage import DistributedRuntimeStorageBackend, storage_backend_for
 from arenyxa.enterprise.identity import LocalEnterpriseIdentityService
 from arenyxa.application.runner import RunOrchestrator
@@ -330,12 +331,10 @@ class EnterpriseServerRuntime:
         payload = {"task": task.to_dict(), "task_snapshot_sha256": task.snapshot_hash()}
         payload_json, payload_sha = _bounded_json(payload, MAX_JOB_PAYLOAD_BYTES, "job payload")
         if existing is not None:
-            if existing["kind"] != "task.run" or existing["resource_id"] != resource_id or existing["permission"] != permission:
+            if existing["kind"] != "task.run" or existing["resource_id"] != resource_id or existing["permission"] != permission or existing["side_effect_mode"] != str(side_effect_mode).strip().casefold():
                 raise _fail("DISTRIBUTED_IDEMPOTENCY_COLLISION", "Idempotency key is already bound to another operation")
                                                                              
-            with self.queue._connect() as connection:
-                row = connection.execute("SELECT payload_sha256 FROM distributed_jobs WHERE job_id=?", (existing["job_id"],)).fetchone()
-            if row is None or not hmac.compare_digest(str(row[0]), payload_sha):
+            if not hmac.compare_digest(str(existing["payload_sha256"]), payload_sha):
                 raise _fail("DISTRIBUTED_IDEMPOTENCY_COLLISION", "Idempotency key payload does not match the original job")
             return str(existing["job_id"])
         decision = self.governance.authorize_operation(
@@ -435,8 +434,12 @@ class EnterpriseServerRuntime:
         if worker is None or worker["state"] == "revoked":
             raise _fail("WORKER_REVOKED", "Worker identity is unavailable")
         context = dict(access_context or {})
-        context.setdefault("worker_id", str(worker["worker_id"]))
-        context.setdefault("permissions", tuple(str(item) for item in dict(worker.get("resources") or {}).get("permissions", ()) if str(item)))
+        context["worker_id"] = str(worker["worker_id"])
+        context["permissions"] = tuple(str(item) for item in dict(worker.get("resources") or {}).get("permissions", ()) if str(item))
+        # No server-owned risk engine is configured. A caller cannot assert a
+        # lower risk score; this proof authenticates a fresh session.
+        context["risk_score"] = 100
+        context["auth_age_seconds"] = 0
         context.setdefault("via_server_relay", True)
         context.setdefault("peer_to_peer", False)
         self.evaluate_network_context(context)
@@ -500,8 +503,10 @@ class EnterpriseServerRuntime:
         if worker is None or str(worker.get("state", "")) == "revoked":
             raise _fail("WORKER_REVOKED", "Worker identity is unavailable")
         actual = dict(context or {})
-        actual.setdefault("worker_id", str(worker["worker_id"]))
-        actual.setdefault("permissions", tuple(str(item) for item in dict(worker.get("resources") or {}).get("permissions", ()) if str(item)))
+        actual["worker_id"] = str(worker["worker_id"])
+        actual["permissions"] = tuple(str(item) for item in dict(worker.get("resources") or {}).get("permissions", ()) if str(item))
+        actual["risk_score"] = 100
+        actual["auth_age_seconds"] = max(0.0, PROCESS_CLOCK.stable_epoch() - float(session["created_at"]))
         actual.setdefault("via_server_relay", True)
         actual.setdefault("peer_to_peer", False)
         self.evaluate_network_context(actual)
@@ -715,7 +720,7 @@ class EnterpriseWorkerRuntime:
             except ArenyxaError:
                 LOGGER.exception("Worker Task snapshot persistence failed and distributed lease failure could not be recorded")
             raise _fail("WORKER_TASK_PERSIST_FAILED", "Worker could not persist the distributed Task snapshot") from exc
-        queue.start_job(lease.job_id, self.worker_id, lease.lease_token)
+        JobLifecycle(queue).start_job(lease.job_id, self.worker_id, lease.lease_token)
         if lease.side_effect_mode == "non_idempotent":
                                                                                                    
                                                                                                  

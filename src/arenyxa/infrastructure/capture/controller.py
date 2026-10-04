@@ -54,8 +54,12 @@ class CaptureController:
         self._queue: queue.Queue[NetworkEvent] = queue.Queue(maxsize=self.queue_capacity)
         self._writer: threading.Thread | None = None
         self._stopping = threading.Event()
+        self._writer_drained = threading.Event()
+        self._stop_in_progress = False
         self._filter: Callable[[NetworkEvent], bool] = lambda _event: True
         self._listeners: list[Callable[[list[NetworkEvent]], None]] = []
+        self._finalization_listeners: list[Callable[[CaptureSession], None]] = []
+        self._finalization_notified = False
         self._writer_error: Exception | None = None
         self._source_error: Exception | None = None
         self._state_lock = threading.RLock()
@@ -75,6 +79,24 @@ class CaptureController:
                 self._listeners.remove(callback)
             except ValueError:
                 record_current_exception(__name__, 'CaptureController.remove_listener:75')
+
+    def add_finalization_listener(self, callback: Callable[[CaptureSession], None]) -> None:
+        with self._state_lock:
+            if callback not in self._finalization_listeners:
+                self._finalization_listeners.append(callback)
+
+    def _notify_finalized(self) -> None:
+        with self._state_lock:
+            session = self.session
+            if session is None or self._finalization_notified:
+                return
+            self._finalization_notified = True
+            listeners = tuple(self._finalization_listeners)
+        for listener in listeners:
+            try:
+                listener(session)
+            except Exception:
+                LOGGER.exception("Capture finalization listener failed")
 
     def _drain_queue(self) -> None:
         while True:
@@ -116,6 +138,8 @@ class CaptureController:
             self._writer_error = None
             self._source_error = None
             self._stopping.clear()
+            self._writer_drained.clear()
+            self._stop_in_progress = False
             self._accepting_stop_tail = False
                                                                                                  
                                                                                                
@@ -124,6 +148,7 @@ class CaptureController:
                 self.session = session
                 self.adapter = adapter
                 self._filter = compiled_filter
+                self._finalization_notified = False
 
     def start(self) -> None:
         """Start capture source and durable writer processing."""
@@ -181,6 +206,8 @@ class CaptureController:
                                                                                               
                                                                                                
                     LOGGER.exception("Failed to persist capture start failure")
+                if self._writer is None or not self._writer.is_alive():
+                    self._notify_finalized()
                 raise
 
     def emit(self, event: NetworkEvent) -> None:
@@ -311,6 +338,7 @@ class CaptureController:
                 raise ArenyxaError("CAPTURE_NOT_ACTIVE", "没有活动捕获会话。", domain="CAPTURE")
             if session.state in {CaptureState.COMPLETED, CaptureState.CANCELLED}:
                 return session
+            self._stop_in_progress = True
 
         adapter_error: Exception | None = None
         adapter = self.adapter
@@ -371,6 +399,14 @@ class CaptureController:
             if failure is None:
                 failure = exc
             LOGGER.exception("Failed to persist final capture state")
+            session.state = CaptureState.FAILED
+
+        with self._state_lock:
+            self._stop_in_progress = False
+        # The body can drain before Thread bootstrap retires. Do not use the
+        # earlier join result as a permanent substitute for completed I/O.
+        if self._writer_drained.is_set() or not self._writer or not self._writer.is_alive():
+            self._notify_finalized()
 
         if failure is not None:
             if self._writer_error is not None:
@@ -467,6 +503,12 @@ class CaptureController:
                     self.store.save_capture(self.session)
                 except Exception:
                     LOGGER.exception("Unable to persist asynchronous capture failure")
+        finally:
+            self._writer_drained.set()
+            with self._state_lock:
+                notify = self.session is not None and self.session.state is CaptureState.FAILED and not self._stop_in_progress
+            if notify:
+                self._notify_finalized()
 
     def _adapter_failure(self) -> Exception | None:
         if self.adapter is None:

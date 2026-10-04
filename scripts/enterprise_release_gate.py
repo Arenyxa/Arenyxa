@@ -62,7 +62,6 @@ def main() -> int:
     payload = {
         "schema": "arenyxa.enterprise-release-gate/v2",
         "version": "0.1.0",
-        "engineering_baseline": "v8.2.0",
         "release_ready": release_ready,
         "checks_completed": len(results),
         "checks_expected": len(GATES),

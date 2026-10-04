@@ -1,5 +1,4 @@
 from __future__ import annotations
-from arenyxa import __package_version__
 
 import base64
 import json
@@ -7,6 +6,7 @@ from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import parse_qsl, urlsplit
 
+from arenyxa import __package_version__
 from arenyxa.infrastructure.capture.proxy_models import ProxyFlow
 from arenyxa.infrastructure.capture.proxy_transport import _parse_raw_message, _secure_write
 

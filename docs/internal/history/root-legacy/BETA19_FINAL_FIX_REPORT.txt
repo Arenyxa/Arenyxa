@@ -1,0 +1,85 @@
+Arenyxa v8.0 beta19 — Final Regression Closure Report
+Date: 2026-08-26
+Scope: user-reported beta19 regressions and low-risk Windows/UI polish
+
+Release rule
+============
+This patch follows a preservation-first rule: features already working in beta19 are not redesigned. Root Developer authentication/trust core files are protected by pre/post SHA-256 comparison and remain byte-for-byte unchanged.
+
+Closed regressions / polish
+===========================
+1. Terminal completion popup theme synchronization
+   - The command completion popup now follows the active visual preset after live theme changes.
+   - Fixes the case where Clean Light was active while the completion popup remained black from the previous preset.
+
+2. Developer / Root Developer wording separation
+   - The ordinary .aryxdev developer login card is now described as “官方开发者授权”.
+   - Root Developer is presented separately as the highest technical authority path.
+   - Root-specific terminology no longer appears inside the ordinary developer-login explanation.
+   - Added a dedicated “退出 Root Developer” action in the Root Developer area.
+   - Root login continues to use the existing begin_root_owner_login -> owner challenge signature -> complete_root_owner_login flow.
+
+3. Enterprise terminology cleanup
+   - User-visible “Enterprise Mode” wording is standardized as “企业工作模式”.
+   - “Office Enterprise / Office Coordinator” style wording is replaced by clearer user-facing terms such as “现有企业”, “企业局域网协调器”, and “设备加入凭据”.
+   - Internal storage/API identifiers are intentionally preserved for compatibility.
+
+4. Navigation / authorization UX preservation
+   - Existing beta19 navigation filtering remains in place: users do not gain permissions by switching Experience Mode, and inaccessible advanced destinations remain filtered by the existing policy/resolver path.
+   - No Security Kernel/RBAC capability grant was weakened.
+
+5. Terminal permission inspection preservation
+   - Existing beta19 read-only permissions/whoami command support is retained.
+   - No permission is granted by these inspection commands.
+
+6. Startup progress visual preservation
+   - Existing beta19 startup progress style isolation is retained so global theme activation at 100% does not turn the bar green/thick.
+   - startup_splash.py and startup_motion_math.py were not modified by this regression patch.
+   - The startup visual verifier’s stale hash for the already-shipped beta19 startup_motion_math.py was corrected to the actual unchanged beta19 baseline hash.
+
+7. Windows-native qualification hardening already present in beta19 remains intact
+   - Npcap/ETW/WFP/DPAPI/TPM-CNG/Event Log/ConPTY qualification paths are preserved.
+   - TPM downgrade logging and ARENYXA_REQUIRE_TPM fail-closed policy are preserved.
+
+8. Regression-test contract cleanup
+   - Updated stale beta19 tests that still asserted pre-modularization developer-navigation source text.
+   - The developer shortcut test now accepts the stricter current condition that also checks whether the target is in the allowed navigation set.
+   - Code-quality ratchet baseline was aligned to the shipped beta19 value without relaxing the non-increasing requirement.
+
+Root core protection
+====================
+The following files must remain exactly unchanged from the beta19 input archive:
+- src/arenyxa/application/developer_access.py
+  SHA-256: 9864a7edfd543546aab5db4d2e08926d94aa7ee90b04ed6e56c59946318f0ca1
+- src/arenyxa/application/root_owner_identity.py
+  SHA-256: 6f0ebec29a371ab053fd5f3957233be2297b70948cef9f416092a3aa18459526
+- src/arenyxa/application/root_workstation_binding.py
+  SHA-256: af7f949aa5cafdc07c0e61ba5de025a3a2904416ec7138796caa167124d5f190
+- src/arenyxa/presentation/root_owner_gate.py
+  SHA-256: 11c383a575f0deb5ee96b5e4aaf4b09c6de75601e9061ec1b946c44bd6171eb0
+- src/arenyxa/presentation/root_developer_gate.py
+  SHA-256: 101cfebeac542fff2a47b7faa61c0fcbb1466291ff6665be931199682f43ac62
+
+Validation completed before final packaging
+===========================================
+- Python compileall: PASS
+- Combined beta19 requested/root/experience/enterprise/startup/developer regression suite: 76 passed
+- Architecture debt gate: PASS (broad_exception=285, enterprise=38, proxy=1, runner_lines=408, module_ceiling=1000)
+- Architecture/code-quality focused tests: 4 passed
+- Beta19 release identity gate: PASS
+- V8 release identity gate: PASS
+- Root persistence contract: PASS
+- UI button connection contract: PASS
+- Welcome window contract: PASS
+- Main-window/page runtime static contracts: PASS (runtime Qt construction may be skipped where no Qt binding is installed)
+- Startup visual baseline: PASS
+
+Packaging consistency
+=====================
+The source repair seed, repair manifest, and SOURCE_MANIFEST.sha256 are rebuilt after all source/test/report changes and verified by the Phase 0 baseline gate before release packaging.
+
+Release identity
+================
+Display version: 8.0 beta19
+Engineering build: beta19
+Distribution version: 8.0.19

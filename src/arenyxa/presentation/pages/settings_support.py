@@ -33,28 +33,39 @@ from arenyxa.qt_compat.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from arenyxa import __display_version__, __display_version__ as __version__, __engineering_build__
+from arenyxa import __display_version__, __display_version__ as __version__
+from arenyxa.compat import strict_zip
+from arenyxa.config import AppSettings
+from arenyxa.application.developer_safety import (
+    DEVELOPER_TERMS_VERSION,
+    RISK_AGREEMENT_TEXT,
+    RISK_AGREEMENT_TITLE,
+    WAIVER_TEXT,
+    WAIVER_TITLE,
+)
+from arenyxa.domain.models import MotionProfile
 from arenyxa.provenance import build_identity_summary, commercialization_notice, verify_release_attestation
 from arenyxa.repair import StartupHealthScanner, installation_root
 from arenyxa.infrastructure.atomic_io import fsync_existing_file
 from arenyxa.infrastructure.observability import Redactor
 from arenyxa.presentation.background import run_background
-from arenyxa.presentation.i18n_runtime import current_text, source_text
-from arenyxa.presentation.language import LanguageManager, literal_for_locale
+from arenyxa.presentation.language import LOCALES, LanguageManager, literal_for_locale
 from arenyxa.presentation.pages.base import WorkspacePage, page_layout
 from arenyxa.presentation.themes import ThemeTokens
 from arenyxa.presentation.widgets import (
     PageHeader,
     SectionCard,
+    ScrollSafeComboBox,
+    ScrollSafeSpinBox,
 )
 
 THEME_META = {
-    "modern_dark": ("theme.modern_dark.meta", "theme.modern_dark.description"),
-    "aurora_glass": ("theme.aurora_glass.meta", "theme.aurora_glass.description"),
-    "clean_light": ("theme.clean_light.meta", "theme.clean_light.description"),
-    "terminal_green": ("theme.terminal_green.meta", "theme.terminal_green.description"),
-    "professional_graphite": ("theme.professional_graphite.meta", "theme.professional_graphite.description"),
-    "blue_productivity": ("theme.blue_productivity.meta", "theme.blue_productivity.description"),
+    "modern_dark": ("正式预设 · 默认", "现代深色 / 高信息密度 / 专业工作台"),
+    "aurora_glass": ("正式预设", "极光液态玻璃 / 青绿光晕 / 深海渐变"),
+    "clean_light": ("正式预设", "明亮浅色 / 清洁留白 / 绿色强调"),
+    "terminal_green": ("正式预设", "复古终端 / 荧光绿 / 低圆角科技感"),
+    "professional_graphite": ("扩展预设", "石墨灰 / 克制玻璃 / 企业专业感"),
+    "blue_productivity": ("扩展预设", "蓝色生产力 / 明亮商务 / 高可读性"),
 }
 
 LOGGER = logging.getLogger(__name__)
@@ -173,9 +184,9 @@ class ThemePreviewCard(QFrame):
                                                                                            
         app = QApplication.instance()
         locale = str(app.property("arenyxa_locale") or "zh_CN") if app is not None else "zh_CN"
-        meta_key, description_key = THEME_META.get(self.theme_id, ("theme.default.meta", "theme.default.description"))
-        meta = current_text(meta_key)
-        description = current_text(description_key)
+        meta_source, description_source = THEME_META.get(self.theme_id, ("视觉预设", "Arenyxa visual profile"))
+        meta = literal_for_locale(meta_source, locale)
+        description = literal_for_locale(description_source, locale)
         display_name = literal_for_locale(t.name, locale)
         text_align = Qt.AlignmentFlag.AlignRight if locale.startswith("ar") else Qt.AlignmentFlag.AlignLeft
         painter.setPen(QColor(t.text))
@@ -209,36 +220,29 @@ class _DeveloperTermsDialog(QDialog):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle(source_text("developer.terms.dialog_title"))
-        self.setProperty("i18n_key_window_title", "developer.terms.dialog_title")
+        self.setWindowTitle("启用 Developer Mode")
         self.setModal(True)
         self.setMinimumWidth(620)
         layout = QVBoxLayout(self)
 
-        risk_title = QLabel(source_text("developer.terms.risk_title"))
-        risk_title.setProperty("i18n_key_text", "developer.terms.risk_title")
+        risk_title = QLabel(RISK_AGREEMENT_TITLE)
         risk_title.setStyleSheet("font-weight: 700;")
-        risk_text = QLabel(source_text("developer.terms.risk_text"))
-        risk_text.setProperty("i18n_key_text", "developer.terms.risk_text")
+        risk_text = QLabel(RISK_AGREEMENT_TEXT)
         risk_text.setWordWrap(True)
         risk_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         layout.addWidget(risk_title)
         layout.addWidget(risk_text)
 
-        waiver_title = QLabel(source_text("developer.terms.waiver_title"))
-        waiver_title.setProperty("i18n_key_text", "developer.terms.waiver_title")
+        waiver_title = QLabel(WAIVER_TITLE)
         waiver_title.setStyleSheet("font-weight: 700; margin-top: 8px;")
-        waiver_text = QLabel(source_text("developer.terms.waiver_text"))
-        waiver_text.setProperty("i18n_key_text", "developer.terms.waiver_text")
+        waiver_text = QLabel(WAIVER_TEXT)
         waiver_text.setWordWrap(True)
         waiver_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         layout.addWidget(waiver_title)
         layout.addWidget(waiver_text)
 
-        self.risk_accept = QCheckBox(source_text("developer.terms.accept_risk"))
-        self.risk_accept.setProperty("i18n_key_text", "developer.terms.accept_risk")
-        self.waiver_accept = QCheckBox(source_text("developer.terms.accept_waiver"))
-        self.waiver_accept.setProperty("i18n_key_text", "developer.terms.accept_waiver")
+        self.risk_accept = QCheckBox("我已阅读并同意开发者风险协议")
+        self.waiver_accept = QCheckBox("我已阅读并同意测试免责协议")
         layout.addWidget(self.risk_accept)
         layout.addWidget(self.waiver_accept)
 
@@ -261,21 +265,21 @@ class AboutPage(WorkspacePage):
     
 
     _STATE_LABELS = {
-        "development": "about.state.development",
-        "verified_official": "about.state.verified_official",
-        "verified_community": "about.state.verified_community",
-        "modified": "about.state.modified",
-        "unverified": "about.state.unverified",
-        "invalid": "about.state.invalid",
+        "development": "源码 / 开发构建",
+        "verified_official": "已验证官方版本",
+        "verified_community": "已验证社区版本",
+        "modified": "已修改版本",
+        "unverified": "未验证发行版",
+        "invalid": "发行签名无效",
     }
 
     _STATE_DETAILS = {
-        "development": "about.detail.development",
-        "verified_official": "about.detail.verified_official",
-        "verified_community": "about.detail.verified_community",
-        "modified": "about.detail.modified",
-        "unverified": "about.detail.unverified",
-        "invalid": "about.detail.invalid",
+        "development": "源码模式允许自由修改；完整性检查不会把正常开发修改当成需要强制恢复的篡改。",
+        "verified_official": "发布证明由内置官方信任根验证。深度校验可进一步核对全部已签名文件与可加载代码。",
+        "verified_community": "发布签名有效，但属于社区/第三方发行身份，不代表 Arenyxa 官方背书。",
+        "modified": "当前安装内容与签名发行清单不一致。软件仍可使用，但不能继续声称为未修改的已验证发行版。",
+        "unverified": "当前发行版没有可验证的发布证明。这不等同于恶意软件，但不能确认其官方来源。",
+        "invalid": "发布证明、签名链或发行清单无效。安装版建议运行深度验证并按结果使用自愈修复中心。",
     }
 
     def __init__(self, context, theme, motion, parent=None) -> None:
@@ -286,12 +290,7 @@ class AboutPage(WorkspacePage):
         self.language_manager: LanguageManager | None = None
         self._quick_identity_at = 0.0
         outer = page_layout(self)
-        outer.addWidget(PageHeader(
-            source_text("about.page.title"),
-            source_text("about.page.subtitle"),
-            title_key="about.page.title",
-            subtitle_key="about.page.subtitle",
-        ))
+        outer.addWidget(PageHeader("关于 Arenyxa", "发行身份、运行环境、隐私边界与项目健康信息"))
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -304,7 +303,7 @@ class AboutPage(WorkspacePage):
         scroll.setWidget(content)
         outer.addWidget(scroll, 1)
 
-        hero = SectionCard(theme, f"Arenyxa v{__display_version__}")
+        hero = SectionCard(theme, f"Arenyxa V{__display_version__}")
         row = QHBoxLayout()
         icon = QLabel()
         icon.setFixedSize(132, 132)
@@ -324,23 +323,20 @@ class AboutPage(WorkspacePage):
         title = QLabel("Arenyxa")
         title.setStyleSheet("font-size: 30px; font-weight: 750;")
         info.addWidget(title)
-        subtitle = QLabel(source_text("about.hero.subtitle"))
-        subtitle.setProperty("i18n_key_text", "about.hero.subtitle")
+        subtitle = QLabel("本地优先、开源的 Web 数据采集、检索与网络分析工作台")
         subtitle.setWordWrap(True)
         subtitle.setProperty("muted", True)
         info.addWidget(subtitle)
         self.identity_label = QLabel()
         self.identity_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         info.addWidget(self.identity_label)
-        self.version_line = QLabel()
-        self.version_line.setProperty("muted", True)
-        self.version_line.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        info.addWidget(self.version_line)
+        version_line = QLabel(f"Version {__display_version__} · Python {platform.python_version()} · Qt {self._qt_version()}")
+        version_line.setProperty("muted", True)
+        version_line.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        info.addWidget(version_line)
         button_row = QHBoxLayout()
-        self.verify_button = QPushButton(source_text("about.verify.button"))
-        self.verify_button.setProperty("i18n_key_text", "about.verify.button")
-        self.copy_button = QPushButton(source_text("about.copy.button"))
-        self.copy_button.setProperty("i18n_key_text", "about.copy.button")
+        self.verify_button = QPushButton("深度验证安装")
+        self.copy_button = QPushButton("复制构建信息")
         self.verify_button.clicked.connect(self._deep_verify)
         self.copy_button.clicked.connect(self._copy_build_info)
         button_row.addWidget(self.verify_button)
@@ -352,54 +348,62 @@ class AboutPage(WorkspacePage):
         hero.body.addLayout(row)
         body.addWidget(hero)
 
-        provenance_card = SectionCard(theme, source_text("about.provenance.title"), title_key="about.provenance.title")
+        provenance_card = SectionCard(theme, "发行身份与完整性")
         self.provenance_text = QLabel()
         self.provenance_text.setWordWrap(True)
         self.provenance_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         provenance_card.body.addWidget(self.provenance_text)
-        self.integrity_result = QLabel(source_text("about.verify.not_run"))
-        self.integrity_result.setProperty("i18n_key_text", "about.verify.not_run")
+        self.integrity_result = QLabel("深度文件验证尚未运行。点击“深度验证安装”可在后台核对程序文件、可加载代码、恢复包和 SQLite 数据库。")
         self.integrity_result.setWordWrap(True)
         self.integrity_result.setProperty("muted", True)
         self.integrity_result.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         provenance_card.body.addWidget(self.integrity_result)
         body.addWidget(provenance_card)
 
-        environment = SectionCard(theme, source_text("about.environment.title"), title_key="about.environment.title")
+        environment = SectionCard(theme, "运行环境与本地数据")
         self.environment_text = QLabel(
-            current_text("about.environment.summary").format(
-                os=platform.platform(),
-                architecture=platform.machine() or "unknown",
-                python=platform.python_version(),
-                qt=self._qt_version(),
-                app_root=installation_root(),
-                data_root=context.paths.root,
-                database=context.paths.database,
-                logs=context.paths.logs,
-            )
+            f"Operating system   {platform.platform()}\n"
+            f"Architecture       {platform.machine() or 'unknown'}\n"
+            f"Python             {platform.python_version()}\n"
+            f"Qt Binding         {self._qt_version()}\n"
+            f"Application root   {installation_root()}\n"
+            f"Data root          {context.paths.root}\n"
+            f"Database           {context.paths.database}\n"
+            f"Logs               {context.paths.logs}"
         )
         self.environment_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.environment_text.setProperty("muted", True)
         environment.body.addWidget(self.environment_text)
         body.addWidget(environment)
 
-        privacy = SectionCard(theme, source_text("about.privacy.title"), title_key="about.privacy.title")
-        privacy_text = QLabel(source_text("about.privacy.text"))
-        privacy_text.setProperty("i18n_key_text", "about.privacy.text")
+        privacy = SectionCard(theme, "本地优先与隐私边界")
+        privacy_text = QLabel(
+            "• Arenyxa 核心任务、数据库、搜索索引和设置默认保存在本机，不要求 Arenyxa 官方云账户。\n"
+            "• Arenyxa 核心采集、解析、检索、导出与网络分析采用本地确定性流程。\n"
+            "• 抓取目标网站、用户主动启用的服务器/市场/网络分析功能会按其用途访问网络；本地优先不代表“永不联网”。\n"
+            "• Cookie、Authorization、Token 等敏感值在日志、诊断和插件边界默认经过脱敏策略。"
+        )
         privacy_text.setWordWrap(True)
         privacy.body.addWidget(privacy_text)
         body.addWidget(privacy)
 
-        license_card = SectionCard(theme, source_text("about.license.title"), title_key="about.license.title")
-        self.license_text = QLabel()
-        self.license_text.setWordWrap(True)
-        self.license_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        license_card.body.addWidget(self.license_text)
+        license_card = SectionCard(theme, "开源许可证与发行边界")
+        license_text = QLabel(
+            "License: GPL-3.0-or-later\n\n"
+            + commercialization_notice()
+            + "\n\n发行签名用于验证来源与完整性，不限制源码修改，也不是许可证授权、联网激活或硬件绑定。"
+        )
+        license_text.setWordWrap(True)
+        license_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        license_card.body.addWidget(license_text)
         body.addWidget(license_card)
 
-        capabilities = SectionCard(theme, source_text("about.capabilities.title"), title_key="about.capabilities.title")
-        capability_text = QLabel(source_text("about.capabilities.text"))
-        capability_text.setProperty("i18n_key_text", "about.capabilities.text")
+        capabilities = SectionCard(theme, "核心能力")
+        capability_text = QLabel(
+            "Capture & Replay · HTTP / Browser / Packet · Search & Data · Dataset Revision · Visualization\n"
+            "Workflow & Automation · Headless Server / RBAC · Plugins & Sandbox · Terminal / Packet Console\n"
+            "Repair Center · Release Provenance · Liquid Glass & Professional Motion · 10 Languages / RTL"
+        )
         capability_text.setWordWrap(True)
         capability_text.setProperty("muted", True)
         capabilities.body.addWidget(capability_text)
@@ -407,42 +411,11 @@ class AboutPage(WorkspacePage):
         body.addStretch()
 
         self._quick_report = None
-        self._refresh_localized_static()
         self._refresh_quick_identity()
 
     def set_language_manager(self, manager: LanguageManager) -> None:
         self.language_manager = manager
-        manager.changed.connect(self._language_changed)
-        self._language_changed()
-
-    def _language_changed(self, *_args) -> None:
-        self._refresh_localized_static()
         self._refresh_quick_identity()
-
-    def _refresh_localized_static(self) -> None:
-        self.version_line.setText(
-            current_text("about.version_line").format(
-                public=__display_version__,
-                engineering=__engineering_build__,
-                python=platform.python_version(),
-                qt=self._qt_version(),
-            )
-        )
-        self.environment_text.setText(
-            current_text("about.environment.summary").format(
-                os=platform.platform(),
-                architecture=platform.machine() or "unknown",
-                python=platform.python_version(),
-                qt=self._qt_version(),
-                app_root=installation_root(),
-                data_root=self.context.paths.root,
-                database=self.context.paths.database,
-                logs=self.context.paths.logs,
-            )
-        )
-        self.license_text.setText(
-            current_text("about.license.text").format(notice=commercialization_notice())
-        )
 
     def _t(self, text: str) -> str:
         return self.language_manager.literal(text) if self.language_manager is not None else text
@@ -463,8 +436,7 @@ class AboutPage(WorkspacePage):
 
     def _render_identity(self, report, *, quick: bool) -> None:
         self._quick_report = report
-        label_key = self._STATE_LABELS.get(report.state.value)
-        identity = current_text(label_key) if label_key else build_identity_summary(report)
+        identity = self._STATE_LABELS.get(report.state.value, build_identity_summary(report))
         if report.build_id:
             identity += f" · Build {report.build_id}"
         if report.signer_key_id:
@@ -475,23 +447,24 @@ class AboutPage(WorkspacePage):
         )
         self.identity_label.style().unpolish(self.identity_label)
         self.identity_label.style().polish(self.identity_label)
-        detail_key = self._STATE_DETAILS.get(report.state.value)
-        detail = current_text(detail_key) if detail_key else current_text("about.detail.complete")
+        detail = self._STATE_DETAILS.get(report.state.value, "发行身份检查已完成。")
         hash_text = report.manifest_hash[:16] + "…" if report.manifest_hash else "n/a"
-        scope = current_text("about.provenance.scope_quick" if quick else "about.provenance.scope_deep")
-        metadata = current_text("about.provenance.metadata").format(
-            version=report.version or __version__,
-            channel=report.channel or "n/a",
-            hash=hash_text,
+        scope = (
+            "快速状态只验证发行证明；只有“深度验证安装”才会逐文件核对安装内容。"
+            if quick
+            else "当前身份状态已经包含本次深度安装完整性校验结果。"
         )
-        self.provenance_text.setText(f"{identity}\n{detail}\n\n{metadata}\n{scope}")
+        metadata = f"Version: {report.version or __version__} · Channel: {report.channel or 'n/a'}"
+        self.provenance_text.setText(
+            self._t(f"{identity}\n{detail}\n\n{metadata}\nManifest SHA-256: {hash_text}\n{scope}")
+        )
 
     def _deep_verify(self) -> None:
         if not self.verify_button.isEnabled():
             return
         self.verify_button.setEnabled(False)
-        self.verify_button.setText(current_text("about.verify.running_button"))
-        self.integrity_result.setText(current_text("about.verify.running"))
+        self.verify_button.setText(self._t("正在后台验证…"))
+        self.integrity_result.setText(self._t("正在核对发布证明、签名清单、安装文件、额外可加载代码、恢复包与 SQLite 完整性…"))
 
         def worker() -> dict[str, object]:
             report = verify_release_attestation(installation_root(), deep_files=True)
@@ -503,60 +476,58 @@ class AboutPage(WorkspacePage):
 
         def completed(result: object) -> None:
             self.verify_button.setEnabled(True)
-            self.verify_button.setText(current_text("about.verify.rerun"))
+            self.verify_button.setText(self._t("重新深度验证"))
             if not isinstance(result, dict):
-                self.integrity_result.setText(current_text("about.verify.unrecognized"))
+                self.integrity_result.setText(self._t("深度验证返回了无法识别的结果。"))
                 return
             report = result.get("provenance")
             if report is None:
-                self.integrity_result.setText(current_text("about.verify.no_provenance"))
+                self.integrity_result.setText(self._t("深度验证未返回发行完整性结果。"))
                 return
             modified = list(getattr(report, "modified_files", []))
             unexpected = list(getattr(report, "unexpected_files", []))
             db_health = str(result.get("database_health", "unknown"))
-            state_key = self._STATE_LABELS.get(getattr(report.state, "value", ""))
-            state_name = current_text(state_key) if state_key else getattr(report, "display_name", "unknown")
+            state_name = self._STATE_LABELS.get(getattr(report.state, "value", ""), getattr(report, "display_name", "unknown"))
             lines = [
-                current_text("about.verify.state").format(state=state_name),
-                current_text("about.verify.modified_count").format(count=len(modified)),
-                current_text("about.verify.unexpected_count").format(count=len(unexpected)),
-                current_text("about.verify.sqlite").format(status=db_health),
+                f"发行状态：{state_name}",
+                f"签名清单中已修改文件：{len(modified)}",
+                f"额外可加载文件：{len(unexpected)}",
+                f"SQLite integrity_check：{db_health}",
             ]
             if modified:
-                lines.append(current_text("about.verify.modified").format(files=", ".join(modified[:8])))
+                lines.append("已修改：" + ", ".join(modified[:8]))
             if unexpected:
-                lines.append(current_text("about.verify.unexpected").format(files=", ".join(unexpected[:8])))
+                lines.append("额外文件：" + ", ".join(unexpected[:8]))
             notes = list(getattr(report, "notes", []))
             if notes:
-                lines.append(current_text("about.verify.notes").format(notes=" | ".join(notes[:4])))
-            lines.append(current_text("about.verify.offline"))
-            self.integrity_result.setText("\n".join(lines))
+                lines.append("说明：" + " | ".join(notes[:4]))
+            lines.append("深度验证仅读取本机安装内容与数据库完整性信息，不需要联网。")
+            self.integrity_result.setText(self._t("\n".join(lines)))
             self._render_identity(report, quick=False)
 
         def failed(message: str) -> None:
             self.verify_button.setEnabled(True)
-            self.verify_button.setText(current_text("about.verify.rerun"))
-            self.integrity_result.setText(current_text("about.verify.failed").format(message=message))
+            self.verify_button.setText(self._t("重新深度验证"))
+            self.integrity_result.setText(self._t(f"深度验证失败：{message}"))
 
         run_background(worker, completed, failed)
 
     def _copy_build_info(self) -> None:
         report = self._quick_report or verify_release_attestation(installation_root(), deep_files=False)
         lines = [
-            f"Arenyxa v{__display_version__}",
-            current_text("about.copy.engineering").format(value=__engineering_build__),
-            current_text("about.copy.release").format(value=report.display_name),
-            current_text("about.copy.channel").format(value=report.channel),
-            current_text("about.copy.build_id").format(value=report.build_id or "n/a"),
-            current_text("about.copy.signer").format(value=report.signer_key_id or "n/a"),
-            current_text("about.copy.manifest").format(value=report.manifest_hash or "n/a"),
-            current_text("about.copy.python").format(value=platform.python_version()),
-            current_text("about.copy.qt").format(value=self._qt_version()),
-            current_text("about.copy.platform").format(value=platform.platform()),
+            f"Arenyxa {__display_version__}",
+            f"Release: {report.display_name}",
+            f"Channel: {report.channel}",
+            f"Build ID: {report.build_id or 'n/a'}",
+            f"Signer: {report.signer_key_id or 'n/a'}",
+            f"Manifest SHA-256: {report.manifest_hash or 'n/a'}",
+            f"Python: {platform.python_version()}",
+            f"Qt Binding: {self._qt_version()}",
+            f"Platform: {platform.platform()}",
             "License: GPL-3.0-or-later",
         ]
         QApplication.clipboard().setText("\n".join(lines))
-        self.statusMessage.emit(current_text("about.copy.done"))
+        self.statusMessage.emit("构建信息已复制到剪贴板")
 
     @staticmethod
     def _qt_version() -> str:

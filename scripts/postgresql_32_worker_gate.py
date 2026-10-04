@@ -44,59 +44,6 @@ def _close(queue: DurableDistributedQueue) -> None:
         logging.getLogger(__name__).debug("Suppressed non-fatal exception", exc_info=True)
 
 
-def _warm_client_pool(queue: DurableDistributedQueue) -> int:
-    """Expand one PostgreSQL client pool to its configured maximum before timing.
-
-    The release gate measures steady-state queue latency, not one-time physical
-    connection creation. Holding every pool slot concurrently forces psycopg_pool
-    to create the full bounded pool outside the timed workload.
-    """
-    metrics = queue.storage_metrics()
-    target = max(1, int(metrics.get("pool_max", 1) or 1))
-    condition = threading.Condition()
-    release = threading.Event()
-    entered = 0
-    failures: list[Exception] = []
-
-    def hold_connection() -> None:
-        nonlocal entered
-        try:
-            with queue._connection():
-                with condition:
-                    entered += 1
-                    condition.notify_all()
-                if not release.wait(timeout=30.0):
-                    raise TimeoutError("timed out while holding PostgreSQL warm-up connection")
-        except Exception as exc:
-            with condition:
-                failures.append(exc)
-                condition.notify_all()
-            raise
-
-    with ThreadPoolExecutor(max_workers=target, thread_name_prefix="arenyxa-pg-warm") as executor:
-        futures = [executor.submit(hold_connection) for _ in range(target)]
-        with condition:
-            ready = condition.wait_for(
-                lambda: entered >= target or bool(failures),
-                timeout=30.0,
-            )
-        release.set()
-        future_errors: list[Exception] = []
-        for future in futures:
-            try:
-                future.result(timeout=30.0)
-            except Exception as exc:
-                future_errors.append(exc)
-
-    if not ready or entered < target or failures or future_errors:
-        first = (failures or future_errors or [RuntimeError("PostgreSQL pool warm-up timed out")])[0]
-        raise RuntimeError(
-            f"PostgreSQL pool warm-up failed: entered={entered} target={target}: "
-            f"{type(first).__name__}: {first}"
-        ) from first
-    return target
-
-
 def _database_lease_diagnostic(
     queue: DurableDistributedQueue, job_id: str, lease_token: str
 ) -> dict[str, Any]:
@@ -349,11 +296,12 @@ def run_gate(
     # semantics across client boundaries instead of only many threads on one Python object.
     client_count = max(2, min(concurrency, 16))
     clients = [DurableDistributedQueue(dsn) for _ in range(client_count)]
-    # Expand every bounded client pool to pool_max before the timed workload.
-    # A single sequential checkout only exercises one slot and leaves the pool
-    # to grow from min_size to max_size under benchmark load, contaminating P99
-    # with one-time physical connection creation.
-    warmed_client_pool_sizes = [_warm_client_pool(client) for client in clients]
+    # psycopg_pool opens min_size connections lazily on the first checkout.
+    # Open every independent client pool before the timed workload so the gate
+    # measures lease-path latency rather than one-time connection establishment.
+    for client in clients:
+        with client._connection():
+            pass
     job_ids = [
         coordinator.enqueue(
             "benchmark.noop", {"sequence": index},
@@ -484,7 +432,6 @@ def run_gate(
             "concurrency": concurrency,
             "slots_per_worker": slots_per_worker,
             "independent_clients": client_count,
-            "warmed_client_pool_sizes": warmed_client_pool_sizes,
             "jobs": jobs,
             "completed": completed,
             "errors": errors,

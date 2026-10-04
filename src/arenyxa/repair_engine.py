@@ -97,13 +97,16 @@ class RepairEngine:
         self.install_root = Path(plan.install_root).resolve()
         self.data_root = Path(plan.data_root).resolve()
         self.paths = AppPaths.discover(self.data_root)
-        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         self.repair_root = self.data_root / "repair"
-        self.backup_root = self.repair_root / "backups" / stamp
         self.log_dir = self.repair_root / "logs"
+        self.finding_codes = {str(item.get("code", "")) for item in plan.detected_findings if isinstance(item, dict)}
+        self._begin_attempt()
+
+    def _begin_attempt(self) -> None:
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(8)
+        self.backup_root = self.repair_root / "backups" / stamp
         self.actions: list[RepairActionResult] = []
         self.unresolved: list[str] = []
-        self.finding_codes = {str(item.get("code", "")) for item in plan.detected_findings if isinstance(item, dict)}
         self.started_at = _utc_now()
                                                                                            
                                                                                               
@@ -169,8 +172,9 @@ class RepairEngine:
                 unresolved=[message],
             )
         try:
+            self._begin_attempt()
             self.log_dir.mkdir(parents=True, exist_ok=True)
-            self.backup_root.mkdir(parents=True, exist_ok=True)
+            self.backup_root.mkdir(parents=True, exist_ok=False)
             self.log("Arenyxa Repair Center / 自愈修复中心")
             self.log(f"安装目录: {self.install_root}")
             self.log(f"数据目录: {self.data_root}")
@@ -239,10 +243,18 @@ class RepairEngine:
             return
         destination = self.backup_root / group / path.name
         destination.parent.mkdir(parents=True, exist_ok=True)
-        if path.is_dir():
-            shutil.copytree(path, destination, dirs_exist_ok=True)
-        else:
-            shutil.copy2(path, destination)
+        while True:
+            try:
+                if path.is_dir():
+                    destination.mkdir(exist_ok=False)
+                    shutil.copytree(path, destination, dirs_exist_ok=True)
+                else:
+                    with destination.open("xb") as target, path.open("rb") as source:
+                        shutil.copyfileobj(source, target)
+                    shutil.copystat(path, destination)
+                return
+            except FileExistsError:
+                destination = destination.with_name(path.name + "-" + secrets.token_hex(8))
 
     def _repair_program_files(self) -> str:
         if not self.plan.source_mode:
@@ -258,7 +270,7 @@ class RepairEngine:
                     bad.append(relative)
             if bad:
                 raise RuntimeError(f"外部恢复后仍有 {len(bad)} 个安装文件异常: {bad[:8]}")
-            return "当前安装目录已由独立修复终端恢复，并完成逐文件 SHA-256 验证。"
+            return "当前安装目录已完成逐文件 SHA-256 验证。"
         seed_path = repair_resource("repair_seed.zip")
         if not seed_path.is_file():
             seed_path = self.data_root / "repair" / "known_good" / "repair_seed.zip"
@@ -788,4 +800,3 @@ class RepairEngine:
             summary = "; ".join(f"{item.code}: {item.title}" for item in remaining[:8])
             raise RuntimeError("修复后仍检测到: " + summary)
         return "启动健康扫描通过。"
-

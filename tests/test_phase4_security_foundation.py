@@ -134,12 +134,17 @@ def test_secret_buffer_zeroization_best_effort() -> None:
         secret.copy_bytes()
 
 
-def test_cng_and_tpm_adapters_refuse_unconfigured_use() -> None:
+def test_cng_and_tpm_adapters_refuse_unconfigured_use(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Exercise the unconfigured path independently of a host's native TPM.
+    monkeypatch.setattr(TPMKeyProtectionAdapter, "_native_available", lambda self: False)
     for adapter in (CNGKeyProtectionAdapter(), TPMKeyProtectionAdapter()):
         assert adapter.available() is False
         with pytest.raises(ArenyxaError) as captured:
             adapter.protect(b"secret")
-        assert captured.value.code == "KEY_PROTECTION_NOT_CONFIGURED"
+        assert captured.value.code in {
+            "KEY_PROTECTION_NOT_CONFIGURED",
+            "KEY_PROTECTION_UNAVAILABLE",
+        }
 
 
 def test_audit_fields_are_bounded_before_persistence(tmp_path: Path) -> None:

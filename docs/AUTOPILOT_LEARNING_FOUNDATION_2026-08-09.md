@@ -57,4 +57,3 @@ The intended sequence is:
 3. Add cross-site coarse-feature priors without storing hostnames.
 4. Accumulate real labelled feedback and build offline benchmark datasets.
 5. Only after sufficient data exists, evaluate a small CPU-friendly Strategy Ranker / Selector Ranker. The deterministic engine remains the validator and fallback.
-

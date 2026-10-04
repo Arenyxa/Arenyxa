@@ -924,4 +924,3 @@ class EnterprisePage(WorkspacePage):
             QMessageBox.information(self, "Enterprise Distributed Jobs", text)
         except Exception as exc:
             self._show_error("读取分布式 Job 失败", exc)
-

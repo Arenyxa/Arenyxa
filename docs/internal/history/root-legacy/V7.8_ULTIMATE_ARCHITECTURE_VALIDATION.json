@@ -1,0 +1,34 @@
+{
+  "schema": "arenyxa.ultimate-architecture-validation/v1",
+  "product": "Arenyxa",
+  "public_version": "7.8",
+  "package_version": "7.8.0",
+  "validated_on": "2026-08-22",
+  "test_all": {
+    "exit_code": 0,
+    "pytest_passed": 1245,
+    "pytest_failed": 0,
+    "conditional_skipped": 5,
+    "critical_ruff": "pass",
+    "python38_grammar_files": 140,
+    "phase0_integrity": "pass",
+    "github_publication_gate": "pass"
+  },
+  "architecture_tests": {
+    "navigation": "pass",
+    "performance": "pass",
+    "startup": "pass",
+    "protocol": "pass"
+  },
+  "runtime_validation": {
+    "offscreen_smoke_exit_code": 0,
+    "single_window_shell": "pass",
+    "navigation_capability_isolation": "pass",
+    "repair_seed_files": 395,
+    "source_manifest_files": 954
+  },
+  "notes": [
+    "Conditional skips require POSIX /proc or an installed TShark parity backend and are accepted by the release gate.",
+    "Full Ruff and Mypy inventories remain advisory under the existing v7.8 release policy; critical Ruff is release-blocking and passed."
+  ]
+}

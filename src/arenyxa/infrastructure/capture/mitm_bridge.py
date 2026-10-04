@@ -25,6 +25,25 @@ _INTERCEPT = flowfilter.parse(_INTERCEPT_SOURCE) if _INTERCEPT_SOURCE else None
 _VIEW = flowfilter.parse(_VIEW_SOURCE) if _VIEW_SOURCE else None
 _LOCK = threading.Lock()
 _SEQUENCE = 0
+_BACKGROUND_TASKS: set[asyncio.Task[Any]] = set()
+
+
+def _spawn_background(coroutine: Any) -> asyncio.Task[Any]:
+    task = asyncio.create_task(coroutine)
+    _BACKGROUND_TASKS.add(task)
+
+    def completed(finished: asyncio.Task[Any]) -> None:
+        _BACKGROUND_TASKS.discard(finished)
+        try:
+            finished.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            # Async bridge callbacks own observation of arbitrary addon failures.
+            record_current_exception(__name__, "mitm_bridge.background_task")
+
+    task.add_done_callback(completed)
+    return task
 
 
 for _directory in (_EVENT_FILE.parent, _PENDING_DIR, _CONTROL_DIR):
@@ -234,7 +253,7 @@ class ArenyxaMitmBridge:
         payload["_flow"] = flow
         _emit(payload)
         if _should_intercept(flow):
-            asyncio.create_task(_wait_for_control(flow, "request", payload["payload"], lambda edited: _apply_http(flow, "request", edited)))
+            _spawn_background(_wait_for_control(flow, "request", payload["payload"], lambda edited: _apply_http(flow, "request", edited)))
 
     def response(self, flow: Any) -> None:
         """Record an HTTP response and schedule interception when policy matches."""
@@ -244,7 +263,7 @@ class ArenyxaMitmBridge:
         payload["_flow"] = flow
         _emit(payload)
         if _should_intercept(flow):
-            asyncio.create_task(_wait_for_control(flow, "response", payload["payload"], lambda edited: _apply_http(flow, "response", edited)))
+            _spawn_background(_wait_for_control(flow, "response", payload["payload"], lambda edited: _apply_http(flow, "response", edited)))
 
     def error(self, flow: Any) -> None:
         """Record an HTTP flow error without exposing sensitive payloads."""
@@ -275,7 +294,7 @@ class ArenyxaMitmBridge:
                     if content is not None:
                         message.content = _decode_bytes(content)
                 await _wait_for_control(flow, "websocket", payload["payload"], apply)
-            asyncio.create_task(apply_wait())
+            _spawn_background(apply_wait())
 
     def websocket_end(self, flow: Any) -> None:
         """Record WebSocket connection closure metadata."""

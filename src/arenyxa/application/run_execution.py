@@ -17,7 +17,7 @@ from typing import Callable
 
 from arenyxa.application.future_callbacks import ReleaseFutureCallback
 from arenyxa.application.reliability import PerformanceSample
-from arenyxa.application.runner_support import _HostLease, _RequestOutcome
+from arenyxa.application.runner_support import RunHandle, _HostLease, _RequestOutcome
 from arenyxa.compat import dataclass
 from arenyxa.domain.enums import RunStatus
 from arenyxa.domain.errors import ArenyxaError
@@ -49,6 +49,38 @@ class _RunExecutionState:
 class RunExecutionMixin:
     """Request/data-plane half of RunOrchestrator."""
 
+    def _on_run_done(self, run: Run, future: Future[Run], state_lock: threading.RLock) -> None:
+        with self._drain_condition:
+            if run.id not in self._handles or run.id in self._retiring_runs:
+                return
+            self._retiring_runs.add(run.id)
+            self._failed_run_retirements.discard(run.id)
+        retired = False
+        try:
+            with state_lock:
+                if run.status not in RunHandle._TERMINAL:
+                    run.status = RunStatus.CANCELLED if future.cancelled() else RunStatus.FAILED
+                    run.stage = run.status.value
+                    run.error_code = None if future.cancelled() else "RUN_UNEXPECTED"
+                    run.finished_at = utc_now()
+                # Future completion and in-memory status cannot prove durability.
+                # Every accepted run retires only after this terminal write.
+                self.store.save_run(run)
+            retired = True
+        # broad-exception-boundary: retain accepted-run ownership after a failed durable write.
+        except Exception:
+            self.logger.exception("failed to persist terminal run", extra={"run_id": run.id})
+        finally:
+            with self._drain_condition:
+                self._retiring_runs.discard(run.id)
+                if retired:
+                    self._handles.pop(run.id, None)
+                else:
+                    self._failed_run_retirements.add(run.id)
+                    self._shutdown_started = False
+                    self._shutdown_failed = True
+                self._drain_condition.notify_all()
+
     def _admit_request(
         self,
         *,
@@ -66,45 +98,44 @@ class RunExecutionMixin:
 
 
 
-        lease = self._host_limiter.try_acquire(host, self._adaptive_rate.limit(host))
-        if lease is None:
-            return False
-        if not self._request_gate.try_acquire(run.id):
-            lease.release()
-            return None
-        if not self._adaptive_rate.ready_and_reserve(host):
-            lease.release()
-            self._request_gate.release()
-            return False
-        try:
-            future = self.request_executor.submit(
-                self._process_request, index, task, run.id, spec, token, lease
-            )
-        except RuntimeError as exc:
-            lease.release()
-            self._request_gate.release()
-            with self._lock:
-                shutting_down = self._closed
-            if token.cancelled or shutting_down:
-                token.cancel()
-                raise ArenyxaError("RUN_CANCELLED", "操作已取消。", domain="RUN") from exc
-            raise
-        # broad-exception-boundary: resource accounting must roll back for every submission failure.
-        except Exception:
-            lease.release()
-            self._request_gate.release()
-            raise
-
-                                                                                          
-                                                                                  
-        future.add_done_callback(ReleaseFutureCallback(self._request_gate.release))
+        # Shutdown snapshots and request handoff share the same admission lock.
         with self._lock:
+            if self._closed:
+                token.cancel()
+                raise ArenyxaError("RUN_CANCELLED", "操作已取消。", domain="RUN")
+            lease = self._host_limiter.try_acquire(host, self._adaptive_rate.limit(host))
+            if lease is None:
+                return False
+            if not self._request_gate.try_acquire(run.id):
+                lease.release()
+                return None
+            if not self._adaptive_rate.ready_and_reserve(host):
+                lease.release()
+                self._request_gate.release()
+                return False
+            try:
+                future = self.request_executor.submit(
+                    self._process_request, index, task, run.id, spec, token, lease
+                )
+            except RuntimeError as exc:
+                lease.release()
+                self._request_gate.release()
+                if token.cancelled or self._closed:
+                    token.cancel()
+                    raise ArenyxaError("RUN_CANCELLED", "操作已取消。", domain="RUN") from exc
+                raise
+            # broad-exception-boundary: resource accounting must roll back for every submission failure.
+            except Exception:
+                lease.release()
+                self._request_gate.release()
+                raise
+
             self._request_futures.add(future)
-        future.add_done_callback(self._forget_request_future)
-                                                                                                
-                                                                                                 
-        future.add_done_callback(ReleaseFutureCallback(lease.release, cancelled_only=True))
-        run.request_count += 1
+            future.add_done_callback(ReleaseFutureCallback(self._request_gate.release))
+            future.add_done_callback(ReleaseFutureCallback(lease.release, cancelled_only=True))
+            # Retire only after both resource-release callbacks have completed.
+            future.add_done_callback(self._forget_request_future)
+            run.request_count += 1
         return future, lease
 
     def _storage_pressure_snapshot(self) -> dict[str, object]:
@@ -431,10 +462,8 @@ class RunExecutionMixin:
         try:
             self._persist_progress(run, on_progress)
         except ArenyxaError as exc:
-            with state_lock:
-                run.status = RunStatus.FAILED
-                run.error_code = "RUN_STORAGE_FAILED"
-                run.stage = "failed"
+            # Keep the execution outcome intact. Retirement owns retrying this
+            # exact terminal state before it releases the run handle.
             self.logger.error(
                 "final run persistence failed",
                 extra={"error_code": exc.code, "context": {"run_id": run.id}},

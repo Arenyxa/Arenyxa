@@ -45,7 +45,7 @@ class ArenyxaRuntimeSupervisor:
         self._probes: dict[str, Callable[[], Mapping[str, Any]]] = {}
         self._incident_listeners: list[Callable[[SupervisorIncident], None]] = []
         self._incidents: list[SupervisorIncident] = []
-        self._reported_stalls: set[tuple[str, int]] = set()
+        self._reported_stalls: set[str] = set()
         self._lock = threading.RLock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -71,9 +71,7 @@ class ArenyxaRuntimeSupervisor:
         now = time.monotonic()
         with self._lock:
             self._heartbeats[component_name] = (now, state_copy)
-            self._reported_stalls = {
-                key for key in self._reported_stalls if key[0] != component_name
-            }
+            self._reported_stalls.discard(component_name)
         self._external.heartbeat(component_name, state_copy)
 
     def start(self) -> None:
@@ -89,14 +87,20 @@ class ArenyxaRuntimeSupervisor:
             self._external.start()
             self._thread.start()
 
-    def stop(self, timeout: float = 2.0) -> None:
+    def stop(self, timeout: float = 2.0) -> bool:
+        deadline = time.monotonic() + max(0.0, float(timeout))
         self._stop.set()
         with self._lock:
             thread = self._thread
-            self._thread = None
         if thread is not None and thread is not threading.current_thread():
-            thread.join(max(0.0, float(timeout)))
-        self._external.stop(timeout=max(1.0, float(timeout)))
+            thread.join(max(0.0, deadline - time.monotonic()))
+        external_closed = self._external.stop(timeout=max(0.0, deadline - time.monotonic()))
+        if thread is not None and thread.is_alive():
+            return False
+        with self._lock:
+            if self._thread is thread:
+                self._thread = None
+        return external_closed is not False
 
     def incidents(self) -> tuple[SupervisorIncident, ...]:
         with self._lock:
@@ -148,13 +152,26 @@ class ArenyxaRuntimeSupervisor:
                 blocked = now - seen
                 if blocked <= self.event_loop_block_seconds:
                     continue
-                bucket = int(blocked // self.event_loop_block_seconds)
-                key = (component, bucket)
                 with self._lock:
-                    if key in self._reported_stalls:
+                    if component in self._reported_stalls or self._heartbeats.get(component, (None,))[0] != seen:
                         continue
-                    self._reported_stalls.add(key)
+                    self._reported_stalls.add(component)
                 self._record_incident(component, blocked, state)
+
+    def _prune_diagnostic_families(self) -> None:
+        """Keep report/stack pairs together, including incomplete disk-write families."""
+        families: dict[str, list[Path]] = {}
+        for path in self.diagnostics_dir.glob("event-loop-block-*"):
+            suffix = next((item for item in (".stacks.log", ".json") if path.name.endswith(item)), None)
+            if suffix is not None and path.is_file():
+                families.setdefault(path.name[:-len(suffix)], []).append(path)
+        try:
+            ordered = sorted(families.values(), key=lambda group: max(path.stat().st_mtime_ns for path in group))
+            for group in ordered[:-32]:
+                for path in group:
+                    path.unlink(missing_ok=True)
+        except OSError:
+            LOGGER.exception("Runtime Supervisor diagnostic retention incomplete")
 
     def _record_incident(
         self, component: str, blocked_seconds: float, state: Mapping[str, Any]
@@ -184,6 +201,8 @@ class ArenyxaRuntimeSupervisor:
             atomic_write_json(report_path, payload)
         except OSError:
             LOGGER.exception("Runtime Supervisor failed to persist incident report")
+        finally:
+            self._prune_diagnostic_families()
         incident = SupervisorIncident(
             component=component,
             code="EVENT_LOOP_BLOCKED",

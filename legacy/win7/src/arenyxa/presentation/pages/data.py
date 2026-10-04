@@ -346,4 +346,3 @@ class VersionPage(WorkspacePage):
             ),
             lambda message: self.detail.setPlainText(f"Revision 比较失败：{message}"),
         )
-

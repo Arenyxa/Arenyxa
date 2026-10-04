@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from arenyxa.qt_compat.QtCore import QPointF, QRectF, Qt, QTimer
+from arenyxa.qt_compat.QtCore import QPointF, QRectF, Qt, QTimer, Slot
 from arenyxa.qt_compat.QtGui import QColor, QLinearGradient, QMouseEvent, QPainter, QPainterPath, QPen
 from arenyxa.qt_compat.QtWidgets import QApplication, QFrame, QWidget
 
@@ -40,7 +40,11 @@ class GlassPanel(QFrame):
         self._hover_timer.setTimerType(Qt.TimerType.PreciseTimer)
         self._hover_timer.setInterval(16)
         self._hover_timer.timeout.connect(self._animate_specular)
-        self.theme_manager.changed.connect(lambda _theme: self.update())
+        self.theme_manager.changed.connect(self._theme_changed)
+
+    @Slot(str)
+    def _theme_changed(self, _theme: str) -> None:
+        self.update()
 
     def _motion_static(self) -> bool:
         current: QWidget | None = self

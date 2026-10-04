@@ -17,7 +17,14 @@ def console_write(
     output or line-oriented worker protocols that intentionally use stdout/stderr.
     """
     stream = sys.stderr if error else sys.stdout
+    if stream is None:
+        return
     text = sep.join(str(value) for value in values) + end
-    stream.write(text)
+    try:
+        stream.write(text)
+    except UnicodeEncodeError:
+        # Redirected Windows consoles may not support Unicode diagnostic symbols.
+        encoding = getattr(stream, "encoding", None) or "utf-8"
+        stream.write(text.encode(encoding, errors="backslashreplace").decode(encoding))
     if flush:
         stream.flush()

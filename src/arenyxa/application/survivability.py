@@ -160,13 +160,18 @@ class SurvivabilityManager:
             )
             self._thread.start()
 
-    def stop(self, timeout: float = 2.0) -> None:
+    def stop(self, timeout: float = 2.0) -> bool:
         self._stop.set()
         with self._lock:
             thread = self._thread
-            self._thread = None
         if thread is not None and thread is not threading.current_thread():
             thread.join(max(0.0, float(timeout)))
+        if thread is not None and thread.is_alive():
+            return False
+        with self._lock:
+            if self._thread is thread:
+                self._thread = None
+        return True
 
     def _run(self) -> None:
         while not self._stop.wait(self.sample_interval_seconds):

@@ -179,6 +179,7 @@ def test_network_terminal_service_protocol_and_input_guards() -> None:
 
 
 def test_packet_capabilities_report_native_coverage_without_external_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("arenyxa.infrastructure.capture.packet_analysis.shutil.which", lambda _name: None)
     engine = PacketAnalysisEngine("")
     assert engine.available is False
     capabilities = engine.capabilities()
@@ -324,7 +325,8 @@ def test_native_capture_inspect_does_not_materialize_full_file_and_reports_trunc
     assert info.truncated is True
 
 
-def test_native_statistics_remain_available_without_external_runtime(tmp_path: Path) -> None:
+def test_native_statistics_remain_available_without_external_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("arenyxa.infrastructure.capture.packet_analysis.shutil.which", lambda _name: None)
     frame = _ethernet(_ipv4(_udp(_dns_query("stats.example"), 53000, 53), 17))
     capture = tmp_path / "stats.pcap"
     _write_pcap(capture, frame)
@@ -340,7 +342,8 @@ def test_native_statistics_remain_available_without_external_runtime(tmp_path: P
     assert service["applications"][0]["key"] == "dns"
 
 
-def test_native_stream_quality_marks_retransmission_without_unbounded_state(tmp_path: Path) -> None:
+def test_native_stream_quality_marks_retransmission_without_unbounded_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("arenyxa.infrastructure.capture.packet_analysis.shutil.which", lambda _name: None)
     payload = b"GET /flow HTTP/1.1\r\nHost: flow.example\r\n\r\n"
     frame = _ethernet(_ipv4(_tcp(payload, 51000, 80), 6))
     capture = tmp_path / "flow.pcap"
@@ -401,7 +404,8 @@ def _tcp_with_sequence(payload: bytes, source_port: int, destination_port: int, 
     return struct.pack("!HHIIBBHHH", source_port, destination_port, sequence, 200, 0x50, flags, 65535, 0, 0) + payload
 
 
-def test_native_tcp_reassembly_recognizes_http_split_across_segments(tmp_path: Path) -> None:
+def test_native_tcp_reassembly_recognizes_http_split_across_segments(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("arenyxa.infrastructure.capture.packet_analysis.shutil.which", lambda _name: None)
     part1 = b"GET /split HTTP/1.1\r\nHo"
     part2 = b"st: reassembled.example\r\nUser-Agent: Arenyxa-Test\r\n\r\n"
     frame1 = _ethernet(_ipv4(_tcp_with_sequence(part1, 51000, 80, 1000), 6))

@@ -40,22 +40,7 @@ class JobLifecycle:
         lease = self._queue.lease_next(worker_id, lease_seconds=lease_seconds)
         if lease is None:
             return None
-        try:
-            self._queue.start_job(lease.job_id, worker_id, lease.lease_token)
-        except Exception:
-            # Lease already committed; release via fail so the job is not orphaned
-            # without a ClaimedJob handle. Best-effort: still surface start_job error.
-            try:
-                self._queue.fail(
-                    lease.job_id,
-                    worker_id,
-                    lease.lease_token,
-                    "JOB_START_FAILED",
-                    retryable=True,
-                )
-            except (OSError, RuntimeError, ValueError):
-                pass
-            raise
+        self.start_job(lease.job_id, worker_id, lease.lease_token)
         return ClaimedJob(
             job_id=lease.job_id,
             worker_id=str(worker_id),
@@ -66,6 +51,25 @@ class JobLifecycle:
             attempt=int(lease.attempt),
             max_attempts=int(lease.max_attempts),
         )
+
+    def start_job(self, job_id: str, worker_id: str, lease_token: str) -> None:
+        """Start an existing lease, releasing it if admission to execution fails."""
+        try:
+            self._queue.start_job(job_id, worker_id, lease_token)
+        except Exception:
+            # Lease already committed; release via fail so the job is not orphaned
+            # without a ClaimedJob handle. Best-effort: still surface start_job error.
+            try:
+                self._queue.fail(
+                    job_id,
+                    worker_id,
+                    lease_token,
+                    "JOB_START_FAILED",
+                    retryable=True,
+                )
+            except Exception:
+                pass
+            raise
 
     def complete_job(self, claimed: ClaimedJob, result: Mapping[str, Any]) -> None:
         self._queue.complete(claimed.job_id, claimed.worker_id, claimed.lease_token, result)

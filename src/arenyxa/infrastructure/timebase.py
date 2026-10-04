@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import threading
 import time
+import math
+import sys
+import uuid
 from dataclasses import dataclass
 from typing import Callable
 
@@ -40,8 +43,20 @@ class StableEpochClock:
     def monotonic(self) -> float:
         return float(self._monotonic())
 
+    def anchored(self, epoch: float, monotonic: float) -> "StableEpochClock":
+        """Return a private clock using a durable anchor in the same boot domain."""
+        if not math.isfinite(epoch) or not math.isfinite(monotonic):
+            raise ValueError("Clock anchor must be finite")
+        value = StableEpochClock(wall=self._wall, monotonic=self._monotonic)
+        value._wall_anchor = epoch
+        value._mono_anchor = monotonic
+        value._last = epoch
+        return value
+
     def stable_epoch(self) -> float:
         candidate = self._wall_anchor + max(0.0, self.monotonic() - self._mono_anchor)
+        if not math.isfinite(candidate):
+            raise ValueError("Clock epoch must be finite")
         with self._lock:
             if candidate < self._last:
                 candidate = self._last
@@ -64,4 +79,27 @@ class StableEpochClock:
         )
 
 
+def boot_clock_domain() -> str:
+    """Identify OS boot without deriving it from the adjustable wall clock."""
+    if sys.platform == "win32":
+        import ctypes
+
+        # SystemBootEnvironmentInformation begins with the boot identifier GUID.
+        buffer = ctypes.create_string_buffer(32)
+        status = ctypes.windll.ntdll.NtQuerySystemInformation(90, buffer, len(buffer), None)
+        if status == 0:
+            return "windows:" + bytes(buffer[:16]).hex()
+    elif sys.platform.startswith("linux"):
+        from pathlib import Path
+
+        try:
+            return "linux:" + Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+        except OSError:
+            pass
+    # Unknown boot identity is deliberately process-scoped: reopening in another
+    # process expires old leases instead of trusting an unrelated monotonic epoch.
+    return "process:" + _PROCESS_CLOCK_DOMAIN
+
+
+_PROCESS_CLOCK_DOMAIN = uuid.uuid4().hex
 PROCESS_CLOCK = StableEpochClock()

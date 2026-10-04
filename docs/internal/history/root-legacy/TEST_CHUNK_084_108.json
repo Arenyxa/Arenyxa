@@ -1,0 +1,170 @@
+[
+  {
+    "file": "tests/test_v656_independent_reaudit.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 6.806,
+    "output": "..............                                                           [100%]\n14 passed in 3.89s\n"
+  },
+  {
+    "file": "tests/test_v656_stability_compatibility_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 7.182,
+    "output": "..........                                                               [100%]\n10 passed in 4.47s\n"
+  },
+  {
+    "file": "tests/test_v660_stability_stress.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 19.336,
+    "output": "..............                                                           [100%]\n14 passed in 15.91s\n"
+  },
+  {
+    "file": "tests/test_v661_windows7_legacy_compat.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 11.005,
+    "output": "...........................                                              [100%]\n27 passed in 8.76s\n"
+  },
+  {
+    "file": "tests/test_v66_final_release.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.375,
+    "output": "...                                                                      [100%]\n3 passed in 0.05s\n"
+  },
+  {
+    "file": "tests/test_v66_icon_stability_reaudit.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.911,
+    "output": "......                                                                   [100%]\n6 passed in 0.24s\n"
+  },
+  {
+    "file": "tests/test_v66_motion_refinement.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.538,
+    "output": ".......                                                                  [100%]\n7 passed in 0.06s\n"
+  },
+  {
+    "file": "tests/test_v66beta2_deep_review.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 12.175,
+    "output": ".................                                                        [100%]\n17 passed in 9.59s\n"
+  },
+  {
+    "file": "tests/test_v66beta2_gui_interaction_semantics.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.206,
+    "output": "......                                                                   [100%]\n6 passed in 0.04s\n"
+  },
+  {
+    "file": "tests/test_v66beta2_navigation_commit_reliability.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.057,
+    "output": "....                                                                     [100%]\n4 passed in 0.04s\n"
+  },
+  {
+    "file": "tests/test_v66beta2_reaudit_ui_lifecycle.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.33,
+    "output": ".......                                                                  [100%]\n7 passed in 0.04s\n"
+  },
+  {
+    "file": "tests/test_v66beta2_repair_dialog_button_compat.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.306,
+    "output": "..                                                                       [100%]\n2 passed in 0.05s\n"
+  },
+  {
+    "file": "tests/test_v66beta2_ui_rtl_responsiveness.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.42,
+    "output": "......                                                                   [100%]\n6 passed in 0.04s\n"
+  },
+  {
+    "file": "tests/test_v66beta2_windows_fsync.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.382,
+    "output": "...                                                                      [100%]\n3 passed in 0.05s\n"
+  },
+  {
+    "file": "tests/test_v66beta2_windows_native_qt_crash_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.363,
+    "output": "...                                                                      [100%]\n3 passed in 0.05s\n"
+  },
+  {
+    "file": "tests/test_v66beta2_windows_qt_header_hotfix.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.389,
+    "output": "...                                                                      [100%]\n3 passed in 0.04s\n"
+  },
+  {
+    "file": "tests/test_v67_integrated_startup_handoff.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.257,
+    "output": ".......                                                                  [100%]\n7 passed in 0.05s\n"
+  },
+  {
+    "file": "tests/test_v67_startup_motion_release.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.033,
+    "output": "........                                                                 [100%]\n8 passed in 0.04s\n"
+  },
+  {
+    "file": "tests/test_v67_startup_repair_scaling_capture_polish.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.244,
+    "output": ".......                                                                  [100%]\n7 passed in 0.06s\n"
+  },
+  {
+    "file": "tests/test_v68_performance_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.162,
+    "output": "......                                                                   [100%]\n6 passed in 0.95s\n"
+  },
+  {
+    "file": "tests/test_v68_stability_hardening.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 3.568,
+    "output": "ss..........                                                             [100%]\n=========================== short test summary info ============================\nSKIPPED [1] tests/test_v68_stability_hardening.py:54: Windows process-probe contract\nSKIPPED [1] tests/test_v68_stability_hardening.py:83: Windows process-probe contract\n10 passed, 2 skipped in 1.37s\n"
+  },
+  {
+    "file": "tests/test_v68_stable_release_polish.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.411,
+    "output": ".....s......                                                             [100%]\n=========================== short test summary info ============================\nSKIPPED [1] tests/test_v68_stable_release_polish.py:87: No supported Qt binding is installed\n11 passed, 1 skipped in 0.21s\n"
+  },
+  {
+    "file": "tests/test_v68_windows_dpi_accessibility_compat.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.807,
+    "output": "..sss..                                                                  [100%]\n=========================== short test summary info ============================\nSKIPPED [2] tests/test_v68_windows_dpi_accessibility_compat.py:75: No supported Qt binding is installed\nSKIPPED [1] tests/test_v68_windows_dpi_accessibility_compat.py:121: No supported Qt binding is installed\n4 passed, 3 skipped in 0.43s\n"
+  },
+  {
+    "file": "tests/test_v70_architecture_network_governance.py",
+    "rc": 0,
+    "timeout": false,
+    "seconds": 2.212,
+    "output": ".......                                                                  [100%]\n7 passed in 0.19s\n"
+  }
+]

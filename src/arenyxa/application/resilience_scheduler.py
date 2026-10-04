@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import logging
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,6 +12,7 @@ from arenyxa.infrastructure.atomic_io import atomic_write_json, read_text_limite
 
 _MAX_HISTORY = 64
 _MAX_FILE_BYTES = 2 * 1024 * 1024
+LOGGER = logging.getLogger(__name__)
 
 
 class ResilienceDrillScheduler:
@@ -34,6 +36,8 @@ class ResilienceDrillScheduler:
         self._enabled = False
         self._last_run_at = ""
         self._last_state = "never"
+        self._failure_count = 0
+        self._last_error = ""
         self._load_config()
 
     def _load_config(self) -> None:
@@ -114,7 +118,17 @@ class ResilienceDrillScheduler:
                 enabled = self._enabled
             if not enabled:
                 return
-            self.run_once()
+            try:
+                self.run_once()
+            except Exception as exc:
+                with self._lock:
+                    self._failure_count += 1
+                    self._last_error = f"{type(exc).__name__}: {exc}"[:1024]
+                    self._last_state = "failed"
+                LOGGER.exception("Scheduled resilience drill failed; next interval remains enabled")
+            else:
+                with self._lock:
+                    self._last_error = ""
 
     def start_if_enabled(self) -> None:
         with self._lock:
@@ -136,19 +150,20 @@ class ResilienceDrillScheduler:
         with self._lock:
             self._enabled = False
             self._save_config()
-            thread = self._thread
-            self._thread = None
-            self._stop.set()
-        if thread is not None and thread is not threading.current_thread():
-            thread.join(timeout=2.0)
+        self.shutdown()
 
-    def shutdown(self) -> None:
+    def shutdown(self, timeout: float = 2.0) -> bool:
         with self._lock:
             thread = self._thread
-            self._thread = None
             self._stop.set()
         if thread is not None and thread is not threading.current_thread():
-            thread.join(timeout=2.0)
+            thread.join(timeout=max(0.0, float(timeout)))
+        if thread is not None and thread.is_alive():
+            return False
+        with self._lock:
+            if self._thread is thread:
+                self._thread = None
+        return True
 
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
@@ -158,5 +173,7 @@ class ResilienceDrillScheduler:
                 "running": bool(self._thread is not None and self._thread.is_alive()),
                 "last_run_at": self._last_run_at,
                 "last_state": self._last_state,
+                "failure_count": self._failure_count,
+                "last_error": self._last_error,
                 "history": self._load_history()[-10:],
             }

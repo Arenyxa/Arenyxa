@@ -9,6 +9,10 @@
 AppId={{62ED5A19-19D3-402F-8819-D06C9D4A768B}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
+VersionInfoVersion={#MyAppVersion}.0
+VersionInfoTextVersion={#MyAppVersion}.0
+VersionInfoProductVersion={#MyAppVersion}.0
+VersionInfoProductTextVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\Arenyxa
 DefaultGroupName=Arenyxa
@@ -31,8 +35,22 @@ MinVersion=6.1sp1
 Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[CustomMessages]
+english.DesktopShortcut=Create a desktop shortcut
+chinesesimplified.DesktopShortcut=创建桌面快捷方式
+english.AdditionalShortcuts=Additional shortcuts:
+chinesesimplified.AdditionalShortcuts=附加快捷方式：
+english.InstallServiceTask=Install Arenyxa Windows Service (administrator mode)
+chinesesimplified.InstallServiceTask=安装 Arenyxa Windows Service（管理员模式）
+english.EnterpriseRuntime=Enterprise runtime:
+chinesesimplified.EnterpriseRuntime=企业运行时：
+english.InstallService=Install Arenyxa Windows Service
+chinesesimplified.InstallService=安装 Arenyxa Windows Service
+english.LaunchArenyxa=Launch Arenyxa
+chinesesimplified.LaunchArenyxa=启动 Arenyxa
+
 [Tasks]
-Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加快捷方式："; Flags: unchecked
+Name: "desktopicon"; Description: "{cm:DesktopShortcut}"; GroupDescription: "{cm:AdditionalShortcuts}"; Flags: unchecked
 
 [Files]
 Source: "{#ProjectRoot}\dist\Arenyxa\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -54,7 +72,7 @@ Type: files; Name: "{autodesktop}\Arenyxa.lnk"
 Type: files; Name: "{group}\Arenyxa.lnk"
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "启动 Arenyxa"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchArenyxa}"; Flags: nowait postinstall skipifsilent
 
 [Code]
 // Arenyxa-only installer: no legacy executable deletion is performed.

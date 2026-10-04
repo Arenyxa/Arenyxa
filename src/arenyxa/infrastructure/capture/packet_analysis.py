@@ -87,11 +87,20 @@ class PacketAnalysisEngine(PacketAnalysisNativeMixin, PacketRowProjectionMixin, 
             fields = self.glossary("fields")
             tools = {name: str(shutil.which(name) or "") for name in self.TOOL_NAMES}
             tools = {key: value for key, value in tools.items() if value}
+            try:
+                interfaces = self.interfaces()
+                live_detail = "" if interfaces else "No live capture interfaces were reported."
+            except ArenyxaError as exc:
+                if not self.available:
+                    raise  # Version/field contract failures remain fatal to this backend.
+                interfaces = []
+                live_detail = str(exc)[:3072]
             return PacketToolCapabilities(
                 available=True, tshark=self.executable, version=version, tools=tools,
-                interfaces=self.interfaces(), protocol_count=len(protocols), field_count=len(fields),
+                interfaces=interfaces, protocol_count=len(protocols), field_count=len(fields),
                 object_exporters=self.object_exporters(), capture_formats=self.capture_formats(),
                 native_protocol_count=len(native_protocols), native_protocols=native_protocols,
+                live_capture_available=bool(interfaces), live_capture_detail=live_detail,
             )
         except ArenyxaError:
             self._external_runtime_failed = True
@@ -555,7 +564,6 @@ class PacketAnalysisEngine(PacketAnalysisNativeMixin, PacketRowProjectionMixin, 
                 if application and f"reassembled:{application}" not in record.info:
                     record.info = " / ".join(part for part in (record.info, f"reassembled:{application}") if part)
             yield record
-
 
 
 

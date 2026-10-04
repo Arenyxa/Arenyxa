@@ -36,7 +36,8 @@ def _coordinator_stack(tmp_path: Path):
 
 
 def test_beta12_release_channel_identity() -> None:
-    assert __release_channel__ == "stable"
+    # Public release qualification is still pending; engineering history is separate.
+    assert __release_channel__ == "candidate"
 
 
 def test_adaptive_controller_does_not_treat_storage_pressure_as_cpu_pressure() -> None:

@@ -19,6 +19,7 @@ def test_release_test_gate_scopes_qt_offscreen_environment() -> None:
     assert "$env:QT_QPA_PLATFORM = 'offscreen'" in script
     assert "Remove-Item Env:QT_QPA_PLATFORM" in script
     assert "finally" in script
+
     assert script.index("$env:QT_QPA_PLATFORM = 'offscreen'") > script.index("[4/5] Running release-blocking pytest")
 
 

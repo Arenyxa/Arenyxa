@@ -42,7 +42,6 @@ from arenyxa.domain.enums import MotionIntent
 from arenyxa.domain.models import MotionProfile
 from arenyxa.presentation.background import begin_background_shutdown, run_background
 from arenyxa.presentation.glass import GlassPanel
-from arenyxa.presentation.i18n_runtime import current_text
 from arenyxa.presentation.language import LanguageManager
 from arenyxa.presentation.launch_geometry import LaunchGeometryPlan
 from arenyxa.presentation.motion import MotionOrchestrator
@@ -212,20 +211,20 @@ class MainWindowNavigationMixin:
         dialog.profileSelected.connect(complete)
         dialog.enterpriseRequested.connect(open_enterprise)
         dialog.fleetRequested.connect(open_fleet)
-        self.show_status(current_text("shell.welcome.opened"))
+        self.show_status("Welcome Center · 独立使用模式窗口")
         dialog.exec()
         dialog.deleteLater()
 
     def _complete_welcome_center(self, profile_id: str, personal_scenario: str = "") -> bool:
         switch_started = time.perf_counter()
-        self.show_status(current_text("shell.experience.switching"))
+        self.show_status("正在切换使用模式并重建工作区导航…")
         try:
             if profile_id == "personal" and personal_scenario:
                 self.context.settings.personal_scenario = personal_scenario
             profile, event = self.experience_controller.switch(profile_id)
         except Exception as exc:
             LOGGER.exception("Failed to apply Arenyxa experience profile")
-            QMessageBox.warning(self, current_text("shell.experience.switch_failed_title"), f"{type(exc).__name__}: {exc}")
+            QMessageBox.warning(self, "无法切换使用模式", f"{type(exc).__name__}: {exc}")
             return False
         self._navigation_switch_generation += 1
         self._last_navigation_diff = self.navigation_policy_engine.diff(event.previous, event.current)
@@ -256,7 +255,7 @@ class MainWindowNavigationMixin:
         self.context.navigation_metrics["preset_switch_latency_ms"] = (
             time.perf_counter() - switch_started
         ) * 1000.0
-        self.show_status(current_text("shell.experience.selected").format(profile=current_text(f"welcome.profile.{profile.id}.title")))
+        self.show_status(f"已选择 {profile.title}；使用模式不会改变安全权限。")
         self.navigate(landing_page)
         return True
 
@@ -307,15 +306,15 @@ class MainWindowNavigationMixin:
 
     def _navigation_denied_message(self, page_id: str) -> str:
         decision = self.navigation_resolver.decision(page_id, self._navigation_context())
-        message_keys = {
-            "EXPERIENCE_MODE_MISMATCH": "shell.navigation.denied.experience_mode",
-            "RUNTIME_MODE_MISMATCH": "shell.navigation.denied.runtime_mode",
-            "ACCOUNT_ROLE_REQUIRED": "shell.navigation.denied.account_role",
-            "DEVELOPER_AUTHORITY_REQUIRED": "shell.navigation.denied.developer_authority",
-            "ROOT_SESSION_REQUIRED": "shell.navigation.denied.root_session",
-            "CAPABILITY_REQUIRED": "shell.navigation.denied.capability",
+        messages = {
+            "EXPERIENCE_MODE_MISMATCH": "当前 Experience Mode 不显示此页面。",
+            "RUNTIME_MODE_MISMATCH": "当前 Runtime Mode 不允许访问此管理页面。",
+            "ACCOUNT_ROLE_REQUIRED": "当前 Account Role 无权访问此页面。",
+            "DEVELOPER_AUTHORITY_REQUIRED": "需要有效的 Developer Credential 与活动会话。",
+            "ROOT_SESSION_REQUIRED": "需要活动且未过期、未撤销的 Root Session。",
+            "CAPABILITY_REQUIRED": "当前会话缺少此页面要求的 capability。",
         }
-        return current_text(message_keys.get(decision.reason, "shell.navigation.denied.default"))
+        return messages.get(decision.reason, "此页面当前不可访问。")
 
     def _sync_navigation_selection(self, page_id: str) -> None:
         
@@ -364,7 +363,7 @@ class MainWindowNavigationMixin:
         except Exception as exc:
             refresh_failed = True
             LOGGER.exception("page activation failed: %s", page_id)
-            self.show_status(current_text("shell.navigation.refresh_failed").format(page_id=page_id, error=f"{type(exc).__name__}: {exc}"))
+            self.show_status(f"{page_id} 页面已打开，但刷新失败：{type(exc).__name__}: {exc}")
         if generation != self._route_generation or self.current_page_id != page_id:
             return
         try:
@@ -372,7 +371,7 @@ class MainWindowNavigationMixin:
         except Exception as exc:
             LOGGER.exception("page translation failed: %s", page_id)
             if not refresh_failed:
-                self.show_status(current_text("shell.navigation.localization_failed").format(page_id=page_id, error=f"{type(exc).__name__}: {exc}"))
+                self.show_status(f"{page_id} 页面已打开，但本地化刷新失败：{type(exc).__name__}: {exc}")
 
     def navigate(self, page_id: str) -> None:
         previous_page_id = self.current_page_id
@@ -396,11 +395,11 @@ class MainWindowNavigationMixin:
                                              
             self._sync_navigation_selection(previous_page_id)
             LOGGER.exception("page construction failed: %s", page_id)
-            self.show_status(current_text("shell.navigation.open_failed").format(page_id=page_id, error=f"{type(exc).__name__}: {exc}"))
+            self.show_status(f"无法打开 {page_id}：{type(exc).__name__}: {exc}")
             QMessageBox.critical(
                 self,
-                current_text("shell.navigation.load_failed_title"),
-                current_text("shell.navigation.load_failed").format(page_id=page_id, error=f"{type(exc).__name__}: {exc}"),
+                "页面加载失败",
+                f"无法打开 {page_id}。\n\n{type(exc).__name__}: {exc}",
             )
             return
 
@@ -429,7 +428,7 @@ class MainWindowNavigationMixin:
             LOGGER.exception("page route commit failed: %s", page_id)
             self._sync_navigation_selection(previous_page_id)
             self.current_page_id = previous_page_id
-            self.show_status(current_text("shell.navigation.switch_failed").format(page_id=page_id, error=f"{type(exc).__name__}: {exc}"))
+            self.show_status(f"无法切换到 {page_id}：{type(exc).__name__}: {exc}")
             return
         self.current_page_id = page_id
         self._sync_navigation_selection(page_id)
@@ -537,7 +536,7 @@ class MainWindowNavigationMixin:
 
     def open_developer_tool(self, action_id: str) -> None:
         if not self._developer_surface_enabled():
-            self.show_status(current_text("shell.developer.mode_required"))
+            self.show_status("Developer Mode 未启用；请在设置 → 高级设置中启用。")
             return
         if action_id == "dev_api":
             self.navigate("advanced")
@@ -575,7 +574,7 @@ class MainWindowNavigationMixin:
                 self._last_navigation_diff = self.navigation_policy_engine.diff(event.previous, event.current)
             except Exception as exc:
                 LOGGER.exception("Failed to enter Developer Experience")
-                self.show_status(current_text("shell.developer.experience_failed").format(error=f"{type(exc).__name__}: {exc}"))
+                self.show_status(f"Developer Experience 切换失败：{type(exc).__name__}: {exc}")
                 return
         else:
             self.context.settings.save(self.context.paths.root / "settings.json")
@@ -586,9 +585,9 @@ class MainWindowNavigationMixin:
             if header is not None:
                 self.motion.reveal(header, MotionIntent.ENTER)
         if root_workstation and not enabled:
-            self.show_status(current_text("shell.developer.root_still_active"))
+            self.show_status("Developer Mode 偏好已关闭；Root Developer Workstation 仍保持平台技术工具可用。")
         else:
-            state = current_text("shell.common.enabled" if enabled else "shell.common.disabled")
+            state = "已启用" if enabled else "已关闭"
             self.show_status(f"Developer Mode {state}")
         if enabled:
             self.navigate("developer_center")
@@ -599,7 +598,7 @@ class MainWindowNavigationMixin:
         self.brand_icon.setVisible(not collapsed)
         self.brand_text.setVisible(not collapsed)
         self.service_label.setVisible(not collapsed)
-        self.collapse_nav.setToolTip(current_text("shell.nav.expand" if collapsed else "shell.nav.collapse"))
+        self.collapse_nav.setToolTip("展开侧边栏" if collapsed else "折叠侧边栏")
         self.collapse_nav.setText("›" if collapsed else "‹")
         for page_id, button in self.nav_buttons.items():
             button.setProperty("navCompact", collapsed)
@@ -678,9 +677,7 @@ class MainWindowNavigationMixin:
         self.context.settings.save(self.context.paths.root / "settings.json")
 
     def update_inspector(self, title: str, data: object) -> None:
-        self.inspector_title.setProperty("i18n_key_text", None)
         self.inspector_title.setText(title)
-        self.inspector_content.setProperty("shellInspectorEmpty", False)
         try:
             text = json.dumps(data, ensure_ascii=False, indent=2, default=str)
         except (TypeError, ValueError):

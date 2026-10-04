@@ -6,6 +6,8 @@ import re
 import tokenize
 from pathlib import Path
 
+from scripts.build_source_manifest import iter_source_files
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "arenyxa"
 
@@ -70,10 +72,10 @@ def test_split_modules_stay_below_original_monolith_sizes() -> None:
 def test_no_chinese_comments_or_python_docstrings_remain() -> None:
     cjk = re.compile(r"[\u4e00-\u9fff]")
     failures: list[str] = []
-    for path in ROOT.rglob("*.py"):
-        if any(part in {".venv", "build", "dist", "__pycache__"} for part in path.parts):
+    for path in iter_source_files(ROOT):
+        if path.suffix != ".py":
             continue
-        text = path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8-sig")
         for token in tokenize.generate_tokens(io.StringIO(text).readline):
             if token.type == tokenize.COMMENT and cjk.search(token.string):
                 failures.append(f"{path}:{token.start[0]} comment")

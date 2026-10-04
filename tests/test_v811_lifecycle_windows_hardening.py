@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 
 from arenyxa.application.windows_conpty import WindowsConPtySession
+from arenyxa.domain.errors import ArenyxaError
 from arenyxa.enterprise.worker_agent import EnterpriseWorkerAgent
 from arenyxa.infrastructure import external_supervisor as supervisor_module
 
@@ -250,6 +251,48 @@ def test_enterprise_worker_stop_deadline_detaches_running_generation_safely() ->
     assert agent.snapshot()["jobs_succeeded"] == 0
 
     release_new.set()
+    assert agent.stop(timeout=1.0)
+
+
+def test_enterprise_worker_generation_capacity_fails_closed_until_physical_drain() -> None:
+    release_first = threading.Event()
+    release_second = threading.Event()
+    client = _WorkerClient()
+    runtime = _WorkerRuntime({"job-first": release_first, "job-second": release_second})
+    first_started = runtime.expect("job-first")
+    second_started = runtime.expect("job-second")
+    third_started = runtime.expect("job-third")
+    agent = _worker_agent(client, runtime)
+
+    client.add_lease("job-first")
+    agent.start()
+    assert first_started.wait(2.0)
+    assert agent.stop(timeout=0.02) is False
+
+    client.add_lease("job-second")
+    agent.start()
+    assert second_started.wait(2.0)
+    assert agent.stop(timeout=0.02) is False
+
+    client.add_lease("job-third")
+    with pytest.raises(ArenyxaError) as captured:
+        agent.start()
+    assert captured.value.code == "WORKER_GENERATION_CAPACITY_EXHAUSTED"
+    with agent._lock:
+        assert len(agent._draining_generations) == 2
+        draining_futures = [
+            future
+            for generation in agent._draining_generations.values()
+            for future in generation.active.values()
+        ]
+
+    release_first.set()
+    release_second.set()
+    for future in draining_futures:
+        future.result(timeout=2.0)
+
+    agent.start()
+    assert third_started.wait(2.0)
     assert agent.stop(timeout=1.0)
 
 

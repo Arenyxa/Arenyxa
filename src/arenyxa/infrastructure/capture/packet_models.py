@@ -37,6 +37,8 @@ class PacketToolCapabilities:
     capture_formats: list[str] = field(default_factory=list)
     native_protocol_count: int = 0
     native_protocols: list[str] = field(default_factory=list)
+    live_capture_available: bool = False
+    live_capture_detail: str = ""
 
 
 @dataclass(slots=True)

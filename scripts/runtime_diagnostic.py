@@ -20,7 +20,7 @@ def main() -> int:
         import arenyxa
         checks["package_import"] = {"ok": True, "version": arenyxa.__display_version__}
         if arenyxa.__display_version__ != "0.1":
-            failures.append("display version is not public v0.1")
+            failures.append("display version is not 0.1")
     except (ImportError, AttributeError) as exc:
         checks["package_import"] = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
         failures.append("package import failed")

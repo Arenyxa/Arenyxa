@@ -83,7 +83,7 @@ def test_postgresql_runtime_reuses_one_bounded_connection_pool(monkeypatch) -> N
 
     assert len(_Pool.created) == 1
     pool = _Pool.created[0]
-    assert pool.kwargs["min_size"] == 4
+    assert pool.kwargs["min_size"] == 8
     assert pool.kwargs["max_size"] == 8
     assert pool.kwargs["open"] is False
     assert pool.kwargs["check"] == backend._check_pool_connection
@@ -278,3 +278,36 @@ def test_postgresql_runtime_close_drains_pool_creation_and_active_admission(monk
     assert pool_type.connection_returned.is_set()
     assert len(pool_type.created) == 1
     assert backend.pool_metrics()["lifecycle_state"] == "closed"
+
+
+def test_postgresql_runtime_close_times_out_stuck_active_connections(monkeypatch) -> None:
+    """BUG-V82-P4-S01: close must not wait forever on _active_connections."""
+    _Pool.created.clear()
+    backend = PostgreSQLDistributedRuntimeStorage("postgresql://user:pass@db/arenyxa")
+    monkeypatch.setattr(backend, "_driver", lambda: (_FakePsycopg, object(), _Pool))
+
+    hold = threading.Event()
+    entered = threading.Event()
+
+    def stuck_checkout() -> None:
+        with backend.connection():
+            entered.set()
+            hold.wait(30.0)
+
+    with ThreadPoolExecutor(max_workers=2, thread_name_prefix="postgres-close-timeout") as executor:
+        checkout_future = executor.submit(stuck_checkout)
+        assert entered.wait(5.0)
+        deadline = time.monotonic() + 5.0
+        while backend.pool_metrics()["active_connections"] < 1:
+            assert time.monotonic() < deadline
+            threading.Event().wait(0.001)
+
+        started = time.monotonic()
+        close_future = executor.submit(lambda: backend.close(timeout=0.2))
+        close_future.result(timeout=5.0)
+        elapsed = time.monotonic() - started
+        assert elapsed < 2.0, f"close hung for {elapsed:.3f}s despite timeout"
+        assert backend.pool_metrics()["lifecycle_state"] == "closed"
+        assert _Pool.created[0].closed is True
+        hold.set()
+        checkout_future.result(timeout=5.0)

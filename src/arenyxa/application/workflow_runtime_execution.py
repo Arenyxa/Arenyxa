@@ -95,9 +95,6 @@ class WorkflowExecutionMixin:
         max_outputs: int | None,
     ) -> WorkflowExecutionResult:
         source = self.store.get_revision_metadata(source_revision_id)
-        # Shutdown may cancel the operation while this preflight repository read is blocked.
-        # Observe that cancellation before performing authorization or any new persistent writes.
-        token.checkpoint()
         if source is None:
             raise ArenyxaError(
                 "DATASET_REVISION_NOT_FOUND",
