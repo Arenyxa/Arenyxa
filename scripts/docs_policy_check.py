@@ -5,11 +5,13 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
 ALLOW = {"README.md", "SECURITY.md", "VERSIONING.md", "CHANGELOG.md"}
 REQUIRED = ("status:", "owner:", "last_reviewed:")
+MARKDOWN_LINK = re.compile(r"!?\\[[^\\]]*\\]\\(([^)\\s]+)(?:\\s+[^)]*)?\\)")
 
 
 def is_archived(path: Path) -> bool:
@@ -43,6 +45,31 @@ def main() -> int:
         warnings.append(f"{len(missing)} active Markdown file(s) lack required front matter; sample: {', '.join(missing[:12])}")
     if malformed:
         warnings.append("Markdown front matter missing required fields: " + ", ".join(malformed[:12]))
+
+    # Relative Markdown links are checked locally without making network calls.
+    link_pattern = MARKDOWN_LINK
+    broken_links: list[str] = []
+    markdown_files = sorted(
+        path for path in list(ROOT.glob("*.md")) + list((ROOT / "docs").rglob("*.md"))
+        if not is_archived(path)
+    )
+    for source in markdown_files:
+        text = source.read_text(encoding="utf-8")
+        for match in link_pattern.finditer(text):
+            raw_target = match.group(1).strip("<>")
+            parsed = urlsplit(raw_target)
+            if parsed.scheme or parsed.netloc or raw_target.startswith("#"):
+                continue
+            relative_target = unquote(parsed.path)
+            target_path = (ROOT / relative_target.lstrip("/")) if relative_target.startswith("/") else (source.parent / relative_target if relative_target else source)
+            if target_path.exists():
+                continue
+            if not target_path.suffix and (target_path / "README.md").is_file():
+                continue
+            line_number = text.count("\\n", 0, match.start()) + 1
+            broken_links.append(f"{source.relative_to(ROOT).as_posix()}:{line_number} -> {relative_target or raw_target}")
+    if broken_links:
+        warnings.append(f"{len(broken_links)} broken local Markdown link(s); sample: " + ", ".join(broken_links[:12]))
 
     identity_path = ROOT / "metadata" / "release-identity.json"
     schema_path = ROOT / "metadata" / "schemas" / "release-identity.schema.json"
