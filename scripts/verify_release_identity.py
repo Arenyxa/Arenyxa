@@ -81,7 +81,7 @@ def verify_identity(root: Path = ROOT) -> dict:
     require("scripts/build_release_attestation.py", 'parser.add_argument("--version", default="0.1.0")')
     require("RUN_ARENYXA.cmd", "title Arenyxa v0.1 Source Launcher")
 
-    identity = json.loads(read("metadata/release-identity.json))
+    identity = json.loads(read("metadata/release-identity.json"))
     identity_fields = {
         "schema": "arenyxa.release-identity/v1", "display_version": "0.1",
         "package_version": "0.1.0", "windows_file_version": "0.1.0.0",

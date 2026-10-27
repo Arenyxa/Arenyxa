@@ -158,8 +158,8 @@ def _external_status(evidence: dict[str, Any], name: str) -> str:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Evaluate Arenyxa v0.1 PDF final acceptance gates")
-    parser.add_argument("--evidence", type=Path, default=ROOT / "metadata" / "manifests" / "v8-test-evidence.json)
-    parser.add_argument("--report", type=Path, default=ROOT / "metadata" / "manifests" / "v8-acceptance-gate.json)
+    parser.add_argument("--evidence", type=Path, default=ROOT / "metadata" / "manifests" / "v8-test-evidence.json")
+    parser.add_argument("--report", type=Path, default=ROOT / "metadata" / "manifests" / "v8-acceptance-gate.json")
     args = parser.parse_args(argv)
 
     stub_findings: list[str] = []

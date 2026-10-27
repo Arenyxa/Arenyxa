@@ -107,7 +107,7 @@ def _proxy_persistence_baseline(flows: int = 5_000) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", default="metadata/manifests/v8-phase6-performance-report.json)
+    parser.add_argument("--output", default="metadata/manifests/v8-phase6-performance-report.json")
     args = parser.parse_args()
 
     telemetry = _telemetry_baseline()

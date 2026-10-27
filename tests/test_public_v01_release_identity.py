@@ -60,7 +60,7 @@ def identity_source_tree(tmp_path: Path) -> Path:
         "packaging/version_info.txt", "packaging/installer.iss", "packaging/installer_win7.iss",
         "scripts/build.ps1", "scripts/build-win7.ps1", "scripts/build_release_attestation.py",
         "RUN_ARENYXA.cmd", "metadata/release-identity.json", "docs/release/COMPATIBILITY_MATRIX.json",
-        "V8_2_metadata/release-identity.json",
+        "docs/internal/history/2026/metadata/v8-2-release-identity.json",
     ):
         destination = tmp_path / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
