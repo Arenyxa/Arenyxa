@@ -17,10 +17,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Validate Arenyxa Enterprise HTTP/TLS server concurrency on loopback.")
     parser.add_argument("--requests", type=int, default=80)
     parser.add_argument("--clients", default="1,4,8,16,32")
-    parser.add_argument("--output", type=Path, default=Path("server-http-performance-report.json"))
+    parser.add_argument("--output", type=Path, default=Path("metadata/manifests/server-http-performance-report.json"))
     args = parser.parse_args()
     levels = tuple(int(item.strip()) for item in args.clients.split(",") if item.strip())
     report = ServerHTTPConcurrencyValidator(requests_per_level=args.requests, client_levels=levels).run().to_dict()
+    args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0 if report["stable"] else 2

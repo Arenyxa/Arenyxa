@@ -7,9 +7,9 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 REPORTS = {
-    "server": ROOT / "server-performance-report-final20.json",
-    "worker": ROOT / "server-worker-performance-report-final20.json",
-    "http": ROOT / "server-http-performance-report-final20.json",
+    "server": ROOT / "metadata/manifests/server-performance-report-final20.json",
+    "worker": ROOT / "metadata/manifests/server-worker-performance-report-final20.json",
+    "http": ROOT / "metadata/manifests/server-http-performance-report-final20.json",
 }
 P99_LIMIT_MS = {"server": 500.0, "worker": 500.0, "http": 500.0}
 
@@ -91,7 +91,9 @@ def main() -> int:
         "checks": checks,
         "failures": failures,
     }
-    (ROOT / "PERFORMANCE_REGRESSION_GATE.json").write_text(
+    report_path = ROOT / "metadata" / "manifests" / "performance-regression-gate.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     print(json.dumps(payload, ensure_ascii=False, indent=2))

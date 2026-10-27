@@ -93,7 +93,8 @@ def main() -> int:
         "passed": passed,
         "checks": checks,
     }
-    report = ROOT / "PRODUCTION_CONFIG_GATE.json"
+    report = ROOT / "metadata" / "manifests" / "production-config-gate.json"
+    report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if passed else 1
