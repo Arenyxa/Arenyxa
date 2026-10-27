@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arenyxa.dev/metadata/schemas/release-identity.schema.json",
+  "title": "Arenyxa public release identity",
+  "description": "Canonical machine-readable identity for the public source release. Product/package/Windows versions and engineering/compatibility identities are deliberately separate.",
+  "type": "object",
+  "required": ["schema", "product", "display_version", "package_version", "windows_file_version", "release_channel", "artifact_name", "compatibility_identity", "release_status"],
+  "properties": {
+    "schema": {"const": "arenyxa.release-identity/v1"},
+    "product": {"const": "Arenyxa"},
+    "display_version": {"type": "string", "minLength": 1},
+    "package_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "windows_file_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "release_channel": {"type": "string", "minLength": 1},
+    "artifact_name": {"type": "string", "minLength": 1},
+    "compatibility_identity": {"type": "string", "minLength": 1},
+    "release_status": {"type": "string", "minLength": 1},
+    "release_readiness": {"type": "string"},
+    "github_public_release": {"type": "boolean"},
+    "distribution_channel": {"type": "string"},
+    "signing_status": {"type": "string"},
+    "legacy_validation": {"type": "string"},
+    "engineering_baseline": {"type": "string"},
+    "internal_version": {"type": "string"},
+    "engineering_phase": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": true
+}

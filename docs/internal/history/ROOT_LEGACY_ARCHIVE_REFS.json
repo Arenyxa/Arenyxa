@@ -1,5 +1,32 @@
 {
   "V7.8_ULTIMATE_ARCHITECTURE_VALIDATION.json": [
     "docs/internal/history/2026/legacy-baselines/v7-8-ultimate-architecture-modification-report.md"
-  ]
+  ],
+  "root_json_migrations": {
+    "RELEASE_IDENTITY.json": "metadata/release-identity.json",
+    "ENTERPRISE_RELEASE_GATE.json": "metadata/manifests/enterprise-release-gate.json",
+    "FINAL_RECOVERY_VALIDATION.json": "metadata/manifests/final-recovery-validation.json",
+    "PERFORMANCE_REGRESSION_GATE.json": "metadata/manifests/performance-regression-gate.json",
+    "PRODUCTION_CONFIG_GATE.json": "metadata/manifests/production-config-gate.json",
+    "V8_ACCEPTANCE_GATE.json": "metadata/manifests/v8-acceptance-gate.json",
+    "V8_PHASE6_PERFORMANCE_REPORT.json": "metadata/manifests/v8-phase6-performance-report.json",
+    "V8_TEST_EVIDENCE.json": "metadata/manifests/v8-test-evidence.json",
+    "WINDOWS_NATIVE_QUALIFICATION.json": "metadata/manifests/windows-native-qualification.json",
+    "production-validation-report.json": "metadata/manifests/production-validation-report.json",
+    "server-http-performance-report-final20.json": "metadata/manifests/server-http-performance-report-final20.json",
+    "server-http-performance-report.json": "metadata/manifests/server-http-performance-report.json",
+    "server-performance-report-final20.json": "metadata/manifests/server-performance-report-final20.json",
+    "server-performance-report.json": "metadata/manifests/server-performance-report.json",
+    "server-ten-dimension-review.json": "metadata/manifests/server-ten-dimension-review.json",
+    "server-worker-performance-report-final20.json": "metadata/manifests/server-worker-performance-report-final20.json",
+    "server-worker-performance-report.json": "metadata/manifests/server-worker-performance-report.json",
+    "HOT_PATH_MEMORY_REPORT_FAST.json": "docs/internal/history/2026/evidence/hot-path-memory-report-fast.json",
+    "TEST_TERMINAL_ITEMS.json": "docs/internal/history/2026/evidence/test-terminal-items.json",
+    "V8_2_RELEASE_IDENTITY.json": "docs/internal/history/2026/metadata/v8-2-release-identity.json",
+    "extreme-production-validation.json": "docs/internal/history/2026/evidence/extreme-production-validation.json",
+    "release-attestation.json": "docs/internal/history/2026/releases/release-attestation-v8-2.json",
+    "server-production-chaos-report.json": "docs/internal/history/2026/evidence/server-production-chaos-report.json",
+    "server-production-chaos-report-v2.json": "docs/internal/history/2026/evidence/server-production-chaos-report-v2.json",
+    "server-worker-performance-report-security-hardening.json": "docs/internal/history/2026/evidence/server-worker-performance-report-security-hardening.json"
+  }
 }

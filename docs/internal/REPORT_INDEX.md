@@ -1,3 +1,9 @@
+---
+status: current
+owner: internal
+last_reviewed: 2026-10-28
+---
+
 # Documentation and Historical Report Index
 
 These files were moved out of the repository root during the Arenyxa v0.1 publication cleanup.
@@ -176,3 +182,36 @@ Historical report blobs remain unchanged. See [archive manifest](history/2026/AR
 ### Deferred machine-readable file migration
 
 Root release/validation JSON files remain at their current paths because scripts generate or consume them by exact path. Move them only with coordinated consumer, test, workflow, and manifest-generator changes. See [documentation index](../INDEX.md).
+
+
+## Root JSON migration — 2026-10-28
+
+The root-level JSON documents were classified by lifecycle instead of extension. The public identity now lives in `metadata/release-identity.json`; generated machine-readable gate results and pinned performance inputs live in `metadata/manifests/`; superseded test-run, V8.2 identity, chaos and security-hardening snapshots live in the dated history archive. Active tooling was updated to the new paths.
+
+| Original root path | New path | Classification | SHA-256 |
+| --- | --- | --- | --- |
+| `ENTERPRISE_RELEASE_GATE.json` | `metadata/manifests/enterprise-release-gate.json` | machine-readable gate/baseline | `58176e98d389b02eeb7148958ba97ef462b4aef2a0b94607d1b6548626ce9c6c` |
+| `extreme-production-validation.json` | `docs/internal/history/2026/evidence/extreme-production-validation.json` | historical evidence | `b79128cdfe477d36d632f4014ba988430d7f01c04a476327ff5e1213aba5cd68` |
+| `FINAL_RECOVERY_VALIDATION.json` | `metadata/manifests/final-recovery-validation.json` | machine-readable gate/baseline | `a5b793d463c918efd5c12168d8bfc658a62886c70705946426ce85cc27f3498a` |
+| `HOT_PATH_MEMORY_REPORT_FAST.json` | `docs/internal/history/2026/evidence/hot-path-memory-report-fast.json` | historical evidence | `83fed4f9f5e57eeeef99d79a6c9798df07abc28f5dad91e22f36c15730d43e26` |
+| `PERFORMANCE_REGRESSION_GATE.json` | `metadata/manifests/performance-regression-gate.json` | machine-readable gate/baseline | `a123022de7e4172a98b8e4cd3d5a0ed208afb205695524348421008dbfed4155` |
+| `PRODUCTION_CONFIG_GATE.json` | `metadata/manifests/production-config-gate.json` | machine-readable gate/baseline | `1c09a782bc19a8a2984c5ca7c31ee7f8186f4b62762baf800222d16579edafdb` |
+| `production-validation-report.json` | `metadata/manifests/production-validation-report.json` | machine-readable gate/baseline | `1e2350c099e0c941a594f2704f10ed18f652a1f180af33a5fa176200347fdee9` |
+| `RELEASE_IDENTITY.json` | `metadata/release-identity.json` | current identity | `5acc4376b0d694ace381d30b694e2e99ddeff8bf9cf83db39d9a5386157d2773` |
+| `release-attestation.json` | `docs/internal/history/2026/releases/release-attestation-v8-2.json` | historical evidence | `b58a002f8655f3f1ee27707f60b017c3bdbb7b81e6eee334381f91c4a1645b3f` |
+| `server-http-performance-report-final20.json` | `metadata/manifests/server-http-performance-report-final20.json` | machine-readable gate/baseline | `758b551fb60cecd880987cf1fa0bcd9ac12aa5ab19c02613aa429402f73c3af5` |
+| `server-http-performance-report.json` | `metadata/manifests/server-http-performance-report.json` | machine-readable gate/baseline | `e0891eff52f8a78c5530c94d7dd432a6cdc36d9b2af4418ebc604bec0e9cfd3e` |
+| `server-performance-report-final20.json` | `metadata/manifests/server-performance-report-final20.json` | machine-readable gate/baseline | `469a75bd406ebf17f20cb227bb412b95849a6cf4de49184be0101f85b9cd7f64` |
+| `server-performance-report.json` | `metadata/manifests/server-performance-report.json` | machine-readable gate/baseline | `71c0b0a196222c6c4f51d23f1044525d96559132c0531a862da8c725149c4133` |
+| `server-production-chaos-report-v2.json` | `docs/internal/history/2026/evidence/server-production-chaos-report-v2.json` | historical evidence | `af81aaf30b1a5b5f76fea211a26f1d8df28a706ebf7c6cda754fd5cfa1e729ad` |
+| `server-production-chaos-report.json` | `docs/internal/history/2026/evidence/server-production-chaos-report.json` | historical evidence | `e2a5136438c418ef178ad3ccf447aa5120fec10dd9bf2950f7cac0ab77f4df5e` |
+| `server-ten-dimension-review.json` | `metadata/manifests/server-ten-dimension-review.json` | machine-readable gate/baseline | `f877b3ee3dc8e0bd8628cda687642d45353398ff7689e9fd9574350f58d9f88d` |
+| `server-worker-performance-report-final20.json` | `metadata/manifests/server-worker-performance-report-final20.json` | machine-readable gate/baseline | `2ea8a341637a43a6eee7106acb51f69a0cab9b40e433d06ce8943f6ba3028d96` |
+| `server-worker-performance-report-security-hardening.json` | `docs/internal/history/2026/evidence/server-worker-performance-report-security-hardening.json` | historical evidence | `07ec5622b8c1e27b156935f1d19121adde0b1fae6319e0007f4fb9e511c14184` |
+| `server-worker-performance-report.json` | `metadata/manifests/server-worker-performance-report.json` | machine-readable gate/baseline | `8700c39d1600a2797ff431cbff872e5766f9ad7359488860374bdcc066596021` |
+| `TEST_TERMINAL_ITEMS.json` | `docs/internal/history/2026/evidence/test-terminal-items.json` | historical evidence | `7297227bdf0aebbf8e7b322b34f1de1a7bd9cfe9fe816b0cbd2b03cce67f9a25` |
+| `V8_2_RELEASE_IDENTITY.json` | `docs/internal/history/2026/metadata/v8-2-release-identity.json` | historical evidence | `f53c4e365e9ea705e7ca9b5462191bdba2a199dc450306a4d36f7c2b52196379` |
+| `V8_ACCEPTANCE_GATE.json` | `metadata/manifests/v8-acceptance-gate.json` | machine-readable gate/baseline | `634ea32e04144772b06c9da696d2795fa975e4aa16e953ccd60577ed514a90aa` |
+| `V8_PHASE6_PERFORMANCE_REPORT.json` | `metadata/manifests/v8-phase6-performance-report.json` | machine-readable gate/baseline | `ab839ffd0e1b62ab02294f616857a9b74c471ba0717dfeb8020e49feb7154b4b` |
+| `V8_TEST_EVIDENCE.json` | `metadata/manifests/v8-test-evidence.json` | machine-readable gate/baseline | `6e93ba5e1c8de1d85fdc15e018d9ad7a4f130ec69cf3672885ed1234fad994a2` |
+| `WINDOWS_NATIVE_QUALIFICATION.json` | `metadata/manifests/windows-native-qualification.json` | machine-readable gate/baseline | `991ae3142f11d2d2e94c5a085d8cc980f9c8eebba2cf7f00e153178adc9b9767` |

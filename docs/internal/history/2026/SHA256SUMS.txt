@@ -53,6 +53,12 @@ cbee76f8e2186d66c299136ae47c5b61c3a3cff0f8ccf742d457e31a6ad9a08c  docs/internal/
 35d5374a27804fd2a13190a1cecbc238050f5b108d3f33d7cb47e10f39a66de6  docs/internal/history/2026/2026-08-14-windows-plugin-sandbox-job-venv-fix.md
 e2542fe71cdda4bdd151259ac463067f890682a15f5ede19473784ccd9ebd71d  docs/internal/history/2026/2026-08-17-v7-0-startup-motion-smoothness-hotfix.md
 5559ede9b4d5a55e88c47684d26ba26f19bab07937eab49a6141641a78a0135b  docs/internal/history/2026/2026-08-18-v7-0-unified-professional-suite.md
+b79128cdfe477d36d632f4014ba988430d7f01c04a476327ff5e1213aba5cd68  docs/internal/history/2026/evidence/extreme-production-validation.json
+83fed4f9f5e57eeeef99d79a6c9798df07abc28f5dad91e22f36c15730d43e26  docs/internal/history/2026/evidence/hot-path-memory-report-fast.json
+af81aaf30b1a5b5f76fea211a26f1d8df28a706ebf7c6cda754fd5cfa1e729ad  docs/internal/history/2026/evidence/server-production-chaos-report-v2.json
+e2a5136438c418ef178ad3ccf447aa5120fec10dd9bf2950f7cac0ab77f4df5e  docs/internal/history/2026/evidence/server-production-chaos-report.json
+07ec5622b8c1e27b156935f1d19121adde0b1fae6319e0007f4fb9e511c14184  docs/internal/history/2026/evidence/server-worker-performance-report-security-hardening.json
+7297227bdf0aebbf8e7b322b34f1de1a7bd9cfe9fe816b0cbd2b03cce67f9a25  docs/internal/history/2026/evidence/test-terminal-items.json
 b8f569c7ee129a70ab9e4cfcc62e6d8904e09b13278955ae76d660d9bdc15b3b  docs/internal/history/2026/legacy-baselines/baseline-analysis.md
 b6d43beb98a466eda82d7796af6b5cb441793eb25d88732d3ebd9cff1edd0524  docs/internal/history/2026/legacy-baselines/development-roadmap.md
 fbbc33d1239f1c3e9f65be094d621bacd2d462a3911dfe3b77380c55d26e4f23  docs/internal/history/2026/legacy-baselines/i18n-motion-refinement.md
@@ -60,6 +66,8 @@ fbbc33d1239f1c3e9f65be094d621bacd2d462a3911dfe3b77380c55d26e4f23  docs/internal/
 fbda65d65a84c1feb912fe0dabb469d6ea1f395886d8b0a28a2f92a26ab4143b  docs/internal/history/2026/legacy-baselines/ui-personalization-dashboard-redesign.md
 e4763add21ce207d874401606685b3c2675c874af552f5ed13174532751ce1bb  docs/internal/history/2026/legacy-baselines/v7-8-ultimate-architecture-modification-report.md
 30848866685f4cdc80d62322c56ff2dacf0ad6f4df07fecae61eaa6d4461b0a9  docs/internal/history/2026/legacy-baselines/v7-8-ultimate-architecture.md
+f53c4e365e9ea705e7ca9b5462191bdba2a199dc450306a4d36f7c2b52196379  docs/internal/history/2026/metadata/v8-2-release-identity.json
+b58a002f8655f3f1ee27707f60b017c3bdbb7b81e6eee334381f91c4a1645b3f  docs/internal/history/2026/releases/release-attestation-v8-2.json
 de8dd48ea61437de84c879f69f58748787a88afdc14c787dd3e9664e5e58b47f  docs/internal/history/2026/roadmap/distributed-state-consistency-hardening.md
 e0a261ac21d2a3e93ae4120042716e5bcf49bc15f5de902a7bf7a1ff66adf402  docs/internal/history/2026/roadmap/enterprise-security-observability-hardening.md
 ba629d38b18bb625a55525782cf6ca10e370b27861f09a5d2b05354ed89b75d2  docs/internal/history/2026/roadmap/first-run-welcome-center.md

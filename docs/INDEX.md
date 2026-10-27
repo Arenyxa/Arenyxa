@@ -22,6 +22,7 @@ last_reviewed: 2026-10-28
 | Read release milestones | [Release history](RELEASE_HISTORY.md) | Timeline, not current verdict |
 | Find old audits, baselines, fixes, and evidence | [Historical report index](internal/REPORT_INDEX.md) | Historical |
 | Review previous roadmap snapshots | [Roadmap archive index](roadmap/INDEX.md) | Historical |
+| Read current release identity and machine-generated evidence | [Metadata index](../metadata/README.md) | Machine-readable contracts and gate results |
 
 ## Lifecycle rules
 

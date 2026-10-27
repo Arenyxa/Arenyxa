@@ -390,6 +390,54 @@
       "size_bytes": 2855
     },
     {
+      "original_path": "extreme-production-validation.json",
+      "archived_path": "docs/internal/history/2026/evidence/extreme-production-validation.json",
+      "topic": "extreme production validation",
+      "status": "historical",
+      "sha256": "b79128cdfe477d36d632f4014ba988430d7f01c04a476327ff5e1213aba5cd68",
+      "size_bytes": 2393
+    },
+    {
+      "original_path": "HOT_PATH_MEMORY_REPORT_FAST.json",
+      "archived_path": "docs/internal/history/2026/evidence/hot-path-memory-report-fast.json",
+      "topic": "hot path memory report fast",
+      "status": "historical",
+      "sha256": "83fed4f9f5e57eeeef99d79a6c9798df07abc28f5dad91e22f36c15730d43e26",
+      "size_bytes": 707
+    },
+    {
+      "original_path": "server-production-chaos-report-v2.json",
+      "archived_path": "docs/internal/history/2026/evidence/server-production-chaos-report-v2.json",
+      "topic": "server production chaos report v2",
+      "status": "historical",
+      "sha256": "af81aaf30b1a5b5f76fea211a26f1d8df28a706ebf7c6cda754fd5cfa1e729ad",
+      "size_bytes": 2384
+    },
+    {
+      "original_path": "server-production-chaos-report.json",
+      "archived_path": "docs/internal/history/2026/evidence/server-production-chaos-report.json",
+      "topic": "server production chaos report",
+      "status": "historical",
+      "sha256": "e2a5136438c418ef178ad3ccf447aa5120fec10dd9bf2950f7cac0ab77f4df5e",
+      "size_bytes": 2385
+    },
+    {
+      "original_path": "server-worker-performance-report-security-hardening.json",
+      "archived_path": "docs/internal/history/2026/evidence/server-worker-performance-report-security-hardening.json",
+      "topic": "server worker performance report security hardening",
+      "status": "historical",
+      "sha256": "07ec5622b8c1e27b156935f1d19121adde0b1fae6319e0007f4fb9e511c14184",
+      "size_bytes": 2978
+    },
+    {
+      "original_path": "TEST_TERMINAL_ITEMS.json",
+      "archived_path": "docs/internal/history/2026/evidence/test-terminal-items.json",
+      "topic": "test terminal items",
+      "status": "historical",
+      "sha256": "7297227bdf0aebbf8e7b322b34f1de1a7bd9cfe9fe816b0cbd2b03cce67f9a25",
+      "size_bytes": 6234
+    },
+    {
       "original_path": "docs/BASELINE_ANALYSIS.md",
       "archived_path": "docs/internal/history/2026/legacy-baselines/baseline-analysis.md",
       "status": "historical",
@@ -437,6 +485,22 @@
       "status": "historical",
       "sha256": "30848866685f4cdc80d62322c56ff2dacf0ad6f4df07fecae61eaa6d4461b0a9",
       "size_bytes": 7838
+    },
+    {
+      "original_path": "V8_2_RELEASE_IDENTITY.json",
+      "archived_path": "docs/internal/history/2026/metadata/v8-2-release-identity.json",
+      "topic": "v8 2 release identity",
+      "status": "historical",
+      "sha256": "f53c4e365e9ea705e7ca9b5462191bdba2a199dc450306a4d36f7c2b52196379",
+      "size_bytes": 430
+    },
+    {
+      "original_path": "release-attestation.json",
+      "archived_path": "docs/internal/history/2026/releases/release-attestation-v8-2.json",
+      "topic": "release attestation v8 2",
+      "status": "historical",
+      "sha256": "b58a002f8655f3f1ee27707f60b017c3bdbb7b81e6eee334381f91c4a1645b3f",
+      "size_bytes": 612
     },
     {
       "original_path": "docs/roadmap/DISTRIBUTED_STATE_CONSISTENCY_HARDENING.md",
