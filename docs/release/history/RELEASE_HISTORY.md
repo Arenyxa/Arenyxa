@@ -10,7 +10,7 @@ last_reviewed: 2026-10-28
 
 Arenyxa public source release identity is `v0.1` / package `0.1.0` / Windows PE `0.1.0.0`. The retained engineering baseline is `v8.2.0`, and runtime/plugin compatibility identity remains `6.8.0`. The distribution posture is **community unsigned**.
 
-The v0.1 promotion preserves engineering provenance and keeps database, protocol, schema and plugin compatibility contracts independent from the public product version. See [version policy](../../VERSIONING.md), [current release status](../RELEASE_STATUS.md) and [current identity](../../metadata/release-identity.json).
+The v0.1 promotion preserves engineering provenance and keeps database, protocol, schema and plugin compatibility contracts independent from the public product version. See [version policy](../../../VERSIONING.md), [current release status](../RELEASE_STATUS.md) and [current identity](../../../metadata/release-identity.json).
 
 For this source-publication decision, the release owner explicitly approved the current application icon, reported completion of manual GUI acceptance, and reclassified the optional 24-hour callback soak as deferred/non-blocking. These decisions do not create claims for tests that were not performed; independent clean-machine installer qualification remains outside the source-publication claim.
 
