@@ -11,7 +11,7 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 ALLOW = {"README.md", "SECURITY.md", "VERSIONING.md", "CHANGELOG.md"}
 REQUIRED = ("status:", "owner:", "last_reviewed:")
-MARKDOWN_LINK = re.compile(r"!?\\[[^\\]]*\\]\\(([^)\\s]+)(?:\\s+[^)]*)?\\)")
+MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)")
 
 
 def is_archived(path: Path) -> bool:
@@ -66,7 +66,7 @@ def main() -> int:
                 continue
             if not target_path.suffix and (target_path / "README.md").is_file():
                 continue
-            line_number = text.count("\\n", 0, match.start()) + 1
+            line_number = text.count("\n", 0, match.start()) + 1
             broken_links.append(f"{source.relative_to(ROOT).as_posix()}:{line_number} -> {relative_target or raw_target}")
     if broken_links:
         warnings.append(f"{len(broken_links)} broken local Markdown link(s); sample: " + ", ".join(broken_links[:12]))
