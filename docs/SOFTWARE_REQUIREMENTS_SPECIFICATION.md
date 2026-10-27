@@ -1,3 +1,9 @@
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa V6.0 软件需求规格说明（SRS）
 
 ## 1. 文档控制

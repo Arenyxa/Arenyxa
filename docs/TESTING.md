@@ -1,3 +1,9 @@
+---
+status: current
+owner: testing
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa 测试与验证
 
 ## 常用入口

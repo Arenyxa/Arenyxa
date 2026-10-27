@@ -1,3 +1,9 @@
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa V6.0 — Self-Healing Repair Center / 自愈修复中心
 
 ## 启动行为

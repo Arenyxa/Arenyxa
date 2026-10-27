@@ -1,3 +1,9 @@
+---
+status: current
+owner: documentation
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa v0.1 Windows 构建与安装验证
 
 当前目标：`v0.1` / 包版本 `0.1.0` / PE `0.1.0.0`。状态为 **candidate、community unsigned、NOT READY FOR RELEASE**。本指南描述构建输入和验收步骤，不代表已经完成安装、签名、升级或发布。
