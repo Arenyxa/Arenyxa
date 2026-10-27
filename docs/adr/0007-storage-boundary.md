@@ -1,3 +1,9 @@
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
 # ADR: Storage Boundary
 
 Status: Accepted — Phase 1 Architecture Freeze

@@ -1,3 +1,9 @@
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
 # ADR 0009 — Reliability and Resource Governance remain Core Runtime services
 
 **Status:** Accepted for Phase 3  
