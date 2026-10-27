@@ -80,6 +80,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+      - name: Documentation policy (warning-only)
+        run: python scripts/docs_policy_check.py
       - name: Install Linux Qt runtime libraries
         if: runner.os == 'Linux'
         run: |

@@ -1,0 +1,575 @@
+{
+  "schema": "arenyxa.documentation-archive-manifest/v1",
+  "archive_date": "2026-10-28",
+  "hash_algorithm": "SHA-256",
+  "note": "Moved file blobs are unchanged; hashes inherited from the pre-migration source manifest.",
+  "entries": [
+    {
+      "original_path": "docs/DEEP_CODE_REVIEW_AND_ABOUT_REFINEMENT_2026-08-08.md",
+      "archived_path": "docs/internal/history/2026/2026-08-08-deep-code-review-and-about-refinement.md",
+      "status": "historical",
+      "sha256": "0e3a9009e8c92b4e8bea65acc0698c43b7924c75ae4e2eea0f0ecaaab0873ce3",
+      "size_bytes": 8358
+    },
+    {
+      "original_path": "docs/SECURITY_INTEGRITY_AUDIT_2026-08-08.md",
+      "archived_path": "docs/internal/history/2026/2026-08-08-security-integrity-audit.md",
+      "status": "historical",
+      "sha256": "17ad33eaab64f06f9ab9ce73d1567fccdb15c018170b3348a991032a0f6aff95",
+      "size_bytes": 4608
+    },
+    {
+      "original_path": "docs/AUTOPILOT_LEARNING_FOUNDATION_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-autopilot-learning-foundation.md",
+      "status": "historical",
+      "sha256": "67fa12036eb587c87ac2927408431f2a6e28ee08cc7669c03a397541a7450418",
+      "size_bytes": 3635
+    },
+    {
+      "original_path": "docs/COMPETITIVE_EDGE_RELEASE_AUDIT_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-competitive-edge-release-audit.md",
+      "status": "historical",
+      "sha256": "121e8005d5f785aac2e8f29154c2008467aa395808d195d44c5975b3d7588e9b",
+      "size_bytes": 2397
+    },
+    {
+      "original_path": "docs/COMPETITIVE_EDGE_WEB_INTELLIGENCE_EXPANSION_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-competitive-edge-web-intelligence-expansion.md",
+      "status": "historical",
+      "sha256": "7e6e88821d6992c2138dc8e86baac1728616001fd44e4a72dde915800075307d",
+      "size_bytes": 4798
+    },
+    {
+      "original_path": "docs/CONCURRENT_WEB_SCRAPING_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-concurrent-web-scraping.md",
+      "status": "historical",
+      "sha256": "b91e6445c9f8e82c8fae0494b3968963c11d527f2dd10bbdf47bfcff59d4072d",
+      "size_bytes": 6031
+    },
+    {
+      "original_path": "docs/DEEP_RUNTIME_RESILIENCE_AUDIT_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-deep-runtime-resilience-audit.md",
+      "status": "historical",
+      "sha256": "b0daa4eff80c75b17682750dd97fe37a4badd7f45899c0526006391bdff78eb7",
+      "size_bytes": 11548
+    },
+    {
+      "original_path": "docs/INTELLIGENCE_STUDIO_AND_UI_EXPANSION_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-intelligence-studio-and-ui-expansion.md",
+      "status": "historical",
+      "sha256": "bec36ce78b59097f5d3a03968b1d8be3cab391b17ee86010d78839ba606fc2b4",
+      "size_bytes": 5198
+    },
+    {
+      "original_path": "docs/LOW_END_PERFORMANCE_OPTIMIZATION_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-low-end-performance-optimization.md",
+      "status": "historical",
+      "sha256": "fbba449e57286f05cfefa46ff1e09f06d2da7067a3f468ccfa29dbd911b8327f",
+      "size_bytes": 4212
+    },
+    {
+      "original_path": "docs/NAVIGATION_ADVANCED_SETTINGS_DEEP_REVIEW_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-navigation-advanced-settings-deep-review.md",
+      "status": "historical",
+      "sha256": "29ef61ef57b1477c7889c5fbf16db2f8f418338b2acf34f0925e2415d9289f85",
+      "size_bytes": 5515
+    },
+    {
+      "original_path": "docs/RELIABILITY_STABILITY_HARDENING_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-reliability-stability-hardening.md",
+      "status": "historical",
+      "sha256": "844d1253144c47aa7c2ae0a3b51af7f7b739e70f2d90c3a2d5da9551d1755049",
+      "size_bytes": 9050
+    },
+    {
+      "original_path": "docs/TERMINAL_HARDENING_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-terminal-hardening.md",
+      "status": "historical",
+      "sha256": "77e47a457a29ff79b64b16183e170345992d7ed8579a763b189213f69b6447ca",
+      "size_bytes": 5474
+    },
+    {
+      "original_path": "docs/V6.1_RELEASE_AUDIT_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-v6-1-release-audit.md",
+      "status": "historical",
+      "sha256": "2e0c1d0487541fba769de27a23f164935f929246e96104361145f78ae2995774",
+      "size_bytes": 3437
+    },
+    {
+      "original_path": "docs/V6.1_UNIFIED_DOMAIN_NETWORK_CORE_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-v6-1-unified-domain-network-core.md",
+      "status": "historical",
+      "sha256": "91921d4eea34ce080e15608267b4d5024139d0ca5fd3975ab24c0ff7da1dcdd6",
+      "size_bytes": 2001
+    },
+    {
+      "original_path": "docs/V6.2.1_AUTOPILOT_INTEGRATION_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-v6-2-1-autopilot-integration.md",
+      "status": "historical",
+      "sha256": "2308a84e8ac12305762048ab7a58bc75535fdc87b17c7d8d072f632d163a530c",
+      "size_bytes": 1903
+    },
+    {
+      "original_path": "docs/V6.2_NETWORK_CAPTURE_ENRICHMENT_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-v6-2-network-capture-enrichment.md",
+      "status": "historical",
+      "sha256": "a85d345c42951cc50b0b2c06be61cbaa2077ad234edcf75697e59c3cdc1910e5",
+      "size_bytes": 3391
+    },
+    {
+      "original_path": "docs/V6.2_RELEASE_AUDIT_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-v6-2-release-audit.md",
+      "status": "historical",
+      "sha256": "01a89cc096eda3931b8bae39f2739145a0b9185f80a1af0eeb394b045c8e240a",
+      "size_bytes": 6171
+    },
+    {
+      "original_path": "docs/V6.3_REPLAY_API_MAP_STABILITY_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-v6-3-replay-api-map-stability.md",
+      "status": "historical",
+      "sha256": "573caa80861cfad3a02ce91172c1313c8b24ab05307d96ef3255a7aaa381f14b",
+      "size_bytes": 3057
+    },
+    {
+      "original_path": "docs/V6.4_DATASET_LINEAGE_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-v6-4-dataset-lineage.md",
+      "status": "historical",
+      "sha256": "94d0de517eca77ba4290b1a363e9baf8e58c337b4b78761967fd2ed8aa3b67dc",
+      "size_bytes": 3212
+    },
+    {
+      "original_path": "docs/V6.5.1_NAVIGATION_AND_STARTUP_HOTFIX_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-v6-5-1-navigation-and-startup-hotfix.md",
+      "status": "historical",
+      "sha256": "93d07ed323c9212338e30ce0258a877e4718eba941bbe187042172a74376aa90",
+      "size_bytes": 2451
+    },
+    {
+      "original_path": "docs/V6.5.2_SIDEBAR_AND_SELECTION_STATE_REVIEW_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-v6-5-2-sidebar-and-selection-state-review.md",
+      "status": "historical",
+      "sha256": "7c860471eef0d66f10a0eecd8374f6b02310fe73fed4cbdb2ff9da89f0ec484f",
+      "size_bytes": 3295
+    },
+    {
+      "original_path": "docs/V6.5.3_REPAIR_MOTION_ADVANCED_I18N_STABILITY_REVIEW_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-v6-5-3-repair-motion-advanced-i18n-stability-review.md",
+      "status": "historical",
+      "sha256": "b2cb9c3f5975c0dcff6bbd0b079f55620a6e147f56c6486f39040d36afea65e4",
+      "size_bytes": 4216
+    },
+    {
+      "original_path": "docs/V6.5.4_SELF_HEALING_RUNTIME_RECOVERY_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-v6-5-4-self-healing-runtime-recovery.md",
+      "status": "historical",
+      "sha256": "31acac8957f5b9655c484e28ae3b188a16653ceca25ca9ede6b7efedd6c173b0",
+      "size_bytes": 3535
+    },
+    {
+      "original_path": "docs/V6.5.5_RECOVERY_HEALTH_RESUME_OPTIMIZATION_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-v6-5-5-recovery-health-resume-optimization.md",
+      "status": "historical",
+      "sha256": "80faec36f779d30ecdc563f8caff94f787fcf0af23605bee1d7c114428594d2e",
+      "size_bytes": 4905
+    },
+    {
+      "original_path": "docs/V6.5.6_INDEPENDENT_REAUDIT_SECURITY_CRASH_CONSISTENCY_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-v6-5-6-independent-reaudit-security-crash-consistency.md",
+      "status": "historical",
+      "sha256": "ea0bdf5241868956022fb4f6725a12d37b71afe6eade5ac2063d5f474b157303",
+      "size_bytes": 5480
+    },
+    {
+      "original_path": "docs/V6.5_WORKFLOW_ENGINE_INTEGRATION_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-v6-5-workflow-engine-integration.md",
+      "status": "historical",
+      "sha256": "3ee204a8accb2793b6ecf9d6cda212d4ed297347ef565d48e28bdb9af00fc643",
+      "size_bytes": 3906
+    },
+    {
+      "original_path": "docs/V6.6.0_STABILITY_COMPATIBILITY_HARDENING_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-v6-6-0-stability-compatibility-hardening.md",
+      "status": "historical",
+      "sha256": "98d0d46152c11351295538a721f64da179760bf7d2791566e2c03b7ea3a38664",
+      "size_bytes": 1897
+    },
+    {
+      "original_path": "docs/V6.6.1_WINDOWS7_LEGACY_COMPATIBILITY_6X_REVIEW_2026-08-09.md",
+      "archived_path": "docs/internal/history/2026/2026-08-09-v6-6-1-windows7-legacy-compatibility-6x-review.md",
+      "status": "historical",
+      "sha256": "5a3c8a55bf9313b1add5ecc2b7b8df67dbebbe684cb53b3c73e6280a8baa3189",
+      "size_bytes": 7936
+    },
+    {
+      "original_path": "docs/ARENYXA_BRAND_MIGRATION_AND_RELEASE_AUDIT_2026-08-10.md",
+      "archived_path": "docs/internal/history/2026/2026-08-10-arenyxa-brand-migration-and-release-audit.md",
+      "status": "historical",
+      "sha256": "027a08c202da0cdae1aa3c4b694503ca7bd52417d3ad783d9cbfcc638161c006",
+      "size_bytes": 6507
+    },
+    {
+      "original_path": "docs/V6.6_STABLE_RELEASE_2026-08-10.md",
+      "archived_path": "docs/internal/history/2026/2026-08-10-v6-6-stable-release.md",
+      "status": "historical",
+      "sha256": "cf4e056d31d362d7b36591808228072b71d9102c5cb8296066294bf5f7b5f6e6",
+      "size_bytes": 2322
+    },
+    {
+      "original_path": "docs/V6.6BETA2_DEEP_CODE_REVIEW_2026-08-10.md",
+      "archived_path": "docs/internal/history/2026/2026-08-10-v6-6beta2-deep-code-review.md",
+      "status": "historical",
+      "sha256": "d9c77f68b9028ca168b2633b09723d52694666dc0c4eecddaeb430fa9cea145c",
+      "size_bytes": 12513
+    },
+    {
+      "original_path": "docs/V6.6BETA2_INDEPENDENT_COMPATIBILITY_REAUDIT_2026-08-10.md",
+      "archived_path": "docs/internal/history/2026/2026-08-10-v6-6beta2-independent-compatibility-reaudit.md",
+      "status": "historical",
+      "sha256": "b4bd9495d8dac636a6c728712e17f274bb543173113e79b10a535f15730b9c92",
+      "size_bytes": 7476
+    },
+    {
+      "original_path": "docs/V6.6BETA2_SECOND_INDEPENDENT_GUI_REAUDIT_2026-08-10.md",
+      "archived_path": "docs/internal/history/2026/2026-08-10-v6-6beta2-second-independent-gui-reaudit.md",
+      "status": "historical",
+      "sha256": "cb6355e47b3c205a39b64d3d9257a3afe7da14a9ef2f09d38810bffab386af1c",
+      "size_bytes": 3135
+    },
+    {
+      "original_path": "docs/V6.7_INTEGRATED_STARTUP_HANDOFF_2026-08-11.md",
+      "archived_path": "docs/internal/history/2026/2026-08-11-v6-7-integrated-startup-handoff.md",
+      "status": "historical",
+      "sha256": "235c6556652c938b68c115c8cfb130e1464f8142ab96c6c4c2a9812cdcbcabca",
+      "size_bytes": 2283
+    },
+    {
+      "original_path": "docs/V6.7_STARTUP_MOTION_RELEASE_2026-08-11.md",
+      "archived_path": "docs/internal/history/2026/2026-08-11-v6-7-startup-motion-release.md",
+      "status": "historical",
+      "sha256": "800f99711c19e2f7c1de9d6dbcab75b18fe5ca7850b2ddd01fc2ebc472cf9264",
+      "size_bytes": 2009
+    },
+    {
+      "original_path": "docs/V6.8_BETA_ADAPTIVE_CONCURRENCY_2026-08-11.md",
+      "archived_path": "docs/internal/history/2026/2026-08-11-v6-8-beta-adaptive-concurrency.md",
+      "status": "historical",
+      "sha256": "e1640216f24bfc6cd0f3c66a31ed4b42c7f18b5784fa3d40287d8839bd7df7bc",
+      "size_bytes": 3687
+    },
+    {
+      "original_path": "docs/V6.8_STABLE_FINAL_PERFORMANCE_STABILITY_COMPATIBILITY_FREEZE_2026-08-11.md",
+      "archived_path": "docs/internal/history/2026/2026-08-11-v6-8-stable-final-performance-stability-compatibility-freeze.md",
+      "status": "historical",
+      "sha256": "f5d9e1f1715d361952e1bbd71115a5d3674bd084f0d0e637795bb5fbbf4d4604",
+      "size_bytes": 6396
+    },
+    {
+      "original_path": "docs/V6.8_STABLE_PERFORMANCE_STARTUP_CONTINUITY_HOTFIX_2026-08-11.md",
+      "archived_path": "docs/internal/history/2026/2026-08-11-v6-8-stable-performance-startup-continuity-hotfix.md",
+      "status": "historical",
+      "sha256": "dc4a7083046d35c51c8e0157e45a3f03cccfc08774c5c69374a4cf9d1207f127",
+      "size_bytes": 5836
+    },
+    {
+      "original_path": "docs/V6.8_STABLE_RELEASE_2026-08-11.md",
+      "archived_path": "docs/internal/history/2026/2026-08-11-v6-8-stable-release.md",
+      "status": "historical",
+      "sha256": "2ecc0219860c7fcf0518f0f5a2cb18d5d33ba8b4a9d82c206471576c3954b576",
+      "size_bytes": 6322
+    },
+    {
+      "original_path": "docs/PHASE0_FROZEN_BASELINE_2026-08-12.md",
+      "archived_path": "docs/internal/history/2026/2026-08-12-phase0-frozen-baseline.md",
+      "status": "historical",
+      "sha256": "bb3f7bbf2c11e0df84a89e82374be5f41923e738642c8191ee22cd94f3027bb0",
+      "size_bytes": 3168
+    },
+    {
+      "original_path": "docs/PHASE0_IMPLEMENTATION_AND_STABILITY_AUDIT_2026-08-12.md",
+      "archived_path": "docs/internal/history/2026/2026-08-12-phase0-implementation-and-stability-audit.md",
+      "status": "historical",
+      "sha256": "1fcffad360ed8bbf0e818f6db699166adc2dd75b9fd22cc4c257e8da2e76aca3",
+      "size_bytes": 4694
+    },
+    {
+      "original_path": "docs/PHASE0_KNOWN_LIMITATIONS_2026-08-12.md",
+      "archived_path": "docs/internal/history/2026/2026-08-12-phase0-known-limitations.md",
+      "status": "historical",
+      "sha256": "46dd18145f2efec0021473d9f6510fa6a42e9cfad3a420bc97f7acc15e8c7999",
+      "size_bytes": 1252
+    },
+    {
+      "original_path": "docs/PHASE0_WINDOWS_VERIFICATION_RECORD_2026-08-12.md",
+      "archived_path": "docs/internal/history/2026/2026-08-12-phase0-windows-verification-record.md",
+      "status": "historical",
+      "sha256": "4fe1e810b8d39e8a317d4b381ceb26eb0e7915c063c6fee1a7a1dd4e2cc25d98",
+      "size_bytes": 2030
+    },
+    {
+      "original_path": "docs/PHASE1_2_IMPLEMENTATION_AND_STABILITY_AUDIT_2026-08-12.md",
+      "archived_path": "docs/internal/history/2026/2026-08-12-phase1-2-implementation-and-stability-audit.md",
+      "status": "historical",
+      "sha256": "9f6dd486f272cd7855888ce09a93e50cb15a202ed3011d2f32aaec6f6857c1c0",
+      "size_bytes": 7200
+    },
+    {
+      "original_path": "docs/PHASE1_2_WINDOWS_VERIFICATION_RECORD_2026-08-12.md",
+      "archived_path": "docs/internal/history/2026/2026-08-12-phase1-2-windows-verification-record.md",
+      "status": "historical",
+      "sha256": "4ec1ee0e7e7369e9d6d4161ef77a210b424f6e62d1bbbb198c6808c35782eb3c",
+      "size_bytes": 2332
+    },
+    {
+      "original_path": "docs/PHASE1_ARCHITECTURE_CONTRACT_FREEZE_2026-08-12.md",
+      "archived_path": "docs/internal/history/2026/2026-08-12-phase1-architecture-contract-freeze.md",
+      "status": "historical",
+      "sha256": "fbee0ecd0c928103532971cb25c76af521d91b81837d8ad9df24281ce1f9eca2",
+      "size_bytes": 3516
+    },
+    {
+      "original_path": "docs/PHASE2_WEB_INTELLIGENCE_2X_2026-08-12.md",
+      "archived_path": "docs/internal/history/2026/2026-08-12-phase2-web-intelligence-2x.md",
+      "status": "historical",
+      "sha256": "2b5c88cede578dfba734201357605bc43479b3c6f172f2f23c47302a8dbf7dcd",
+      "size_bytes": 3094
+    },
+    {
+      "original_path": "docs/PHASE3_RELIABILITY_RESOURCE_GOVERNANCE_2X_2026-08-12.md",
+      "archived_path": "docs/internal/history/2026/2026-08-12-phase3-reliability-resource-governance-2x.md",
+      "status": "historical",
+      "sha256": "ebe716981dc39be718972babcaf3697b6d1b88a286d11e74dfca0cf44033c1ef",
+      "size_bytes": 5672
+    },
+    {
+      "original_path": "docs/ROADMAP_BINDING_CONSTRAINTS_2026-08-12.md",
+      "archived_path": "docs/internal/history/2026/2026-08-12-roadmap-binding-constraints.md",
+      "status": "historical",
+      "sha256": "cbee76f8e2186d66c299136ae47c5b61c3a3cff0f8ccf742d457e31a6ad9a08c",
+      "size_bytes": 3943
+    },
+    {
+      "original_path": "docs/FINAL_QUALITY_GATE_2026-08-13.md",
+      "archived_path": "docs/internal/history/2026/2026-08-13-final-quality-gate.md",
+      "status": "historical",
+      "sha256": "7a3646f62e23f68c30808764156d7e69bd121ccc76145882141cb82b2aca0f37",
+      "size_bytes": 887
+    },
+    {
+      "original_path": "docs/GITHUB_PUBLICATION_AUDIT_2026-08-14.md",
+      "archived_path": "docs/internal/history/2026/2026-08-14-github-publication-audit.md",
+      "status": "historical",
+      "sha256": "953133fef2722efbae95ec3d9aa8e132a0c59292328381e3f6243cc0290caa48",
+      "size_bytes": 4982
+    },
+    {
+      "original_path": "docs/V7.0_STABLE_RELEASE_2026-08-14.md",
+      "archived_path": "docs/internal/history/2026/2026-08-14-v7-0-stable-release.md",
+      "status": "historical",
+      "sha256": "1aaf5fec89c028d6ca5c39aa29ac4747776428cceeb7eb37c4d3fc6422778516",
+      "size_bytes": 3545
+    },
+    {
+      "original_path": "docs/WINDOWS_PLUGIN_SANDBOX_JOB_VENV_FIX_2026-08-14.md",
+      "archived_path": "docs/internal/history/2026/2026-08-14-windows-plugin-sandbox-job-venv-fix.md",
+      "status": "historical",
+      "sha256": "35d5374a27804fd2a13190a1cecbc238050f5b108d3f33d7cb47e10f39a66de6",
+      "size_bytes": 1891
+    },
+    {
+      "original_path": "docs/V7.0_STARTUP_MOTION_SMOOTHNESS_HOTFIX_2026-08-17.md",
+      "archived_path": "docs/internal/history/2026/2026-08-17-v7-0-startup-motion-smoothness-hotfix.md",
+      "status": "historical",
+      "sha256": "e2542fe71cdda4bdd151259ac463067f890682a15f5ede19473784ccd9ebd71d",
+      "size_bytes": 1499
+    },
+    {
+      "original_path": "docs/V7.0_UNIFIED_PROFESSIONAL_SUITE_2026-08-18.md",
+      "archived_path": "docs/internal/history/2026/2026-08-18-v7-0-unified-professional-suite.md",
+      "status": "historical",
+      "sha256": "5559ede9b4d5a55e88c47684d26ba26f19bab07937eab49a6141641a78a0135b",
+      "size_bytes": 2855
+    },
+    {
+      "original_path": "docs/BASELINE_ANALYSIS.md",
+      "archived_path": "docs/internal/history/2026/legacy-baselines/baseline-analysis.md",
+      "status": "historical",
+      "sha256": "b8f569c7ee129a70ab9e4cfcc62e6d8904e09b13278955ae76d660d9bdc15b3b",
+      "size_bytes": 2621
+    },
+    {
+      "original_path": "docs/DEVELOPMENT_ROADMAP.md",
+      "archived_path": "docs/internal/history/2026/legacy-baselines/development-roadmap.md",
+      "status": "historical",
+      "sha256": "b6d43beb98a466eda82d7796af6b5cb441793eb25d88732d3ebd9cff1edd0524",
+      "size_bytes": 1487
+    },
+    {
+      "original_path": "docs/I18N_MOTION_REFINEMENT.md",
+      "archived_path": "docs/internal/history/2026/legacy-baselines/i18n-motion-refinement.md",
+      "status": "historical",
+      "sha256": "fbbc33d1239f1c3e9f65be094d621bacd2d462a3911dfe3b77380c55d26e4f23",
+      "size_bytes": 5637
+    },
+    {
+      "original_path": "docs/QA_VERIFICATION_REPORT.md",
+      "archived_path": "docs/internal/history/2026/legacy-baselines/qa-verification-report.md",
+      "status": "historical",
+      "sha256": "2cb00009e9d0399deeeb89371be452a3af9f6c272c6251c988706d6d438e7b0d",
+      "size_bytes": 2871
+    },
+    {
+      "original_path": "docs/UI_PERSONALIZATION_DASHBOARD_REDESIGN.md",
+      "archived_path": "docs/internal/history/2026/legacy-baselines/ui-personalization-dashboard-redesign.md",
+      "status": "historical",
+      "sha256": "fbda65d65a84c1feb912fe0dabb469d6ea1f395886d8b0a28a2f92a26ab4143b",
+      "size_bytes": 1781
+    },
+    {
+      "original_path": "docs/V7.8_ULTIMATE_ARCHITECTURE_MODIFICATION_REPORT.md",
+      "archived_path": "docs/internal/history/2026/legacy-baselines/v7-8-ultimate-architecture-modification-report.md",
+      "status": "historical",
+      "sha256": "e4763add21ce207d874401606685b3c2675c874af552f5ed13174532751ce1bb",
+      "size_bytes": 4343
+    },
+    {
+      "original_path": "docs/V7.8_ULTIMATE_ARCHITECTURE.md",
+      "archived_path": "docs/internal/history/2026/legacy-baselines/v7-8-ultimate-architecture.md",
+      "status": "historical",
+      "sha256": "30848866685f4cdc80d62322c56ff2dacf0ad6f4df07fecae61eaa6d4461b0a9",
+      "size_bytes": 7838
+    },
+    {
+      "original_path": "docs/roadmap/DISTRIBUTED_STATE_CONSISTENCY_HARDENING.md",
+      "archived_path": "docs/internal/history/2026/roadmap/distributed-state-consistency-hardening.md",
+      "status": "historical",
+      "sha256": "de8dd48ea61437de84c879f69f58748787a88afdc14c787dd3e9664e5e58b47f",
+      "size_bytes": 4292
+    },
+    {
+      "original_path": "docs/roadmap/ENTERPRISE_SECURITY_OBSERVABILITY_HARDENING.md",
+      "archived_path": "docs/internal/history/2026/roadmap/enterprise-security-observability-hardening.md",
+      "status": "historical",
+      "sha256": "e0a261ac21d2a3e93ae4120042716e5bcf49bc15f5de902a7bf7a1ff66adf402",
+      "size_bytes": 2851
+    },
+    {
+      "original_path": "docs/roadmap/FIRST_RUN_WELCOME_CENTER.md",
+      "archived_path": "docs/internal/history/2026/roadmap/first-run-welcome-center.md",
+      "status": "historical",
+      "sha256": "ba629d38b18bb625a55525782cf6ca10e370b27861f09a5d2b05354ed89b75d2",
+      "size_bytes": 936
+    },
+    {
+      "original_path": "docs/roadmap/PHASE11_12_IMPLEMENTATION.md",
+      "archived_path": "docs/internal/history/2026/roadmap/phase11-12-implementation.md",
+      "status": "historical",
+      "sha256": "ee4190e7f59cbc7af9bd91955892afc9f828c357f12158692b6ff9dffcb2899b",
+      "size_bytes": 5966
+    },
+    {
+      "original_path": "docs/roadmap/PHASE4_SECURITY_FOUNDATION.md",
+      "archived_path": "docs/internal/history/2026/roadmap/phase4-security-foundation.md",
+      "status": "historical",
+      "sha256": "16b44c49e7a4da52bae5577ccf4dc14c1cdee09b69699b5a6d1a7430f0b5cecb",
+      "size_bytes": 1490
+    },
+    {
+      "original_path": "docs/roadmap/PHASE5_DEVELOPER_AUTHORITY_BOUNDARY.md",
+      "archived_path": "docs/internal/history/2026/roadmap/phase5-developer-authority-boundary.md",
+      "status": "historical",
+      "sha256": "ecd645164c8556ebdc28d14148c7c8cdecfa0373ee7c50d458dc4663645fdc14",
+      "size_bytes": 1121
+    },
+    {
+      "original_path": "docs/roadmap/PHASE6_DEVELOPER_ACCESS.md",
+      "archived_path": "docs/internal/history/2026/roadmap/phase6-developer-access.md",
+      "status": "historical",
+      "sha256": "b80b598d2e787cd0ab1b9abc1bc210b3ed0c351c431478ec45990bedc566d31d",
+      "size_bytes": 1842
+    },
+    {
+      "original_path": "docs/roadmap/PHASE7_10_ENTERPRISE_PLATFORM_2026-08-12.md",
+      "archived_path": "docs/internal/history/2026/roadmap/phase7-10-enterprise-platform-2026-08-12.md",
+      "status": "historical",
+      "sha256": "98205f9b70e2cd59bc45b890b852d07c86c5323bc7ffc311b5d17a270a0b9b16",
+      "size_bytes": 5614
+    },
+    {
+      "original_path": "docs/roadmap/PHASE7_LOCAL_ENTERPRISE_IDENTITY.md",
+      "archived_path": "docs/internal/history/2026/roadmap/phase7-local-enterprise-identity.md",
+      "status": "historical",
+      "sha256": "465742deaa3a4a5573e7983686bd7658ab41cdc54e2a3d5878e0274cb0385e39",
+      "size_bytes": 2409
+    },
+    {
+      "original_path": "P0_P1_FINAL_FIX_REPORT.md",
+      "archived_path": "docs/internal/history/root-legacy/p0-p1-fix-report.md",
+      "status": "historical",
+      "sha256": "e55ce8e50579791fe9701c71ce236361d5d91c8f9fb85fe3d4c9a48a2203b8ea",
+      "size_bytes": 2150
+    },
+    {
+      "original_path": "P0_P1_SECURITY_FIXES.md",
+      "archived_path": "docs/internal/history/root-legacy/p0-p1-security-fix-report.md",
+      "status": "historical",
+      "sha256": "6825f9719437311910e82d9fe180b9936e087b97948dc02aa1bd6a458dd0cb40",
+      "size_bytes": 895
+    },
+    {
+      "original_path": "IMPLEMENTATION.md",
+      "archived_path": "docs/internal/history/root-legacy/phase6-1-follow-up-implementation.md",
+      "status": "historical",
+      "sha256": "c661ec49251b338b9e6d76ed7d9574d5e8f50e50b79cda2049ca77fbdaf45489",
+      "size_bytes": 2425
+    },
+    {
+      "original_path": "TEST_REPORT.md",
+      "archived_path": "docs/internal/history/root-legacy/v8-0-beta17-test-report.md",
+      "status": "historical",
+      "sha256": "a7f4be995080b80a9a63f24e0791850192f201aa85994aeb19cb2e2fb62598a6",
+      "size_bytes": 1733
+    },
+    {
+      "original_path": "FINAL_ACCEPTANCE_REPORT.md",
+      "archived_path": "docs/internal/history/root-legacy/v8-0-engineering-acceptance-report.md",
+      "status": "historical",
+      "sha256": "a9c1cc000abb8f2a08017a1da424712d11eeb43ff00d54fdce7a92ff6d1935d7",
+      "size_bytes": 6331
+    },
+    {
+      "original_path": "FEATURE_PRESERVATION_MATRIX.md",
+      "archived_path": "docs/internal/history/root-legacy/v8-0-feature-preservation-matrix.md",
+      "status": "historical",
+      "sha256": "9c08fb216a2d7c7cc25847df09d9413623393d2e89afb0fbfb2e95d710b4f1c9",
+      "size_bytes": 4800
+    },
+    {
+      "original_path": "TEST_EXECUTION_REPORT.md",
+      "archived_path": "docs/internal/history/root-legacy/v8-0-test-execution-report.md",
+      "status": "historical",
+      "sha256": "fc985b8deda1906b222a951478ec91dfd04e33457df0c528900198b54fec73be",
+      "size_bytes": 2055
+    },
+    {
+      "original_path": "CURRENT_CAPABILITY_MANIFEST.md",
+      "archived_path": "docs/internal/history/root-legacy/v8-2-capability-manifest.md",
+      "status": "historical",
+      "sha256": "b434bf1add10bca46ddc3369468f445be24f119f7a79bbf015a9d2af78f15fa0",
+      "size_bytes": 4424
+    },
+    {
+      "original_path": "WINDOWS_TERMINAL_DIRECT_TEST_QUOTING_FIX_README.txt",
+      "archived_path": "docs/internal/history/root-legacy/windows-terminal-direct-test-quoting-fix.txt",
+      "status": "historical",
+      "sha256": "dfe08f489bd26647cea8225e1a0dd43fab880f8aa7c865a1c97aafc9610b9b9e",
+      "size_bytes": 653
+    },
+    {
+      "original_path": "WINDOWS_UI_SMOKE_LAZY_PAGE_FIX_README.txt",
+      "archived_path": "docs/internal/history/root-legacy/windows-ui-smoke-lazy-page-fix.txt",
+      "status": "historical",
+      "sha256": "892f3813721838f3e96f2c8429e07318ee37fad1be22cafedf94b2f90afb3989",
+      "size_bytes": 314
+    }
+  ]
+}

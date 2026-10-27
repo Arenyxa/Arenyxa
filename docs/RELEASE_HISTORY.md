@@ -13,9 +13,9 @@ For this source-publication decision, the release owner explicitly approved the 
 Earlier filenames and version labels describe historical engineering snapshots. Their original assertions and results remain historical source material and do not redefine the public v0.1 identity.
 
 - [v8.2 engineering identity](../V8_2_RELEASE_IDENTITY.json) retains the implementation provenance preceding the public identity change.
-- [v7.0 engineering release record](V7.0_STABLE_RELEASE_2026-08-14.md) records the earlier integrated platform work.
-- [v6.8 engineering record](V6.8_STABLE_RELEASE_2026-08-11.md) and [v6.7 startup-motion record](V6.7_STARTUP_MOTION_RELEASE_2026-08-11.md) retain their contemporary findings.
-- [v6.6 engineering record](V6.6_STABLE_RELEASE_2026-08-10.md) and [Windows 7 compatibility design](V6.6.1_WINDOWS7_LEGACY_COMPATIBILITY_6X_REVIEW_2026-08-09.md) explain the frozen legacy lane.
+- [v7.0 engineering release record](internal/history/2026/2026-08-14-v7-0-stable-release.md) records the earlier integrated platform work.
+- [v6.8 engineering record](internal/history/2026/2026-08-11-v6-8-stable-release.md) and [v6.7 startup-motion record](internal/history/2026/2026-08-11-v6-7-startup-motion-release.md) retain their contemporary findings.
+- [v6.6 engineering record](internal/history/2026/2026-08-10-v6-6-stable-release.md) and [Windows 7 compatibility design](internal/history/2026/2026-08-09-v6-6-1-windows7-legacy-compatibility-6x-review.md) explain the frozen legacy lane.
 - Root-level Beta/v6/v7/v8 reports that are not required by active tooling are archived under [internal historical reports](internal/REPORT_INDEX.md).
 
 Migration fixtures retain their original migration identifiers and recorded digests. Public version promotion does not rewrite those historical bytes or certify the legacy runtime.
