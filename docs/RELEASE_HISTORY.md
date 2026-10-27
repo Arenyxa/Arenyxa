@@ -1,3 +1,9 @@
+---
+status: historical
+owner: release
+last_reviewed: 2026-10-28
+---
+
 # Release and engineering history
 
 ## Public v0.1 — 2026-10-04

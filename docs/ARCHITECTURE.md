@@ -1,3 +1,9 @@
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa v0.1 Architecture
 
 > This document describes the **Arenyxa v0.1 candidate source tree**, derived from engineering baseline **v8.2.0**. Current status is **community unsigned, NOT READY FOR RELEASE**. Source ownership and tests are evidence for specific contracts; native platform behavior and release readiness require separate recorded validation.

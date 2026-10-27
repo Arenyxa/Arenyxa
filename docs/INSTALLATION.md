@@ -1,3 +1,9 @@
+---
+status: current
+owner: documentation
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa 安装
 
 Arenyxa v0.1 已作为公共源码版本发布准备完成。Windows 分发保持 **community unsigned**；源码发布不等于 Authenticode 签名，也不声明已经完成独立干净机器安装资格验证。

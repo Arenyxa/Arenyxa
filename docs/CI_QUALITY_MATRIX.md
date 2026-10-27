@@ -1,3 +1,9 @@
+---
+status: current
+owner: engineering
+last_reviewed: 2026-10-28
+---
+
 # CI Quality Matrix
 
 The repository defines `.github/workflows/quality.yml` as the cross-platform release validation matrix.

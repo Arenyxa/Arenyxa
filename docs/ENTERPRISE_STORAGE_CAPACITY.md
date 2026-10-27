@@ -1,3 +1,9 @@
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
 # Enterprise Distributed Storage Capacity
 
 Arenyxa supports two persistence envelopes for the Enterprise distributed runtime:

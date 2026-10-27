@@ -1,3 +1,9 @@
+---
+status: current
+owner: release
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa v0.1 Release Status
 
 ## Release Identity
