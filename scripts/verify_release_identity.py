@@ -81,7 +81,7 @@ def verify_identity(root: Path = ROOT) -> dict:
     require("scripts/build_release_attestation.py", 'parser.add_argument("--version", default="0.1.0")')
     require("RUN_ARENYXA.cmd", "title Arenyxa v0.1 Source Launcher")
 
-    identity = json.loads(read("RELEASE_IDENTITY.json"))
+    identity = json.loads(read("metadata/release-identity.json))
     identity_fields = {
         "schema": "arenyxa.release-identity/v1", "display_version": "0.1",
         "package_version": "0.1.0", "windows_file_version": "0.1.0.0",
@@ -94,11 +94,11 @@ def verify_identity(root: Path = ROOT) -> dict:
     }
     for key, value in identity_fields.items():
         if identity.get(key) != value:
-            raise RuntimeError("RELEASE_IDENTITY.json: inconsistent " + key)
+            raise RuntimeError("metadata/release-identity.json: inconsistent " + key)
     matrix = json.loads(read("docs/release/COMPATIBILITY_MATRIX.json"))
     if matrix.get("product_release_version") != "0.1.0" or matrix.get("runtime_compatibility_identity") != "6.8.0":
         raise RuntimeError("documented public/compatibility identity mismatch")
-    require("V8_2_RELEASE_IDENTITY.json", '"artifact_name": "Arenyxa_v8.2"')
+    require("docs/internal/history/2026/metadata/v8-2-release-identity.json", '"artifact_name": "Arenyxa_v8.2"')
     return identity
 
 

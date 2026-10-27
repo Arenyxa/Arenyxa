@@ -125,7 +125,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         description="Execute and retain reproducible Arenyxa v0.1 validation evidence."
     )
     parser.add_argument("--full", action="store_true", help="include the complete pytest regression suite")
-    parser.add_argument("--report", type=Path, default=ROOT / "V8_TEST_EVIDENCE.json")
+    parser.add_argument("--report", type=Path, default=ROOT / "metadata" / "manifests" / "v8-test-evidence.json)
     args = parser.parse_args(argv)
     environment = dict(os.environ)
     environment["PYTHONUTF8"] = "1"

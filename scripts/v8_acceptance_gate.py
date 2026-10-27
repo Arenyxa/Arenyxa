@@ -158,8 +158,8 @@ def _external_status(evidence: dict[str, Any], name: str) -> str:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Evaluate Arenyxa v0.1 PDF final acceptance gates")
-    parser.add_argument("--evidence", type=Path, default=ROOT / "V8_TEST_EVIDENCE.json")
-    parser.add_argument("--report", type=Path, default=ROOT / "V8_ACCEPTANCE_GATE.json")
+    parser.add_argument("--evidence", type=Path, default=ROOT / "metadata" / "manifests" / "v8-test-evidence.json)
+    parser.add_argument("--report", type=Path, default=ROOT / "metadata" / "manifests" / "v8-acceptance-gate.json)
     args = parser.parse_args(argv)
 
     stub_findings: list[str] = []
@@ -191,9 +191,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         and _contains("src/arenyxa/application/performance_telemetry.py", "max_samples")
         and _contains("src/arenyxa/infrastructure/capture/proxy_persistence.py", "queue.Queue(maxsize=self.capacity)")
     )
-    phase6_report = ROOT / "V8_PHASE6_PERFORMANCE_REPORT.json"
+    phase6_report = ROOT / "metadata" / "manifests" / "v8-phase6-performance-report.json
     performance_checked = phase6_report.is_file()
-    phase6_gate = ROOT / "V8_PHASE6_GATE.json"
+    phase6_gate = ROOT / "metadata" / "manifests" / "v8-phase6-gate.json
     survivability_checked = phase6_gate.is_file() or (
         _contains("scripts/v8_phase6_gate.py", "test_v80_phase6_survivability.py", "v8_phase6_performance_validation.py")
         and _contains("src/arenyxa/application/resilience_drills.py", "run_phase6")

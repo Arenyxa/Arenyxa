@@ -112,7 +112,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the Arenyxa final multi-dimensional quality gate.")
     parser.add_argument("--full", action="store_true", help="also run the complete pytest suite")
     parser.add_argument("--include-legacy", action="store_true", help="also run the frozen Windows 7 compatibility lane")
-    parser.add_argument("--report", type=Path, default=ROOT / "FINAL_QUALITY_GATE.json")
+    parser.add_argument("--report", type=Path, default=ROOT / "metadata/manifests/final-quality-gate.json")
     args = parser.parse_args(argv)
 
     results: list[dict[str, object]] = []
