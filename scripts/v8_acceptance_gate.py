@@ -191,9 +191,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         and _contains("src/arenyxa/application/performance_telemetry.py", "max_samples")
         and _contains("src/arenyxa/infrastructure/capture/proxy_persistence.py", "queue.Queue(maxsize=self.capacity)")
     )
-    phase6_report = ROOT / "metadata" / "manifests" / "v8-phase6-performance-report.json
+    phase6_report = ROOT / "metadata" / "manifests" / "v8-phase6-performance-report.json"
     performance_checked = phase6_report.is_file()
-    phase6_gate = ROOT / "metadata" / "manifests" / "v8-phase6-gate.json
+    phase6_gate = ROOT / "metadata" / "manifests" / "v8-phase6-gate.json"
     survivability_checked = phase6_gate.is_file() or (
         _contains("scripts/v8_phase6_gate.py", "test_v80_phase6_survivability.py", "v8_phase6_performance_validation.py")
         and _contains("src/arenyxa/application/resilience_drills.py", "run_phase6")
