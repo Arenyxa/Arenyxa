@@ -15,7 +15,7 @@ last_reviewed: 2026-10-28
 | Integrate against command/API surfaces | [API reference](API_REFERENCE.md) | Stable reference; verify optional adapters |
 | Understand system design | [Architecture](ARCHITECTURE.md), [module tree](FUNCTION_MODULE_TREE.md), [UI component tree](UI_COMPONENT_TREE.md) | Stable reference |
 | Navigate source code | [Code navigation](architecture/CODE_NAVIGATION.md) | Developer reference |
-| Review architecture decisions | [ADR directory](adr/) | Append-only; decisions may be superseded |
+| Review architecture decisions | [ADR index](architecture/adr/INDEX.md) | Append-only; decisions may be superseded |
 | Run tests and quality gates | [Testing guide](TESTING.md), [CI quality matrix](CI_QUALITY_MATRIX.md) | Current |
 | Understand security boundaries | [Security docs](SECURITY.md), [root SECURITY.md](../SECURITY.md) | Current |
 | Understand version/build/compatibility identities | [Version policy](../VERSIONING.md), [release provenance](RELEASE_PROVENANCE_AND_ANTI_TAMPER.md) | Current |

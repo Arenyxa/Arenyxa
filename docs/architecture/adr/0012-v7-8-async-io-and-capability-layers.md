@@ -1,5 +1,5 @@
 ---
-status: stable
+status: historical
 owner: architecture
 last_reviewed: 2026-10-28
 ---

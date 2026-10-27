@@ -223,3 +223,23 @@ The root-level JSON documents were classified by lifecycle instead of extension.
 | --- | --- | --- | --- |
 | `docs/RELEASE_STATUS.md` | `docs/release/RELEASE_STATUS.md` | current | `8daa819cbc8740f64b7c7c166aa8ccc3036951cddf28eb7411b800c6acc6dbfe` |
 | `docs/RELEASE_HISTORY.md` | `docs/release/history/RELEASE_HISTORY.md` | historical timeline | `9d34c47e8dd615426b843afed79bd3178d90fc40d938789cd3ed6bde0165575d` |
+
+
+## ADR canonical path migration — 2026-10-28
+
+Architecture Decision Records are grouped under `docs/architecture/adr/` and listed in the numbered [ADR index](../architecture/adr/INDEX.md). File contents were preserved except ADR 0012, whose status is now marked historical.
+
+| Original path | Canonical path | Lifecycle | SHA-256 before migration | Decision |
+| --- | --- | --- | --- | --- |
+| `docs/adr/0001-run-runtime-boundary.md` | `docs/architecture/adr/0001-runtime-boundary.md` | stable / accepted | `59a4d43120bb479371aad0f26c651ef37de740073ebf971181b8f97975968e93` | Run Runtime Boundary |
+| `docs/adr/0002-workflow-runtime-boundary.md` | `docs/architecture/adr/0002-workflow-runtime-boundary.md` | stable / accepted | `62451998f192a86f0c7ee2b65df331e5fec305858bf5fec65b33b960ccd5a7e5` | Workflow Runtime Boundary |
+| `docs/adr/0003-dataset-boundary.md` | `docs/architecture/adr/0003-dataset-boundary.md` | stable / accepted | `c020d63b94d96cd4973133a0beca936480e07674da57db337a9484eb3c3d8ee6` | Dataset Boundary |
+| `docs/adr/0004-capture-boundary.md` | `docs/architecture/adr/0004-capture-boundary.md` | stable / accepted | `0906633927d546e01e63d09a72b4f5bce14f063aa1775dea786f409d265f9d94` | Capture Boundary |
+| `docs/adr/0005-recovery-boundary.md` | `docs/architecture/adr/0005-recovery-boundary.md` | stable / accepted | `2bfb4c1b5126d9ec217fbb7ef1b6e995d2c200e25c7d638f514dd689a657187d` | Recovery Boundary |
+| `docs/adr/0006-plugin-boundary.md` | `docs/architecture/adr/0006-plugin-boundary.md` | stable / accepted | `bc285cbba39cf4d6cd9f337dcada311ccfe946a92fbfa46aefd4b4a97575bc68` | Plugin Boundary |
+| `docs/adr/0007-storage-boundary.md` | `docs/architecture/adr/0007-storage-boundary.md` | stable / accepted | `e45806c288b67e2da95d0a0c6a863215857aab736fd88e3dcf01ec39170ab5aa` | Storage Boundary |
+| `docs/adr/0008-ui-shell-boundary.md` | `docs/architecture/adr/0008-ui-shell-boundary.md` | stable / accepted | `2394be4f2c1d5fa1203d6f713371b577c3ae98119d73a18c961da5fa3148aff1` | UI Shell Boundary |
+| `docs/adr/0009-reliability-resource-governance.md` | `docs/architecture/adr/0009-reliability-resource-governance.md` | stable / accepted | `54d07b0f09b2b54c48602b8a00ee48f131f7ef4b7c4be8733dc1a2c1e23397f9` | Reliability and Resource Governance |
+| `docs/adr/0010-workflow-test-lab.md` | `docs/architecture/adr/0010-workflow-test-lab.md` | stable / accepted | `4189c8d8dcd90bdf372c9b5816e6c7b5a0c4968c4e9d036564eeea23867f6731` | Workflow Test Lab |
+| `docs/adr/ADR_HARDWARE_ROOT_TPM_LIFECYCLE.md` | `docs/architecture/adr/0011-hardware-root-tpm-lifecycle.md` | stable / accepted | `8e976ece8bc786335dbd30428181805899101241c525fc73bde9010ed376bd4f` | Hardware Root TPM Lifecycle |
+| `docs/adr/ADR_V78_ASYNC_IO_AND_CAPABILITY_LAYERS.md` | `docs/architecture/adr/0012-v7-8-async-io-and-capability-layers.md` | historical snapshot | `23634347c74e7548a125503af5a22b74429697be3bd87ca2170db50acc226a4d` | v7.8 Async I/O and Capability Layers |
