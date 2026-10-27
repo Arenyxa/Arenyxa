@@ -20,4 +20,4 @@ Roadmap documents evolve rapidly. Previous snapshots are preserved as planning h
 | `docs/roadmap/PHASE7_10_ENTERPRISE_PLATFORM_2026-08-12.md` | [phase7-10-enterprise-platform-2026-08-12.md](../internal/history/2026/roadmap/phase7-10-enterprise-platform-2026-08-12.md) |
 | `docs/roadmap/PHASE7_LOCAL_ENTERPRISE_IDENTITY.md` | [phase7-local-enterprise-identity.md](../internal/history/2026/roadmap/phase7-local-enterprise-identity.md) |
 
-For current boundaries, see [release status](../RELEASE_STATUS.md), [architecture](../ARCHITECTURE.md), and [historical reports](../internal/REPORT_INDEX.md).
+For current boundaries, see [release status](../release/RELEASE_STATUS.md), [architecture](../ARCHITECTURE.md), and [historical reports](../internal/REPORT_INDEX.md).
