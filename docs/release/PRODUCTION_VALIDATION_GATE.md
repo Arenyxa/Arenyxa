@@ -1,3 +1,9 @@
+---
+status: current
+owner: release
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa Production Validation Gate
 
 Arenyxa separates **local crash/recovery correctness** from **real multi-node production evidence**. A one-host simulation is never promoted to production proof.

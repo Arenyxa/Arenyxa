@@ -1,3 +1,9 @@
+---
+status: current
+owner: security
+last_reviewed: 2026-10-28
+---
+
 # Independent Security Review Checklist
 
 Candidate review status: NOT EXECUTED as an independent audit. This is a checklist for Arenyxa v0.1, not completed audit evidence or release approval. Record reviewer, exact artifact hashes, environment, results and unresolved findings before marking any item complete. Community unsigned / NOT READY FOR RELEASE remains the current status.

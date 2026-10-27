@@ -1,3 +1,9 @@
+---
+status: current
+owner: release
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa LTS Policy — Phase 12
 
 Candidate policy scope: Arenyxa v0.1 is community unsigned and NOT READY FOR RELEASE. The values below mirror ReleasePolicy defaults (24-month maintenance, 30-month security fixes, 12-month deprecation); this candidate has not been designated an LTS release and has no asserted LTS start date.

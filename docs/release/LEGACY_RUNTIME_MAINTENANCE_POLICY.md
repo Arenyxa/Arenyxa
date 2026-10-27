@@ -1,3 +1,9 @@
+---
+status: current
+owner: release
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa Legacy Runtime Maintenance Policy
 
 Arenyxa has two deliberately different support lanes.
