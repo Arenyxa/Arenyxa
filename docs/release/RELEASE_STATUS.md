@@ -52,8 +52,8 @@ This verdict is deliberately narrower than “all Windows deployment scenarios q
 
 ## Evidence
 
-- [Release history](RELEASE_HISTORY.md)
-- [Testing](TESTING.md)
-- [Installation](INSTALLATION.md)
-- [Security](SECURITY.md)
-- [Historical report index](internal/REPORT_INDEX.md)
+- [Release history](history/RELEASE_HISTORY.md)
+- [Testing](../TESTING.md)
+- [Installation](../INSTALLATION.md)
+- [Security](../SECURITY.md)
+- [Historical report index](../internal/REPORT_INDEX.md)

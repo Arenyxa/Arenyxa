@@ -9,7 +9,7 @@ last_reviewed: 2026-10-28
 | I want to… | Read | Lifecycle |
 | --- | --- | --- |
 | Understand the product and start it | [README](../README.md) | Current |
-| Check publication status and limitations | [Release status](RELEASE_STATUS.md) | Current |
+| Check publication status and limitations | [Release status](release/RELEASE_STATUS.md) | Current |
 | Install on Windows | [Windows installer guide](WINDOWS_INSTALLER_zh-CN.md) | Current |
 | Build from source | [Local build guide](LOCAL_BUILD_zh-CN.md) | Current |
 | Integrate against command/API surfaces | [API reference](API_REFERENCE.md) | Stable reference; verify optional adapters |
@@ -19,7 +19,7 @@ last_reviewed: 2026-10-28
 | Run tests and quality gates | [Testing guide](TESTING.md), [CI quality matrix](CI_QUALITY_MATRIX.md) | Current |
 | Understand security boundaries | [Security docs](SECURITY.md), [root SECURITY.md](../SECURITY.md) | Current |
 | Understand version/build/compatibility identities | [Version policy](../VERSIONING.md), [release provenance](RELEASE_PROVENANCE_AND_ANTI_TAMPER.md) | Current |
-| Read release milestones | [Release history](RELEASE_HISTORY.md) | Timeline, not current verdict |
+| Read release milestones | [Release history](release/history/RELEASE_HISTORY.md) | Timeline, not current verdict |
 | Find old audits, baselines, fixes, and evidence | [Historical report index](internal/REPORT_INDEX.md) | Historical |
 | Review previous roadmap snapshots | [Roadmap archive index](roadmap/INDEX.md) | Historical |
 | Read current release identity and machine-generated evidence | [Metadata index](../metadata/README.md) | Machine-readable contracts and gate results |

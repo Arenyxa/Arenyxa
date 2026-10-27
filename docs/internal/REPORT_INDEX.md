@@ -83,8 +83,8 @@ These files were moved out of the repository root during the Arenyxa v0.1 public
 | `WINDOWS_REPAIR_CENTER_BUTTON_COMPAT_HOTFIX_README.txt` | `docs/internal/history/root-legacy/WINDOWS_REPAIR_CENTER_BUTTON_COMPAT_HOTFIX_README.txt` | Historical fix note | `918aa612bdd2ec1f931eaae9e319617ba20058168259a01e0886c30b0b137e96` |
 | `WINDOWS_UI_RTL_RESPONSIVENESS_HOTFIX_README.txt` | `docs/internal/history/root-legacy/WINDOWS_UI_RTL_RESPONSIVENESS_HOTFIX_README.txt` | Historical fix note | `c99920644a9e8f0b88d7f51e65ed8714a5149c3be9b59fe9d6493aeae999d16f` |
 
-Current public status is documented in [`../RELEASE_STATUS.md`](../RELEASE_STATUS.md).
-Historical release chronology is documented in [`../RELEASE_HISTORY.md`](../RELEASE_HISTORY.md).
+Current public status is documented in [`../release/RELEASE_STATUS.md`](../release/RELEASE_STATUS.md).
+Historical release chronology is documented in [`../release/history/RELEASE_HISTORY.md`](../release/history/RELEASE_HISTORY.md).
 
 
 ## Documentation cleanup archive — 2026-10-28
@@ -215,3 +215,11 @@ The root-level JSON documents were classified by lifecycle instead of extension.
 | `V8_PHASE6_PERFORMANCE_REPORT.json` | `metadata/manifests/v8-phase6-performance-report.json` | machine-readable gate/baseline | `ab839ffd0e1b62ab02294f616857a9b74c471ba0717dfeb8020e49feb7154b4b` |
 | `V8_TEST_EVIDENCE.json` | `metadata/manifests/v8-test-evidence.json` | machine-readable gate/baseline | `6e93ba5e1c8de1d85fdc15e018d9ad7a4f130ec69cf3672885ed1234fad994a2` |
 | `WINDOWS_NATIVE_QUALIFICATION.json` | `metadata/manifests/windows-native-qualification.json` | machine-readable gate/baseline | `991ae3142f11d2d2e94c5a085d8cc980f9c8eebba2cf7f00e153178adc9b9767` |
+
+
+## Release documentation canonical paths — 2026-10-28
+
+| Original path | Canonical path | Lifecycle | SHA-256 |
+| --- | --- | --- | --- |
+| `docs/RELEASE_STATUS.md` | `docs/release/RELEASE_STATUS.md` | current | `8daa819cbc8740f64b7c7c166aa8ccc3036951cddf28eb7411b800c6acc6dbfe` |
+| `docs/RELEASE_HISTORY.md` | `docs/release/history/RELEASE_HISTORY.md` | historical timeline | `9d34c47e8dd615426b843afed79bd3178d90fc40d938789cd3ed6bde0165575d` |

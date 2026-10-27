@@ -21,4 +21,4 @@ Do not globally replace `8.x`, `6.8.0`, migration numbers or protocol versions. 
 
 Installer AppId, application data names and file associations are retained. Moving the numeric product version from engineering 8.x to public 0.1 is not a proven in-place upgrade strategy. An older-engineering-version installation, a clean install, migration rollback and uninstall/data retention must be tested explicitly on suitable disposable Windows environments.
 
-Release signing, Authenticode, Developer identity and Enterprise Root authority are separate trust systems. This community candidate does not use Root/Owner/Enterprise credentials to sign the product. See [SECURITY.md](SECURITY.md) and [historical record](docs/RELEASE_HISTORY.md).
+Release signing, Authenticode, Developer identity and Enterprise Root authority are separate trust systems. This community candidate does not use Root/Owner/Enterprise credentials to sign the product. See [SECURITY.md](SECURITY.md) and [historical record](docs/release/history/RELEASE_HISTORY.md).
