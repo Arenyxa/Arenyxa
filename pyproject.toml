@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=83,<84", "wheel>=0.46.2,<0.47"]
+requires = ["setuptools>=84.1.0,<85", "wheel>=0.46.2,<0.47"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -74,7 +74,7 @@ full = [
   "opentelemetry-exporter-otlp-proto-http>=1.30,<2; python_version >= '3.11'",
 ]
 dev = [
-  "setuptools>=83,<84; python_version >= '3.11'",
+  "setuptools>=84.1.0,<85; python_version >= '3.11'",
   "wheel>=0.46.2,<0.47; python_version >= '3.11'",
   "pytest>=8.3,<10; python_version >= '3.11'",
   "pytest-cov>=6,<8; python_version >= '3.11'",
