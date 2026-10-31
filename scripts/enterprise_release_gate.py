@@ -71,7 +71,8 @@ def main() -> int:
             "still requires an explicit evidence file through production_release_gate.py."
         ),
     }
-    report = ROOT / "ENTERPRISE_RELEASE_GATE.json"
+    report = ROOT / "metadata" / "manifests" / "enterprise-release-gate.json"
+    report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if release_ready else 1

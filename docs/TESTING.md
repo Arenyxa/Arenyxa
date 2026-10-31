@@ -1,3 +1,9 @@
+---
+status: current
+owner: testing
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa 测试与验证
 
 ## 常用入口
@@ -18,4 +24,4 @@
 - 24 小时 soak 被 Release Owner 明确改为 deferred / non-blocking，不记录为 passed。
 - 独立 clean-Windows 安装、升级、回滚和卸载资格不由本次源码发布声明。
 
-当前发布范围和限制见 [Release Status](RELEASE_STATUS.md)。
+当前发布范围和限制见 [Release Status](release/RELEASE_STATUS.md)。

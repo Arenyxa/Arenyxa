@@ -1,3 +1,9 @@
+---
+status: stable
+owner: release
+last_reviewed: 2026-10-28
+---
+
 # Release provenance and anti-tamper design
 
 ## Goals

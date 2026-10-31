@@ -1,3 +1,9 @@
+---
+status: current
+owner: legal
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa name, logo, and distribution identity
 
 Arenyxa source code is licensed under **GPL-3.0-or-later**. That license intentionally permits studying, modifying, redistributing, and charging for copies or services, provided the GPL obligations are satisfied.

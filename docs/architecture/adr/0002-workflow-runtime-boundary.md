@@ -1,4 +1,10 @@
-# ADR: Storage Boundary
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
+# ADR: Workflow Runtime Boundary
 
 Status: Accepted — Phase 1 Architecture Freeze
 
@@ -8,11 +14,11 @@ Arenyxa 6.8 accumulated a mature Web/Workflow/Dataset/Recovery runtime. Phase 1 
 
 ## Decision
 
-SQLiteStore and atomic_io own transaction/atomic-write durability.
+WorkflowEngine owns deterministic node semantics; WorkflowDatasetService owns checkpoint/revision integration and resume consistency.
 
 ## Consequence / invariant
 
-Success is not reported before durable commit; callers do not bypass storage invariants.
+A resumed execution must not duplicate committed output or non-idempotent effects.
 
 ## Compatibility
 

@@ -1,4 +1,10 @@
-# ADR: Dataset Boundary
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
+# ADR: Run Runtime Boundary
 
 Status: Accepted — Phase 1 Architecture Freeze
 
@@ -8,11 +14,11 @@ Arenyxa 6.8 accumulated a mature Web/Workflow/Dataset/Recovery runtime. Phase 1 
 
 ## Decision
 
-DatasetVersionService and DataLineageService own revision identity, ancestry and lineage evidence.
+RunOrchestrator owns Run lifecycle, cancellation, progress and durable run-state transitions. HTTP/storage are adapters; UI cannot mutate Run truth directly.
 
 ## Consequence / invariant
 
-A revision is complete and attributable or is not exposed as ready.
+Retries are bounded and idempotency-aware; failure cannot leave UI state ahead of durable state.
 
 ## Compatibility
 

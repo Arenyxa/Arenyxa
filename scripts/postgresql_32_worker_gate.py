@@ -497,6 +497,7 @@ def main(argv: list[str] | None = None) -> int:
     encoded = json.dumps(result, sort_keys=True)
     print(encoded)
     if args.report is not None:
+        args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
     return 0 if result["passed"] else 2
 

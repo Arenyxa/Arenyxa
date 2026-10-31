@@ -1,3 +1,9 @@
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa V6.0 功能模块树
 
 ```text

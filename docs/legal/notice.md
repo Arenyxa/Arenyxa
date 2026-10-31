@@ -1,3 +1,9 @@
+---
+status: current
+owner: legal
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa distribution notice
 
 Arenyxa is distributed under **GNU GPL-3.0-or-later**. See `LICENSE` for the complete GPLv3 text.

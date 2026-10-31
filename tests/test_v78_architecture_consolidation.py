@@ -21,7 +21,7 @@ def test_v78_release_identity_and_architecture_documents() -> None:
     assert __version__ == "0.1"
     assert __package_version__ == "0.1.0"
     assert (ROOT / "docs/architecture/V7_8_ARCHITECTURE_CONSOLIDATION.md").is_file()
-    assert (ROOT / "docs/adr/ADR_V78_ASYNC_IO_AND_CAPABILITY_LAYERS.md").is_file()
+    assert (ROOT / "docs/architecture/adr/0012-v7-8-async-io-and-capability-layers.md").is_file()
 
 
 def test_heavy_integrations_are_optional_capabilities() -> None:

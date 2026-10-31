@@ -1,4 +1,10 @@
-# ADR: Workflow Runtime Boundary
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
+# ADR: Recovery Boundary
 
 Status: Accepted — Phase 1 Architecture Freeze
 
@@ -8,11 +14,11 @@ Arenyxa 6.8 accumulated a mature Web/Workflow/Dataset/Recovery runtime. Phase 1 
 
 ## Decision
 
-WorkflowEngine owns deterministic node semantics; WorkflowDatasetService owns checkpoint/revision integration and resume consistency.
+RuntimeRecoveryService owns startup reconciliation of interrupted durable state.
 
 ## Consequence / invariant
 
-A resumed execution must not duplicate committed output or non-idempotent effects.
+Only defined invariants are repaired; ambiguity/corruption fails closed with diagnostics.
 
 ## Compatibility
 

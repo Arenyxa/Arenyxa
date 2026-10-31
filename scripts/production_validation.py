@@ -11,7 +11,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run Arenyxa isolated production/chaos validation gates.")
     parser.add_argument("--soak-jobs", type=int, default=256, help="bounded local durable-queue soak jobs (32..10000)")
     parser.add_argument("--multi-node-evidence", type=Path, default=None, help="optional real Server+2 Worker evidence JSON")
-    parser.add_argument("--output", type=Path, default=Path("production-validation-report.json"), help="JSON report destination")
+    parser.add_argument("--output", type=Path, default=Path("metadata/manifests/production-validation-report.json"), help="JSON report destination")
     args = parser.parse_args()
 
     def progress(message: str) -> None:

@@ -1,3 +1,9 @@
+---
+status: current
+owner: release
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa v8.0 Physical QA Release Checklist
 
 Use this checklist only for hardware-backed certification. Automated CI may verify logic and contracts, but must not mark these items as passed without a real Windows host or physical/VM lab configured for the item.

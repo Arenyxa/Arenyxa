@@ -34,12 +34,12 @@ def _status(report: dict[str, Any] | None, keys: tuple[str, ...]) -> str:
 
 
 def main() -> int:
-    enterprise = _read("ENTERPRISE_RELEASE_GATE.json")
-    quality = _read("FINAL_QUALITY_GATE.json")
-    performance = _read("PERFORMANCE_REGRESSION_GATE.json")
-    recovery = _read("FINAL_RECOVERY_VALIDATION.json")
-    production_config = _read("PRODUCTION_CONFIG_GATE.json")
-    production = _read("production-validation-report.json")
+    enterprise = _read("metadata/manifests/enterprise-release-gate.json")
+    quality = _read("metadata/manifests/final-quality-gate.json")
+    performance = _read("metadata/manifests/performance-regression-gate.json")
+    recovery = _read("metadata/manifests/final-recovery-validation.json")
+    production_config = _read("metadata/manifests/production-config-gate.json")
+    production = _read("metadata/manifests/production-validation-report.json")
 
     dimensions = {
         "architecture": _status(enterprise, ("release_ready",)),
@@ -71,7 +71,8 @@ def main() -> int:
             "production_config_gate": production_config,
         },
     }
-    destination = ROOT / "FINAL_ENTERPRISE_AUDIT_REPORT.json"
+    destination = ROOT / "metadata" / "manifests" / "final-enterprise-audit-report.json"
+    destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if local_ready else 1

@@ -1,3 +1,9 @@
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa Stable Local API Reference
 
 This document defines the small, stable application-facing surface that release tooling checks. Internal implementation modules may evolve without becoming compatibility promises.

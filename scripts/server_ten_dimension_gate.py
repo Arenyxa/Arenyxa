@@ -62,7 +62,7 @@ def main() -> int:
     parser.add_argument("--performance-report", type=Path, default=None)
     parser.add_argument("--http-performance-report", type=Path, default=None)
     parser.add_argument("--worker-performance-report", type=Path, default=None)
-    parser.add_argument("--output", type=Path, default=Path("server-ten-dimension-review.json"))
+    parser.add_argument("--output", type=Path, default=Path("metadata/manifests/server-ten-dimension-review.json"))
     args = parser.parse_args()
     modern = ROOT / "src" / "arenyxa"
     scripts = ROOT / "scripts"

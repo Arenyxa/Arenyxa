@@ -1,3 +1,9 @@
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa v8.0 Shared Platform Control Plane
 
 This document is the implementation map for the v8.0 application-service boundary. It supplements the preserved v7.8 execution architecture; it does not replace or bypass any existing capture, replay, proxy, protocol, enterprise, storage, recovery, plug-in, or automation service.

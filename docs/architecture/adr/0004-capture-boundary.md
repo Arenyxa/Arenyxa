@@ -1,4 +1,10 @@
-# ADR: Run Runtime Boundary
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
+# ADR: Capture Boundary
 
 Status: Accepted — Phase 1 Architecture Freeze
 
@@ -8,11 +14,11 @@ Arenyxa 6.8 accumulated a mature Web/Workflow/Dataset/Recovery runtime. Phase 1 
 
 ## Decision
 
-RunOrchestrator owns Run lifecycle, cancellation, progress and durable run-state transitions. HTTP/storage are adapters; UI cannot mutate Run truth directly.
+CaptureController owns adapter lifecycle, event buffering, session state and drop accounting.
 
 ## Consequence / invariant
 
-Retries are bounded and idempotency-aware; failure cannot leave UI state ahead of durable state.
+Backpressure may cause explicit bounded drops; it may not silently fabricate completeness.
 
 ## Compatibility
 

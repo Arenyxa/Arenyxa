@@ -1,4 +1,10 @@
-# ADR: Capture Boundary
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
+# ADR: Storage Boundary
 
 Status: Accepted — Phase 1 Architecture Freeze
 
@@ -8,11 +14,11 @@ Arenyxa 6.8 accumulated a mature Web/Workflow/Dataset/Recovery runtime. Phase 1 
 
 ## Decision
 
-CaptureController owns adapter lifecycle, event buffering, session state and drop accounting.
+SQLiteStore and atomic_io own transaction/atomic-write durability.
 
 ## Consequence / invariant
 
-Backpressure may cause explicit bounded drops; it may not silently fabricate completeness.
+Success is not reported before durable commit; callers do not bypass storage invariants.
 
 ## Compatibility
 

@@ -42,7 +42,9 @@ def main() -> int:
         "returncode": completed.returncode,
         "output_tail": completed.stdout[-8000:],
     }
-    (ROOT / "FINAL_RECOVERY_VALIDATION.json").write_text(
+    report_path = ROOT / "metadata" / "manifests" / "final-recovery-validation.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     print(json.dumps(payload, ensure_ascii=False, indent=2))

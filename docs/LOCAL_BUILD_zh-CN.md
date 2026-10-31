@@ -1,3 +1,9 @@
+---
+status: current
+owner: build
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa v0.1 本地编译与调试教程
 
 当前为 candidate / community unsigned / NOT READY FOR RELEASE。包版本 `0.1.0`，工程基线 `v8.2.0`，兼容身份 `6.8.0`。以下是源码运行和调试步骤；不代表干净 Windows 安装、GUI、原生能力或 legacy runtime 已验收。发布身份由 `scripts/verify_release_identity.py` 核验，实际交付边界见 [Windows 安装指南](WINDOWS_INSTALLER_zh-CN.md)。

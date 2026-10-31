@@ -1,3 +1,9 @@
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa v7.8 Architecture Consolidation
 
 Arenyxa v7.8 is an architecture-consolidation release. The goal is to preserve the hardened network/security feature set while reducing the cost of installing, testing, tracing, and changing the runtime.

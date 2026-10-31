@@ -1,3 +1,9 @@
+---
+status: current
+owner: security
+last_reviewed: 2026-10-28
+---
+
 # 安全说明
 
 权威安全政策保留在仓库根目录 [SECURITY.md](../SECURITY.md)。本页只提供公共文档入口，避免复制可能发生漂移的安全要求。

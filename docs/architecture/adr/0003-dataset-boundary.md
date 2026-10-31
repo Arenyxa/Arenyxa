@@ -1,4 +1,10 @@
-# ADR: Plugin Boundary
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
+# ADR: Dataset Boundary
 
 Status: Accepted — Phase 1 Architecture Freeze
 
@@ -8,11 +14,11 @@ Arenyxa 6.8 accumulated a mature Web/Workflow/Dataset/Recovery runtime. Phase 1 
 
 ## Decision
 
-PluginManager owns discovery/manifest compatibility; PluginSandbox/worker own isolated invocation.
+DatasetVersionService and DataLineageService own revision identity, ancestry and lineage evidence.
 
 ## Consequence / invariant
 
-Plugin failure or undeclared capability cannot become host-process authority.
+A revision is complete and attributable or is not exposed as ready.
 
 ## Compatibility
 

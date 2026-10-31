@@ -17,7 +17,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run Arenyxa bounded server concurrency and thread-safety validation.")
     parser.add_argument("--jobs", type=int, default=192)
     parser.add_argument("--workers", default="1,2,4,8,16,32")
-    parser.add_argument("--output", type=Path, default=Path("server-performance-report.json"))
+    parser.add_argument("--output", type=Path, default=Path("metadata/manifests/server-performance-report.json"))
     args = parser.parse_args()
     levels = [int(item.strip()) for item in args.workers.split(",") if item.strip()]
     report = ServerConcurrencyValidator(jobs_per_level=args.jobs, worker_levels=levels).run()

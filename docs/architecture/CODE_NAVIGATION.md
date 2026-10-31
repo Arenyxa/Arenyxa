@@ -1,3 +1,9 @@
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa v8.0 Code Navigation
 
 This document is the operational map for changing Arenyxa without creating architecture drift.

@@ -1,3 +1,9 @@
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
 # ADR 0010 — Workflow Test Lab is isolated from production execution state
 
 **Status:** Accepted for Phase 3  

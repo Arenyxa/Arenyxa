@@ -1,3 +1,9 @@
+---
+status: historical
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
 # ADR: v7.8 Async I/O and Capability Layers
 
 **Status:** Accepted for Arenyxa v7.8.

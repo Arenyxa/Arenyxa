@@ -1,4 +1,10 @@
-# ADR: Recovery Boundary
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
+# ADR: Plugin Boundary
 
 Status: Accepted — Phase 1 Architecture Freeze
 
@@ -8,11 +14,11 @@ Arenyxa 6.8 accumulated a mature Web/Workflow/Dataset/Recovery runtime. Phase 1 
 
 ## Decision
 
-RuntimeRecoveryService owns startup reconciliation of interrupted durable state.
+PluginManager owns discovery/manifest compatibility; PluginSandbox/worker own isolated invocation.
 
 ## Consequence / invariant
 
-Only defined invariants are repaired; ambiguity/corruption fails closed with diagnostics.
+Plugin failure or undeclared capability cannot become host-process authority.
 
 ## Compatibility
 

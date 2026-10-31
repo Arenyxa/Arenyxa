@@ -126,7 +126,7 @@ def _commands(env: dict[str, str]) -> list[Command]:
         ),
         Command(
             "postgresql_32_worker",
-            (py, "scripts/postgresql_32_worker_gate.py", "--dsn", env.get("ARENYXA_POSTGRES_TEST_DSN", ""), "--report", "POSTGRESQL_32_WORKER_GATE.json"),
+            (py, "scripts/postgresql_32_worker_gate.py", "--dsn", env.get("ARENYXA_POSTGRES_TEST_DSN", ""), "--report", "metadata/manifests/postgresql-32-worker-gate.json"),
             600,
             required_local=False,
             available=has_pg,
@@ -134,7 +134,7 @@ def _commands(env: dict[str, str]) -> list[Command]:
         ),
         Command(
             "windows_native",
-            (py, "scripts/windows_native_qualification.py", "--report", "WINDOWS_NATIVE_QUALIFICATION.json"),
+            (py, "scripts/windows_native_qualification.py", "--report", "metadata/manifests/windows-native-qualification.json"),
             900,
             required_local=False,
             available=is_windows,
@@ -145,7 +145,7 @@ def _commands(env: dict[str, str]) -> list[Command]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Arenyxa v0.1 final release validation and evidence collector")
-    parser.add_argument("--report", type=Path, default=ROOT / "V8_TEST_EVIDENCE.json")
+    parser.add_argument("--report", type=Path, default=ROOT / "metadata" / "manifests" / "v8-test-evidence.json")
     args = parser.parse_args(argv)
     env = dict(os.environ)
     env["PYTHONUTF8"] = "1"

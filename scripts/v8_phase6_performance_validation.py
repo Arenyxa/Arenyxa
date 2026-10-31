@@ -107,7 +107,7 @@ def _proxy_persistence_baseline(flows: int = 5_000) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", default="V8_PHASE6_PERFORMANCE_REPORT.json")
+    parser.add_argument("--output", default="metadata/manifests/v8-phase6-performance-report.json")
     args = parser.parse_args()
 
     telemetry = _telemetry_baseline()
@@ -143,6 +143,7 @@ def main() -> int:
         "passed": passed,
     }
     target = ROOT / args.output
+    target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if passed else 1

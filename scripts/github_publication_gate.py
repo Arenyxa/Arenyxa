@@ -16,10 +16,10 @@ REQUIRED_FILES = {
     '.gitattributes',
     '.gitignore',
     'LICENSE',
-    'NOTICE.md',
+    'docs/legal/notice.md',
     'README.md',
     'SECURITY.md',
-    'TRADEMARKS.md',
+    'docs/legal/trademarks.md',
     'pyproject.toml',
 }
 

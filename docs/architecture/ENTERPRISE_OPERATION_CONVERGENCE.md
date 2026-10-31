@@ -1,3 +1,9 @@
+---
+status: stable
+owner: architecture
+last_reviewed: 2026-10-28
+---
+
 # Enterprise Operation Convergence
 
 Arenyxa treats Enterprise ownership as a backend security property, never as a presentation/UI property.

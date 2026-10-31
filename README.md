@@ -6,9 +6,11 @@ Arenyxa is a Windows-first network inspection, proxy debugging, data collection 
 
 ## Status and evidence
 
-The current identity is recorded in [RELEASE_IDENTITY.json](RELEASE_IDENTITY.json), while [VERSIONING.md](VERSIONING.md) separates product, engineering, compatibility and schema versions. The current publication decision and validation scope are summarized in [docs/RELEASE_STATUS.md](docs/RELEASE_STATUS.md).
+Start with the [documentation index](docs/INDEX.md) for task-oriented navigation to current guides, architecture references, release status, and preserved historical evidence.
 
-The v0.1 source tree passed the release regression/integrity work recorded for this cycle after the release owner approved the current application icon. Representative automated GUI flows and release-owner manual GUI acceptance are recorded separately. The optional 24-hour soak was explicitly deferred as non-blocking and is not reported as passed. Independent clean-machine install/upgrade/rollback/uninstall qualification is not claimed by this source publication. Historical engineering audits remain indexed in [docs/RELEASE_HISTORY.md](docs/RELEASE_HISTORY.md).
+The current identity is recorded in [metadata/release-identity.json](metadata/release-identity.json), while [VERSIONING.md](VERSIONING.md) separates product, engineering, compatibility and schema versions. The current publication decision and validation scope are summarized in [docs/release/RELEASE_STATUS.md](docs/release/RELEASE_STATUS.md).
+
+The v0.1 source tree passed the release regression/integrity work recorded for this cycle after the release owner approved the current application icon. Representative automated GUI flows and release-owner manual GUI acceptance are recorded separately. The optional 24-hour soak was explicitly deferred as non-blocking and is not reported as passed. Independent clean-machine install/upgrade/rollback/uninstall qualification is not claimed by this source publication. Historical engineering audits remain indexed in [docs/release/history/RELEASE_HISTORY.md](docs/release/history/RELEASE_HISTORY.md).
 
 The modern lane targets Python 3.11–3.13 and PySide6. The frozen legacy lane targets Python 3.8/PySide2 on Windows 7 SP1 x64. **Legacy runtime, packaging and installation are NOT TESTED for this candidate.** Its matching version metadata is not a compatibility certification.
 

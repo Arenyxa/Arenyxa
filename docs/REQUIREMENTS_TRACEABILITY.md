@@ -1,3 +1,9 @@
+---
+status: current
+owner: engineering
+last_reviewed: 2026-10-28
+---
+
 # Arenyxa V6.0 需求追踪矩阵
 
 | 需求范围 | 设计/实现证据 | 验证证据 |

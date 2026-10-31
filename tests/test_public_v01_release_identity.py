@@ -25,7 +25,7 @@ def test_public_identity_is_independent_from_engineering_and_compatibility() -> 
 
 
 def test_public_source_identity_records_publication_without_signing() -> None:
-    identity = json.loads((ROOT / "RELEASE_IDENTITY.json").read_text(encoding="utf-8"))
+    identity = json.loads((ROOT / "metadata/release-identity.json").read_text(encoding="utf-8"))
     assert identity["release_status"] == "public"
     assert identity["release_readiness"] == "READY FOR SOURCE PUBLICATION"
     assert identity["github_public_release"] is True
@@ -59,8 +59,8 @@ def identity_source_tree(tmp_path: Path) -> Path:
         "src/arenyxa/__init__.py", "legacy/win7/src/arenyxa/__init__.py", "pyproject.toml",
         "packaging/version_info.txt", "packaging/installer.iss", "packaging/installer_win7.iss",
         "scripts/build.ps1", "scripts/build-win7.ps1", "scripts/build_release_attestation.py",
-        "RUN_ARENYXA.cmd", "RELEASE_IDENTITY.json", "docs/release/COMPATIBILITY_MATRIX.json",
-        "V8_2_RELEASE_IDENTITY.json",
+        "RUN_ARENYXA.cmd", "metadata/release-identity.json", "docs/release/COMPATIBILITY_MATRIX.json",
+        "docs/internal/history/2026/metadata/v8-2-release-identity.json",
     ):
         destination = tmp_path / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -76,7 +76,7 @@ def test_source_identity_gate_rejects_compatibility_drift_and_false_depromotion(
     with pytest.raises(RuntimeError, match="compatibility identity mismatch"):
         identity_gate.verify_identity(identity_source_tree)
     metadata.write_text(original, encoding="utf-8")
-    identity = identity_source_tree / "RELEASE_IDENTITY.json"
+    identity = identity_source_tree / "metadata/release-identity.json"
     value = json.loads(identity.read_text(encoding="utf-8"))
     value["github_public_release"] = False
     identity.write_text(json.dumps(value), encoding="utf-8")
